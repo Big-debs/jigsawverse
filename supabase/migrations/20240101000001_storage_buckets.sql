@@ -1,6 +1,6 @@
 -- =====================================================
 -- STORAGE BUCKETS AND POLICIES
--- File: supabase/migrations/20240101000003_storage_buckets.sql
+-- File: supabase/migrations/20240101000001_storage_buckets.sql
 -- =====================================================
 
 -- Create storage buckets
