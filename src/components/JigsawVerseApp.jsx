@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus } from 'lucide-react';
 
 // =====================================================
 // MOCK SERVICES (Replace with actual Supabase integration)
@@ -31,7 +31,7 @@ const mockGameService = {
     game_code: code,
     status: 'waiting'
   }),
-  joinGame: async (code, userId, userName) => ({ success: true })
+  joinGame: async () => ({ success: true })
 };
 
 // =====================================================
@@ -218,7 +218,7 @@ const HomeScreen = ({ onNavigate, setIsHost }) => {
           </div>
           <h3 className="text-2xl font-bold text-white mb-2">Join Game</h3>
           <p className="text-cyan-100">
-            Enter a game code to join your friend's puzzle challenge
+            Enter a game code to join your friend&apos;s puzzle challenge
           </p>
           <div className="mt-4 flex items-center text-white font-medium">
             <span>Enter Code</span>
@@ -500,7 +500,7 @@ const JoinGameScreen = ({ onGameJoined, onBack }) => {
 // GAMEPLAY SCREEN (Simplified Demo)
 // =====================================================
 
-const GameplayScreen = ({ gameData, isHost, onGameEnd, onExit }) => {
+const GameplayScreen = ({ isHost, onGameEnd, onExit }) => {
   const [myScore, setMyScore] = useState(0);
   const [opponentScore, setOpponentScore] = useState(0);
   const [moves, setMoves] = useState(0);
@@ -539,7 +539,7 @@ const GameplayScreen = ({ gameData, isHost, onGameEnd, onExit }) => {
           {isMyTurn ? (
             <p className="text-yellow-400 font-bold animate-pulse">Your Turn</p>
           ) : (
-            <p className="text-cyan-400">Opponent's Turn</p>
+            <p className="text-cyan-400">Opponent&apos;s Turn</p>
           )}
           <p className="text-purple-200 text-sm">Move {moves}/10</p>
         </div>

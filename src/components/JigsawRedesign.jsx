@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, Users, User, Play, Grid3x3, Clock, Gamepad2, ChevronRight, Image, Sparkles, Eye, Shuffle, RotateCcw, Maximize2, Check, X, Zap, Mail, Lock, LogIn, UserPlus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Upload, Users, User, Play, ChevronRight, Image, Eye, Shuffle, RotateCcw, Maximize2, Check, X, Zap, Mail, Lock, LogIn, UserPlus } from 'lucide-react';
 
 const JigsawRedesign = () => {
   const [currentScreen, setCurrentScreen] = useState('welcome');
   const [selectedImage, setSelectedImage] = useState(null);
-  const [showWelcome, setShowWelcome] = useState(true);
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [isLogin, setIsLogin] = useState(true);
   const [gameState, setGameState] = useState({
@@ -20,7 +19,8 @@ const JigsawRedesign = () => {
   useEffect(() => {
     if (currentScreen === 'welcome') {
       const timer = setTimeout(() => {
-        setShowWelcome(false);
+        // Welcome screen auto-advance
+        setCurrentScreen('login');
       }, 3000);
       return () => clearTimeout(timer);
     }
@@ -140,7 +140,7 @@ const JigsawRedesign = () => {
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-2">
             JIGSAW<span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">verse</span>
           </h2>
-          <p className="text-purple-200">Welcome back! Let's play.</p>
+          <p className="text-purple-200">Welcome back! Let&apos;s play.</p>
         </div>
 
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl">
@@ -207,7 +207,7 @@ const JigsawRedesign = () => {
               {isLogin ? (
                 <>
                   <LogIn className="w-5 h-5" />
-                  Login & Play
+                  Login &amp; Play
                 </>
               ) : (
                 <>

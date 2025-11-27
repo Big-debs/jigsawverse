@@ -4,7 +4,7 @@
 
 import { supabase } from '../config/supabase';
 import { gameService, realtimeService, storageService } from '../services';
-import { ImageProcessor, GameLogic } from '../lib/gameLogic';
+import { ImageProcessor, GameLogic } from './gameLogic';
 
 // =====================================================
 // 1. CREATE GAME (Host)
@@ -130,11 +130,11 @@ export class MultiplayerGameHost {
           console.log('Presence sync:', state);
           this.handlePresenceSync(state);
         })
-        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        .on('presence', { event: 'join' }, ({ newPresences }) => {
           console.log('Player joined:', newPresences);
           this.handlePlayerJoin(newPresences);
         })
-        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        .on('presence', { event: 'leave' }, ({ leftPresences }) => {
           console.log('Player left:', leftPresences);
           this.handlePlayerLeave(leftPresences);
         })
@@ -215,7 +215,6 @@ export class MultiplayerGameHost {
   async makeMove(pieceId, gridIndex) {
     if (!this.gameLogic) throw new Error('Game not initialized');
 
-    const user = await supabase.auth.getUser();
     const currentPlayer = 'playerA'; // Host is always playerA
 
     // Validate move locally first
@@ -499,223 +498,6 @@ export class MultiplayerGameGuest {
     }
   }
 }
-
-// =====================================================
-// 3. SERVER-SIDE VALIDATION (Supabase Edge Function)
-// File: supabase/functions/validate-move/index.ts
-// =====================================================
-
-/*
-// This runs on Supabase Edge (server-side)
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-serve(async (req) => {
-  try {
-    const { gameId, playerId, pieceId, gridIndex } = await req.json()
-
-    // Create Supabase client with service role key (server-side)
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    // 1. Get current game state
-    const { data: gameState, error: stateError } = await supabaseAdmin
-      .from('game_state')
-      .select('*')
-      .eq('game_id', gameId)
-      .single()
-
-    if (stateError) throw stateError
-
-    // 2. Validate it's player's turn
-    const game = await supabaseAdmin
-      .from('games')
-      .select('*')
-      .eq('id', gameId)
-      .single()
-
-    const isPlayerA = game.data.player_a_id === playerId
-    const currentTurn = gameState.current_turn
-    
-    if ((isPlayerA && currentTurn !== 'playerA') || 
-        (!isPlayerA && currentTurn !== 'playerB')) {
-      return new Response(
-        JSON.stringify({ error: 'Not your turn' }),
-        { status: 400 }
-      )
-    }
-
-    // 3. Validate piece placement
-    const piece = gameState.pieces.find(p => p.id === pieceId)
-    if (!piece) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid piece' }),
-        { status: 400 }
-      )
-    }
-
-    const isCorrect = piece.correctPosition === gridIndex
-
-    // 4. Calculate score changes
-    let scoreChange = isCorrect ? 10 : 0
-    let newStreak = isCorrect ? (isPlayerA ? gameState.player_a_streak + 1 : gameState.player_b_streak + 1) : 0
-
-    // Streak bonus
-    if (newStreak >= 3) {
-      scoreChange += Math.floor(newStreak / 3) * 2
-    }
-
-    // 5. Return validation result
-    return new Response(
-      JSON.stringify({
-        valid: true,
-        correct: isCorrect,
-        scoreChange,
-        newStreak
-      }),
-      { headers: { "Content-Type": "application/json" } }
-    )
-
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500 }
-    )
-  }
-})
-*/
-
-// =====================================================
-// 4. REACT COMPONENT USAGE
-// =====================================================
-
-export const MultiplayerGameExample = () => {
-  const [gameHost, setGameHost] = useState(null);
-  const [gameGuest, setGameGuest] = useState(null);
-  const [gameState, setGameState] = useState(null);
-  const [mode, setMode] = useState(null); // 'host' or 'guest'
-
-  // HOST: Create game
-  const handleCreateGame = async (imageFile, settings) => {
-    const host = new MultiplayerGameHost();
-    
-    // Set up callbacks
-    host.onStateUpdate = (state) => setGameState(state);
-    host.onOpponentJoin = (name) => alert(`${name} joined the game!`);
-    host.onPlayerLeave = () => alert('Opponent disconnected');
-    
-    const result = await host.createGame(imageFile, settings);
-    
-    setGameHost(host);
-    setMode('host');
-    setGameState(host.gameLogic.getGameState());
-    
-    // Show game code to share
-    alert(`Share this code with your opponent: ${result.gameCode}`);
-    
-    return result;
-  };
-
-  // GUEST: Join game
-  const handleJoinGame = async (gameCode) => {
-    const guest = new MultiplayerGameGuest();
-    
-    // Set up callbacks
-    guest.onStateUpdate = (state) => setGameState(state);
-    guest.onGameUpdate = (game) => {
-      if (game.status === 'active') {
-        alert('Game started!');
-      }
-    };
-    
-    const result = await guest.joinGame(gameCode);
-    
-    setGameGuest(guest);
-    setMode('guest');
-    setGameState(result.gameState);
-    
-    return result;
-  };
-
-  // Make a move
-  const handlePlacePiece = async (pieceId, gridIndex) => {
-    try {
-      const player = mode === 'host' ? gameHost : gameGuest;
-      const result = await player.makeMove(pieceId, gridIndex);
-      
-      if (result.awaitingCheck) {
-        // UI shows check/pass buttons
-      }
-    } catch (error) {
-      alert(error.message);
-    }
-  };
-
-  // Respond to check
-  const handleCheckResponse = async (decision) => {
-    const player = mode === 'host' ? gameHost : gameGuest;
-    const result = await player.respondToCheck(decision);
-    // Handle result
-  };
-
-  return (
-    <div>
-      {/* UI implementation here */}
-    </div>
-  );
-};
-
-// =====================================================
-// 5. COMPLETE FLOW DIAGRAM
-// =====================================================
-
-/*
-MULTIPLAYER FLOW:
-
-1. HOST CREATES GAME:
-   [Host] -> Upload Image
-   [Host] -> Process Image into Pieces
-   [Supabase] <- Create game record (gets game_code)
-   [Supabase] <- Create game_state record
-   [Host] <- Receives game_code (e.g., "A4B7C2")
-   [Host] -> Subscribe to realtime channel
-   [Host] -> Track presence
-
-2. GUEST JOINS:
-   [Guest] -> Enter game_code
-   [Supabase] <- Query game by code
-   [Supabase] -> Return game data
-   [Supabase] <- Update game.player_b_id
-   [Supabase] <- Set game.status = 'active'
-   [Guest] -> Subscribe to realtime channel
-   [Guest] -> Track presence
-   [Host] <- Receives "player joined" event
-
-3. GAMEPLAY LOOP:
-   [Player A] -> Place piece
-   [Supabase] <- Update game_state (grid, racks, turn)
-   [Player B] <- Receives state update via realtime
-   [Player B] -> UI updates automatically
-   
-   [Player B] -> Check or Pass
-   [Supabase] <- Update game_state (pending_check handled)
-   [Player A] <- Receives decision
-   
-   [Repeat until game complete]
-
-4. GAME END:
-   [Supabase] <- Update game.status = 'completed'
-   [Supabase] <- Update user_stats for both players
-   [Both Players] <- Show game over screen
-
-5. DISCONNECT HANDLING:
-   [Player] -> Closes browser/disconnects
-   [Supabase] <- Presence "leave" event
-   [Other Player] <- Receives disconnect notification
-   [Supabase] <- Game.status = 'abandoned' (after timeout)
-*/
 
 export default {
   MultiplayerGameHost,
