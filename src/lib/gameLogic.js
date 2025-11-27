@@ -469,44 +469,6 @@ export class GameLogic {
   }
 }
 
-// =====================================================
-// USAGE EXAMPLE
-// =====================================================
-
-/*
-// 1. Process Image
-const processor = new ImageProcessor('path/to/image.jpg', 10);
-const { pieces, gridDimensions } = await processor.sliceImage();
-
-// 2. Initialize Game
-const game = new GameLogic(gridDimensions.totalPieces, pieces);
-game.initialize();
-
-// 3. Player A places a piece
-const result = game.placePiece('playerA', pieceId, gridIndex);
-
-// 4. Player B decides to check or pass
-if (result.awaitingCheck) {
-  const checkResult = game.handleOpponentCheck('playerB', 'check'); // or 'pass'
-  
-  if (checkResult.awaitingPlacerDecision) {
-    // Player A can now check or pass
-    const placerResult = game.handlePlacerCheck('playerA', 'pass'); // or 'check'
-  }
-}
-
-// 5. Get current game state
-const state = game.getGameState();
-
-// 6. Export to Firebase
-const firebaseData = game.exportForFirebase();
-await databaseService.updateGame(gameId, firebaseData);
-*/
-
-// =====================================================
-// EXPORT
-// =====================================================
-
 export default {
   ImageProcessor,
   GameLogic
