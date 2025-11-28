@@ -83,4 +83,34 @@ export const createPresenceChannel = () => {
   return supabase.channel('presence');
 };
 
+// Helper to check connection
+export const checkConnection = async () => {
+  try {
+    const { error } = await supabase.from('games').select('count').limit(1);
+    return !error;
+  } catch (err) {
+    console.error('Supabase connection failed:', err);
+    return false;
+  }
+};
+
+// Centralized error handler for API responses
+export const handleApiError = (error) => {
+  console.error('API Error:', error);
+  
+  if (error.code === 'PGRST116') {
+    return 'Resource not found';
+  }
+  
+  if (error.code === '23505') {
+    return 'Duplicate entry';
+  }
+  
+  if (error.message?.includes('JWT')) {
+    return 'Session expired. Please login again.';
+  }
+  
+  return error.message || 'An unexpected error occurred';
+};
+
 export default supabase;
