@@ -4,6 +4,13 @@
 
 import { supabase } from '../config/supabase';
 
+// Configuration constants
+const LEADERBOARD_CONFIG = {
+  DEFAULT_LIMIT: 50,
+  MIN_GAMES_FOR_WIN_RATE: 5,
+  MIN_GAMES_FOR_ACCURACY: 5
+};
+
 /**
  * Leaderboard API - Provides endpoints for leaderboard data
  */
@@ -77,24 +84,31 @@ export const leaderboardApi = {
   },
 
   /**
-   * Get leaderboard by win rate (minimum 5 games)
+   * Get leaderboard by win rate (minimum games required)
+   * Note: Uses in-memory sorting for win rate since Supabase doesn't support 
+   * computed column ordering. For large datasets, consider using a database view
+   * or stored procedure with window functions.
    * @param {number} limit - Maximum entries to return
    * @param {number} offset - Offset for pagination
    * @param {number} minGames - Minimum games played to qualify
    * @returns {Promise<Array>} Leaderboard entries
    */
-  async getWinRateLeaderboard(limit = 50, offset = 0, minGames = 5) {
+  async getWinRateLeaderboard(limit = LEADERBOARD_CONFIG.DEFAULT_LIMIT, offset = 0, minGames = LEADERBOARD_CONFIG.MIN_GAMES_FOR_WIN_RATE) {
+    // For optimal performance with large datasets, consider creating a database view
+    // that pre-calculates win_rate: (games_won::float / games_played * 100)
     const { data, error } = await supabase
       .from('user_stats')
       .select(`
         *,
         profiles!inner(id, username, display_name, avatar_url)
       `)
-      .gte('games_played', minGames);
+      .gte('games_played', minGames)
+      .gt('games_won', 0);
 
     if (error) throw error;
 
-    // Calculate win rate and sort
+    // Calculate win rate and sort (in-memory due to Supabase limitations)
+    // For better scalability, create a materialized view with pre-calculated win_rate
     const sorted = data
       .map(entry => ({
         ...entry,
@@ -179,36 +193,67 @@ export const leaderboardApi = {
 
   /**
    * Get user's position on the global leaderboard
+   * Note: For large user bases, consider using a PostgreSQL function with
+   * window functions (ROW_NUMBER() OVER (ORDER BY total_score DESC)) for
+   * better performance. Example:
+   * SELECT *, ROW_NUMBER() OVER (ORDER BY total_score DESC) as rank
+   * FROM user_stats WHERE user_id = $1
    * @param {string} userId - User UUID
    * @returns {Promise<Object>} User's rank and surrounding entries
    */
   async getUserLeaderboardPosition(userId) {
-    const { data, error } = await supabase
+    // First, get the user's stats and count of players with higher scores
+    const { data: userStats, error: userError } = await supabase
       .from('user_stats')
       .select(`
         *,
         profiles!inner(id, username, display_name, avatar_url)
       `)
-      .order('total_score', { ascending: false });
+      .eq('user_id', userId)
+      .single();
 
-    if (error) throw error;
+    if (userError && userError.code !== 'PGRST116') throw userError;
 
-    const userIndex = data.findIndex(entry => entry.user_id === userId);
-    
-    if (userIndex === -1) {
+    // Get total count
+    const { count: totalPlayers, error: countError } = await supabase
+      .from('user_stats')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) throw countError;
+
+    if (!userStats) {
       return {
-        rank: data.length + 1,
-        totalPlayers: data.length,
+        rank: totalPlayers + 1,
+        totalPlayers: totalPlayers || 0,
         userStats: null,
         nearbyPlayers: []
       };
     }
 
-    // Get 2 players above and below
-    const start = Math.max(0, userIndex - 2);
-    const end = Math.min(data.length, userIndex + 3);
-    const nearbyPlayers = data.slice(start, end).map((entry, idx) => ({
-      rank: start + idx + 1,
+    // Count players with higher scores to determine rank
+    const { count: higherScores, error: rankError } = await supabase
+      .from('user_stats')
+      .select('*', { count: 'exact', head: true })
+      .gt('total_score', userStats.total_score);
+
+    if (rankError) throw rankError;
+
+    const userRank = (higherScores || 0) + 1;
+
+    // Get nearby players (2 above and 2 below)
+    const { data: nearbyData, error: nearbyError } = await supabase
+      .from('user_stats')
+      .select(`
+        *,
+        profiles!inner(id, username, display_name, avatar_url)
+      `)
+      .order('total_score', { ascending: false })
+      .range(Math.max(0, userRank - 3), userRank + 1);
+
+    if (nearbyError) throw nearbyError;
+
+    const nearbyPlayers = nearbyData.map((entry, idx) => ({
+      rank: Math.max(0, userRank - 2) + idx + 1,
       userId: entry.user_id,
       username: entry.profiles.username,
       displayName: entry.profiles.display_name,
@@ -217,17 +262,15 @@ export const leaderboardApi = {
       isCurrentUser: entry.user_id === userId
     }));
 
-    const userEntry = data[userIndex];
-
     return {
-      rank: userIndex + 1,
-      totalPlayers: data.length,
+      rank: userRank,
+      totalPlayers: totalPlayers || 0,
       userStats: {
-        totalScore: userEntry.total_score,
-        gamesPlayed: userEntry.games_played,
-        gamesWon: userEntry.games_won,
-        winRate: userEntry.games_played > 0 
-          ? Math.round((userEntry.games_won / userEntry.games_played) * 100) 
+        totalScore: userStats.total_score,
+        gamesPlayed: userStats.games_played,
+        gamesWon: userStats.games_won,
+        winRate: userStats.games_played > 0 
+          ? Math.round((userStats.games_won / userStats.games_played) * 100) 
           : 0
       },
       nearbyPlayers

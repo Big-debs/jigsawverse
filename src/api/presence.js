@@ -5,6 +5,12 @@
 import { supabase } from '../config/supabase';
 import { realtimeService } from '../services/realtime.service';
 
+// Configuration constants
+const PRESENCE_CONFIG = {
+  // Time in milliseconds before a player is considered offline
+  ONLINE_TIMEOUT_MS: 5 * 60 * 1000 // 5 minutes
+};
+
 /**
  * Presence API - Provides endpoints for player presence tracking
  */
@@ -98,14 +104,14 @@ export const presenceApi = {
    * @returns {Promise<number>} Count of online players
    */
   async getOnlineCount() {
-    // Consider players online if seen in last 5 minutes
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    // Consider players online if seen within the configured timeout
+    const timeoutThreshold = new Date(Date.now() - PRESENCE_CONFIG.ONLINE_TIMEOUT_MS).toISOString();
     
     const { count, error } = await supabase
       .from('player_presence')
       .select('*', { count: 'exact', head: true })
       .eq('is_online', true)
-      .gte('last_seen', fiveMinutesAgo);
+      .gte('last_seen', timeoutThreshold);
 
     if (error) throw error;
     return count;
