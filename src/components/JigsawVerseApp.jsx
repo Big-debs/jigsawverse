@@ -101,6 +101,31 @@ class ConnectionManager {
   }
 }
 
+// Heartbeat configuration
+const HEARTBEAT_CONFIG = {
+  INTERVAL: 60000, // 60 seconds - reduced frequency for less database load
+};
+
+/**
+ * Create a lightweight heartbeat function for connection monitoring
+ * Uses the Supabase realtime connection status instead of database queries
+ * @param {Object} multiplayerRef - Reference to multiplayer instance
+ * @returns {Function} Heartbeat check function
+ */
+function createHeartbeatCheck(multiplayerRef) {
+  return async () => {
+    if (!multiplayerRef.current) {
+      throw new Error('No active connection');
+    }
+    // Check if the multiplayer instance reports as connected
+    if (!multiplayerRef.current.isConnected) {
+      throw new Error('Connection lost');
+    }
+    // Connection is healthy
+    return true;
+  };
+}
+
 // =====================================================
 // APP ROUTES
 // =====================================================
@@ -518,12 +543,11 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, onGameCreat
       });
       connectionManager.updateStatus(CONNECTION_STATUS.CONNECTED);
 
-      // Start heartbeat for connection monitoring
-      connectionManager.startHeartbeat(async () => {
-        // Simple ping to check connection
-        const { error } = await supabase.from('games').select('id').eq('id', result.gameId).single();
-        if (error) throw error;
-      });
+      // Start lightweight heartbeat for connection monitoring
+      connectionManager.startHeartbeat(
+        createHeartbeatCheck(multiplayerRef),
+        HEARTBEAT_CONFIG.INTERVAL
+      );
 
       setProgress('Game created!');
       
@@ -685,10 +709,28 @@ const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
     };
   }, [multiplayerRef, onGameStart]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(gameCode || '');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(gameCode || '');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      // Fallback for browsers that don't support clipboard API
+      console.warn('Clipboard API not supported:', err);
+      // Create a temporary input element for fallback
+      const textArea = document.createElement('textarea');
+      textArea.value = gameCode || '';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (fallbackErr) {
+        console.error('Fallback copy failed:', fallbackErr);
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   return (
@@ -776,11 +818,11 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
       });
       connectionManager.updateStatus(CONNECTION_STATUS.CONNECTED);
 
-      // Start heartbeat for connection monitoring
-      connectionManager.startHeartbeat(async () => {
-        const { error } = await supabase.from('games').select('id').eq('id', result.gameId).single();
-        if (error) throw error;
-      });
+      // Start lightweight heartbeat for connection monitoring
+      connectionManager.startHeartbeat(
+        createHeartbeatCheck(multiplayerRef),
+        HEARTBEAT_CONFIG.INTERVAL
+      );
 
       setProgress('Game joined!');
       

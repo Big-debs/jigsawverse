@@ -17,6 +17,26 @@ const CHANNEL_STATUS = {
   TIMED_OUT: 'TIMED_OUT'
 };
 
+// Reconnection configuration constants
+const RECONNECT_CONFIG = {
+  BASE_DELAY: 1000,        // Base delay in milliseconds
+  MAX_DELAY: 30000,        // Maximum delay (30 seconds)
+  MAX_ATTEMPTS: 5,         // Maximum reconnection attempts
+  CHANNEL_TIMEOUT: 30000   // Channel subscription timeout (30 seconds)
+};
+
+/**
+ * Calculate exponential backoff delay for reconnection
+ * @param {number} attempt - Current attempt number
+ * @returns {number} Delay in milliseconds
+ */
+function calculateReconnectDelay(attempt) {
+  return Math.min(
+    RECONNECT_CONFIG.BASE_DELAY * Math.pow(2, attempt),
+    RECONNECT_CONFIG.MAX_DELAY
+  );
+}
+
 // =====================================================
 // 1. CREATE GAME (Host)
 // =====================================================
@@ -29,7 +49,7 @@ export class MultiplayerGameHost {
     this.presenceChannel = null;
     this.isConnected = false;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
+    this.maxReconnectAttempts = RECONNECT_CONFIG.MAX_ATTEMPTS;
   }
 
   /**
@@ -114,7 +134,7 @@ export class MultiplayerGameHost {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error('Channel subscription timeout'));
-      }, 30000); // 30 second timeout
+      }, RECONNECT_CONFIG.CHANNEL_TIMEOUT);
 
       const channel = supabase
         .channel(`game:${gameId}`, {
@@ -213,7 +233,7 @@ export class MultiplayerGameHost {
     }
 
     this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    const delay = calculateReconnectDelay(this.reconnectAttempts);
     
     console.log(`Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
     
@@ -415,7 +435,7 @@ export class MultiplayerGameGuest {
     this.presenceChannel = null;
     this.isConnected = false;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
+    this.maxReconnectAttempts = RECONNECT_CONFIG.MAX_ATTEMPTS;
   }
 
   /**
@@ -486,7 +506,7 @@ export class MultiplayerGameGuest {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error('Channel subscription timeout'));
-      }, 30000);
+      }, RECONNECT_CONFIG.CHANNEL_TIMEOUT);
 
       const channel = supabase
         .channel(`game:${gameId}`, {
@@ -575,7 +595,7 @@ export class MultiplayerGameGuest {
     }
 
     this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    const delay = calculateReconnectDelay(this.reconnectAttempts);
     
     console.log(`Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
     

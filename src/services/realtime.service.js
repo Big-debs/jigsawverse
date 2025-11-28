@@ -160,28 +160,39 @@ export const realtimeService = {
     return channel;
   },
 
-  // Get presence state for a game
-  async getPresenceState(gameId) {
-    const channel = supabase.channel(`presence:${gameId}`);
+  // Get presence state for a game (requires existing channel)
+  getPresenceState(channel) {
+    if (!channel) {
+      console.warn('No channel provided to getPresenceState');
+      return {};
+    }
     return channel.presenceState();
   },
 
   // Broadcast a custom event to all players in the game
   async broadcastEvent(gameId, eventType, payload) {
-    const channel = supabase.channel(`broadcast:${gameId}`);
-    
-    await channel.subscribe();
-    
-    channel.send({
-      type: 'broadcast',
-      event: eventType,
-      payload
+    return new Promise((resolve, reject) => {
+      const channel = supabase.channel(`broadcast:${gameId}`);
+      
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: eventType,
+            payload
+          }).then(() => {
+            // Cleanup after successful send with a small delay
+            setTimeout(async () => {
+              await supabase.removeChannel(channel);
+              resolve();
+            }, 500);
+          }).catch((err) => {
+            supabase.removeChannel(channel);
+            reject(err);
+          });
+        }
+      });
     });
-
-    // Cleanup after sending
-    setTimeout(() => {
-      supabase.removeChannel(channel);
-    }, 1000);
   },
 
   // Listen for custom broadcast events
