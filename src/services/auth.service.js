@@ -104,6 +104,26 @@ export const authService = {
   // Listen to auth state changes
   onAuthStateChange(callback) {
     return supabase.auth.onAuthStateChange(callback);
+  },
+
+  // Reset password
+  async resetPassword(email) {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`
+    });
+
+    if (error) throw error;
+    return data;
+  },
+
+  // Update user metadata via auth
+  async updateUserMetadata(updates) {
+    const { data, error } = await supabase.auth.updateUser({
+      data: updates
+    });
+
+    if (error) throw error;
+    return data;
   }
 };
 

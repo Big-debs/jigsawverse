@@ -104,6 +104,50 @@ export const storageService = {
     const { data, error } = await query;
     if (error) throw error;
     return data;
+  },
+
+  // Get image URL from storage path
+  getImageUrl(path) {
+    const { data } = supabase.storage
+      .from(STORAGE_BUCKETS.PUZZLE_IMAGES)
+      .getPublicUrl(path);
+
+    return data.publicUrl;
+  },
+
+  // Upload avatar
+  async uploadAvatar(userId, file) {
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${userId}/avatar.${fileExt}`;
+
+    const { error } = await supabase.storage
+      .from(STORAGE_BUCKETS.AVATARS)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (error) throw error;
+
+    const { data: urlData } = supabase.storage
+      .from(STORAGE_BUCKETS.AVATARS)
+      .getPublicUrl(filePath);
+
+    return urlData.publicUrl;
+  },
+
+  // List user's images from storage
+  async listUserImages(userId) {
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKETS.PUZZLE_IMAGES)
+      .list(`${userId}/`, {
+        limit: 100,
+        offset: 0,
+        sortBy: { column: 'created_at', order: 'desc' }
+      });
+
+    if (error) throw error;
+    return data;
   }
 };
 

@@ -175,6 +175,36 @@ export const gameService = {
       .eq('id', gameId);
 
     if (error) throw error;
+  },
+
+  // Get user's game history (both completed and in-progress)
+  async getUserGames(userId, limit = 10) {
+    const { data, error } = await supabase
+      .from('games')
+      .select('*')
+      .or(`player_a_id.eq.${userId},player_b_id.eq.${userId}`)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data;
+  },
+
+  // End game with winner
+  async endGame(gameId, winnerId) {
+    const { data, error } = await supabase
+      .from('games')
+      .update({
+        status: 'completed',
+        winner_id: winnerId,
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', gameId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 };
 
