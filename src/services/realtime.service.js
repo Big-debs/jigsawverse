@@ -51,10 +51,16 @@ export const realtimeService = {
     return data;
   },
 
-  // Subscribe to game state changes
-  subscribeToGameState(gameId, callback) {
+  // Subscribe to game state changes with reconnection support
+  subscribeToGameState(gameId, callback, onStatusChange = null) {
     const channel = supabase
-      .channel(`game_state:${gameId}`)
+      .channel(`game_state:${gameId}`, {
+        config: {
+          broadcast: {
+            self: false
+          }
+        }
+      })
       .on(
         'postgres_changes',
         {
@@ -65,15 +71,25 @@ export const realtimeService = {
         },
         (payload) => callback(payload.new)
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (onStatusChange) {
+          onStatusChange(status);
+        }
+      });
 
     return () => supabase.removeChannel(channel);
   },
 
-  // Subscribe to game changes
-  subscribeToGame(gameId, callback) {
+  // Subscribe to game changes with reconnection support
+  subscribeToGame(gameId, callback, onStatusChange = null) {
     const channel = supabase
-      .channel(`game:${gameId}`)
+      .channel(`game:${gameId}`, {
+        config: {
+          broadcast: {
+            self: false
+          }
+        }
+      })
       .on(
         'postgres_changes',
         {
@@ -84,12 +100,16 @@ export const realtimeService = {
         },
         (payload) => callback(payload.new || payload.old)
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (onStatusChange) {
+          onStatusChange(status);
+        }
+      });
 
     return () => supabase.removeChannel(channel);
   },
 
-  // Presence tracking
+  // Enhanced presence tracking with heartbeat
   async trackPresence(gameId, userId, userName) {
     const channel = supabase.channel(`presence:${gameId}`, {
       config: {
@@ -99,17 +119,92 @@ export const realtimeService = {
       }
     });
 
+    let heartbeatInterval = null;
+
     await channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
+        // Initial presence track
         await channel.track({
           user_id: userId,
           user_name: userName,
-          online_at: new Date().toISOString()
+          online_at: new Date().toISOString(),
+          last_heartbeat: new Date().toISOString()
         });
+
+        // Setup heartbeat to keep presence alive
+        heartbeatInterval = setInterval(async () => {
+          try {
+            await channel.track({
+              user_id: userId,
+              user_name: userName,
+              online_at: new Date().toISOString(),
+              last_heartbeat: new Date().toISOString()
+            });
+          } catch (err) {
+            console.error('Presence heartbeat error:', err);
+          }
+        }, 30000); // Every 30 seconds
       }
     });
 
+    // Return channel with cleanup function
+    const cleanup = async () => {
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+      await channel.untrack();
+      await supabase.removeChannel(channel);
+    };
+
+    channel.cleanup = cleanup;
     return channel;
+  },
+
+  // Get presence state for a game (requires existing channel)
+  getPresenceState(channel) {
+    if (!channel) {
+      console.warn('No channel provided to getPresenceState');
+      return {};
+    }
+    return channel.presenceState();
+  },
+
+  // Broadcast a custom event to all players in the game
+  async broadcastEvent(gameId, eventType, payload) {
+    return new Promise((resolve, reject) => {
+      const channel = supabase.channel(`broadcast:${gameId}`);
+      
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: eventType,
+            payload
+          }).then(() => {
+            // Cleanup after successful send with a small delay
+            setTimeout(async () => {
+              await supabase.removeChannel(channel);
+              resolve();
+            }, 500);
+          }).catch((err) => {
+            supabase.removeChannel(channel);
+            reject(err);
+          });
+        }
+      });
+    });
+  },
+
+  // Listen for custom broadcast events
+  subscribeToEvents(gameId, eventType, callback) {
+    const channel = supabase
+      .channel(`broadcast:${gameId}`)
+      .on('broadcast', { event: eventType }, (payload) => {
+        callback(payload.payload);
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }
 };
 
