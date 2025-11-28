@@ -118,8 +118,7 @@ export const storageService = {
   // Upload avatar
   async uploadAvatar(userId, file) {
     const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}/avatar.${fileExt}`;
-    const filePath = fileName;
+    const filePath = `${userId}/avatar.${fileExt}`;
 
     const { error } = await supabase.storage
       .from(STORAGE_BUCKETS.AVATARS)

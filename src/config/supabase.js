@@ -86,7 +86,7 @@ export const createPresenceChannel = () => {
 // Helper to check connection
 export const checkConnection = async () => {
   try {
-    const { error } = await supabase.from('games').select('count').limit(1);
+    const { error } = await supabase.auth.getSession();
     return !error;
   } catch (err) {
     console.error('Supabase connection failed:', err);
