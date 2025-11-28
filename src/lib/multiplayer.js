@@ -7,6 +7,17 @@ import { gameService, realtimeService, storageService } from '../services';
 import { ImageProcessor, GameLogic } from './gameLogic';
 
 // =====================================================
+// CONNECTION STATE CONSTANTS
+// =====================================================
+
+const CHANNEL_STATUS = {
+  SUBSCRIBED: 'SUBSCRIBED',
+  CLOSED: 'CLOSED',
+  CHANNEL_ERROR: 'CHANNEL_ERROR',
+  TIMED_OUT: 'TIMED_OUT'
+};
+
+// =====================================================
 // 1. CREATE GAME (Host)
 // =====================================================
 
@@ -15,6 +26,10 @@ export class MultiplayerGameHost {
     this.gameId = null;
     this.gameLogic = null;
     this.realtimeChannel = null;
+    this.presenceChannel = null;
+    this.isConnected = false;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
   }
 
   /**
@@ -75,7 +90,7 @@ export class MultiplayerGameHost {
 
       console.log('Step 7: Setting up presence tracking...');
       // 7. Track host presence
-      await realtimeService.trackPresence(game.id, userId, userName);
+      this.presenceChannel = await realtimeService.trackPresence(game.id, userId, userName);
 
       console.log('✅ Game created successfully!');
       return {
@@ -96,9 +111,18 @@ export class MultiplayerGameHost {
    * Setup realtime channel for game updates
    */
   setupRealtimeChannel(gameId) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Channel subscription timeout'));
+      }, 30000); // 30 second timeout
+
       const channel = supabase
-        .channel(`game:${gameId}`)
+        .channel(`game:${gameId}`, {
+          config: {
+            broadcast: { self: false },
+            presence: { key: this.gameId }
+          }
+        })
         .on(
           'postgres_changes',
           {
@@ -139,14 +163,78 @@ export class MultiplayerGameHost {
           this.handlePlayerLeave(leftPresences);
         })
         .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
+          console.log('Channel status:', status);
+          
+          if (status === CHANNEL_STATUS.SUBSCRIBED) {
+            clearTimeout(timeoutId);
+            this.isConnected = true;
+            this.reconnectAttempts = 0;
             console.log('Subscribed to game channel');
+            
+            // Notify connection status
+            if (this.onConnectionChange) {
+              this.onConnectionChange('connected');
+            }
+            
             resolve(channel);
+          } else if (status === CHANNEL_STATUS.CHANNEL_ERROR || status === CHANNEL_STATUS.TIMED_OUT) {
+            this.isConnected = false;
+            console.error('Channel error:', status);
+            
+            if (this.onConnectionChange) {
+              this.onConnectionChange('error');
+            }
+            
+            // Attempt reconnection
+            this.attemptReconnect();
+          } else if (status === CHANNEL_STATUS.CLOSED) {
+            this.isConnected = false;
+            
+            if (this.onConnectionChange) {
+              this.onConnectionChange('disconnected');
+            }
           }
         });
 
       return channel;
     });
+  }
+
+  /**
+   * Attempt to reconnect to the channel
+   */
+  async attemptReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('Max reconnection attempts reached');
+      if (this.onConnectionChange) {
+        this.onConnectionChange('failed');
+      }
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    
+    console.log(`Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    
+    if (this.onConnectionChange) {
+      this.onConnectionChange('reconnecting');
+    }
+
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    try {
+      // Remove old channel and create new one
+      if (this.realtimeChannel) {
+        await supabase.removeChannel(this.realtimeChannel);
+      }
+      
+      this.realtimeChannel = await this.setupRealtimeChannel(this.gameId);
+      console.log('Reconnection successful');
+    } catch (err) {
+      console.error('Reconnection failed:', err);
+      this.attemptReconnect();
+    }
   }
 
   /**
@@ -276,9 +364,42 @@ export class MultiplayerGameHost {
    * Cleanup and disconnect
    */
   async disconnect() {
-    if (this.realtimeChannel) {
-      await supabase.removeChannel(this.realtimeChannel);
+    this.isConnected = false;
+    
+    // Cleanup presence channel
+    if (this.presenceChannel) {
+      try {
+        if (this.presenceChannel.cleanup) {
+          await this.presenceChannel.cleanup();
+        } else {
+          await supabase.removeChannel(this.presenceChannel);
+        }
+      } catch (err) {
+        console.error('Error cleaning up presence channel:', err);
+      }
+      this.presenceChannel = null;
     }
+
+    // Cleanup realtime channel
+    if (this.realtimeChannel) {
+      try {
+        await supabase.removeChannel(this.realtimeChannel);
+      } catch (err) {
+        console.error('Error cleaning up realtime channel:', err);
+      }
+      this.realtimeChannel = null;
+    }
+
+    // Clear callbacks
+    this.onStateUpdate = null;
+    this.onGameUpdate = null;
+    this.onPresenceUpdate = null;
+    this.onPlayerJoin = null;
+    this.onPlayerLeave = null;
+    this.onOpponentJoin = null;
+    this.onConnectionChange = null;
+
+    console.log('Disconnected from game');
   }
 }
 
@@ -291,6 +412,10 @@ export class MultiplayerGameGuest {
     this.gameId = null;
     this.gameLogic = null;
     this.realtimeChannel = null;
+    this.presenceChannel = null;
+    this.isConnected = false;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
   }
 
   /**
@@ -339,7 +464,7 @@ export class MultiplayerGameGuest {
 
       console.log('Step 6: Tracking presence...');
       // 6. Track presence
-      await realtimeService.trackPresence(game.id, userId, userName);
+      this.presenceChannel = await realtimeService.trackPresence(game.id, userId, userName);
 
       console.log('✅ Successfully joined game!');
       return {
@@ -355,12 +480,21 @@ export class MultiplayerGameGuest {
   }
 
   /**
-   * Setup realtime channel (same as host)
+   * Setup realtime channel with reconnection support
    */
   setupRealtimeChannel(gameId) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Channel subscription timeout'));
+      }, 30000);
+
       const channel = supabase
-        .channel(`game:${gameId}`)
+        .channel(`game:${gameId}`, {
+          config: {
+            broadcast: { self: false },
+            presence: { key: this.gameId }
+          }
+        })
         .on(
           'postgres_changes',
           {
@@ -393,14 +527,75 @@ export class MultiplayerGameGuest {
           this.handlePresenceSync(state);
         })
         .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
+          console.log('Channel status:', status);
+          
+          if (status === CHANNEL_STATUS.SUBSCRIBED) {
+            clearTimeout(timeoutId);
+            this.isConnected = true;
+            this.reconnectAttempts = 0;
             console.log('Subscribed to game channel');
+            
+            if (this.onConnectionChange) {
+              this.onConnectionChange('connected');
+            }
+            
             resolve(channel);
+          } else if (status === CHANNEL_STATUS.CHANNEL_ERROR || status === CHANNEL_STATUS.TIMED_OUT) {
+            this.isConnected = false;
+            console.error('Channel error:', status);
+            
+            if (this.onConnectionChange) {
+              this.onConnectionChange('error');
+            }
+            
+            this.attemptReconnect();
+          } else if (status === CHANNEL_STATUS.CLOSED) {
+            this.isConnected = false;
+            
+            if (this.onConnectionChange) {
+              this.onConnectionChange('disconnected');
+            }
           }
         });
 
       return channel;
     });
+  }
+
+  /**
+   * Attempt to reconnect to the channel
+   */
+  async attemptReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('Max reconnection attempts reached');
+      if (this.onConnectionChange) {
+        this.onConnectionChange('failed');
+      }
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    
+    console.log(`Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    
+    if (this.onConnectionChange) {
+      this.onConnectionChange('reconnecting');
+    }
+
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    try {
+      if (this.realtimeChannel) {
+        await supabase.removeChannel(this.realtimeChannel);
+      }
+      
+      this.realtimeChannel = await this.setupRealtimeChannel(this.gameId);
+      console.log('Reconnection successful');
+    } catch (err) {
+      console.error('Reconnection failed:', err);
+      this.attemptReconnect();
+    }
   }
 
   /**
@@ -490,12 +685,42 @@ export class MultiplayerGameGuest {
   }
 
   /**
-   * Cleanup
+   * Cleanup and disconnect
    */
   async disconnect() {
-    if (this.realtimeChannel) {
-      await supabase.removeChannel(this.realtimeChannel);
+    this.isConnected = false;
+    
+    // Cleanup presence channel
+    if (this.presenceChannel) {
+      try {
+        if (this.presenceChannel.cleanup) {
+          await this.presenceChannel.cleanup();
+        } else {
+          await supabase.removeChannel(this.presenceChannel);
+        }
+      } catch (err) {
+        console.error('Error cleaning up presence channel:', err);
+      }
+      this.presenceChannel = null;
     }
+
+    // Cleanup realtime channel
+    if (this.realtimeChannel) {
+      try {
+        await supabase.removeChannel(this.realtimeChannel);
+      } catch (err) {
+        console.error('Error cleaning up realtime channel:', err);
+      }
+      this.realtimeChannel = null;
+    }
+
+    // Clear callbacks
+    this.onStateUpdate = null;
+    this.onGameUpdate = null;
+    this.onPresenceUpdate = null;
+    this.onConnectionChange = null;
+
+    console.log('Disconnected from game');
   }
 }
 
