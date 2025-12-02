@@ -424,19 +424,27 @@ export class GameLogic {
     };
   }
 
-  exportForFirebase() {
+  // Export game state for database storage
+  // Only includes columns that exist in the game_state table
+  exportForDatabase() {
     return {
       grid: this.grid.map(p => p ? { id: p.id, correctPosition: p.correctPosition } : null),
-      current_turn: this.currentTurn,
-      scores: this.scores,
       player_a_rack: this.playerARack.map(p => p ? p.id : null),
       player_b_rack: this.playerBRack.map(p => p ? p.id : null),
       piece_pool: this.piecePool.map(p => p.id),
-      game_state: this.gameState,
+      current_turn: this.currentTurn,
+      timer_remaining: this.timerRemaining,
       pending_check: this.pendingCheck,
-      move_history: this.moveHistory,
-      timer_remaining: this.timerRemaining
+      move_history: this.moveHistory
+      // NOTE: 'scores' and 'game_state' columns DO NOT EXIST - removed
+      // NOTE: 'pieces' exists but we don't update it after initialization
+      // NOTE: 'awaiting_decision' exists and is set separately in makeMove/respondToCheck
     };
+  }
+
+  // Backward compatibility alias
+  exportForFirebase() {
+    return this.exportForDatabase();
   }
 
   // Import game data from Firebase/Supabase (renamed from importFromFirebase)

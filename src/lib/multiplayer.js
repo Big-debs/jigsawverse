@@ -411,8 +411,8 @@ export class MultiplayerGameHost {
 
     const result = this.gameLogic.handleOpponentCheck('playerA', decision);
 
-    await realtimeService.updateGameState(this. gameId, {
-      ... this.gameLogic.exportForFirebase(),
+    await realtimeService.updateGameState(this.gameId, {
+      ...this.gameLogic.exportForDatabase(),
       awaiting_decision: result.awaitingPlacerDecision ? 'placer_check' : null
     });
 
@@ -734,7 +734,7 @@ export class MultiplayerGameGuest {
     const result = this.gameLogic.handleOpponentCheck('playerB', decision);
 
     await realtimeService.updateGameState(this.gameId, {
-      ...this.gameLogic. exportForFirebase(),
+      ...this.gameLogic.exportForDatabase(),
       awaiting_decision: result.awaitingPlacerDecision ? 'placer_check' : null
     });
 
