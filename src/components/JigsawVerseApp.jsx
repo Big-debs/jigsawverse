@@ -26,7 +26,7 @@ class ConnectionManager {
     this.reconnectDelay = 1000; // Start with 1 second
     this.maxReconnectDelay = 30000; // Max 30 seconds
     this.heartbeatInterval = null;
-    this.connectionStatus = CONNECTION_STATUS.DISCONNECTED;
+    this. connectionStatus = CONNECTION_STATUS.DISCONNECTED;
     this.onStatusChange = null;
     this.onReconnect = null;
   }
@@ -47,8 +47,8 @@ class ConnectionManager {
   }
 
   async attemptReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.updateStatus(CONNECTION_STATUS.ERROR);
+    if (this.reconnectAttempts >= this. maxReconnectAttempts) {
+      this.updateStatus(CONNECTION_STATUS. ERROR);
       return false;
     }
 
@@ -57,7 +57,7 @@ class ConnectionManager {
 
     // Exponential backoff
     const delay = Math.min(
-      this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
+      this.reconnectDelay * Math. pow(2, this.reconnectAttempts - 1),
       this.maxReconnectDelay
     );
 
@@ -68,7 +68,7 @@ class ConnectionManager {
         await this.onReconnect();
       }
       this.reconnectAttempts = 0;
-      this.updateStatus(CONNECTION_STATUS.CONNECTED);
+      this.updateStatus(CONNECTION_STATUS. CONNECTED);
       return true;
     } catch {
       return this.attemptReconnect();
@@ -80,7 +80,7 @@ class ConnectionManager {
     this.heartbeatInterval = setInterval(async () => {
       try {
         await callback();
-        this.updateStatus(CONNECTION_STATUS.CONNECTED);
+        this.updateStatus(CONNECTION_STATUS. CONNECTED);
       } catch {
         this.attemptReconnect();
       }
@@ -88,7 +88,7 @@ class ConnectionManager {
   }
 
   stopHeartbeat() {
-    if (this.heartbeatInterval) {
+    if (this. heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
@@ -118,7 +118,7 @@ function createHeartbeatCheck(multiplayerRef) {
       throw new Error('No active connection');
     }
     // Check if the multiplayer instance reports as connected
-    if (!multiplayerRef.current.isConnected) {
+    if (! multiplayerRef. current.isConnected) {
       throw new Error('Connection lost');
     }
     // Connection is healthy
@@ -153,51 +153,34 @@ const JigsawVerseApp = () => {
   const [loading, setLoading] = useState(true);
 
   // Refs for multiplayer instances and connection manager
- // Find and update the guest/anonymous user initialization in JigsawVerseApp.jsx
-// In the useEffect that checks for auth state, ensure anonymous sign-in happens if no user exists
+  const multiplayerRef = useRef(null);
+  const connectionManagerRef = useRef(new ConnectionManager());
 
-// Around line 156-180, update the auth check to auto-sign in anonymously:
-
-useEffect(() => {
-  const initAuth = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?. user) {
-        setUser(session.user);
-      } else {
-        // Auto sign-in anonymously if no session exists
-        const { data, error } = await supabase.auth. signInAnonymously();
-        if (! error && data. user) {
-          // Update with guest metadata
-          await supabase.auth.updateUser({
-            data: {
-              username: `Guest_${Date.now() % 10000}`,
-              display_name: 'Guest Player',
-              is_anonymous: true
-            }
-          });
-          setUser(data. user);
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?. user) {
+          setUser(session. user);
+        } else {
+          // Auto sign-in anonymously if no session exists
+          const { data, error } = await supabase.auth. signInAnonymously();
+          if (! error && data?.user) {
+            // Update with guest metadata
+            await supabase.auth.updateUser({
+              data: {
+                username: `Guest_${Date.now() % 10000}`,
+                display_name: 'Guest Player',
+                is_anonymous: true
+              }
+            });
+            setUser(data. user);
+          }
         }
-      }
-    } catch (error) {
-      console. error('Auth initialization failed:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  initAuth();
-
-  // Listen for auth changes
-  const { data: { subscription } } = supabase.auth. onAuthStateChange(
-    (_event, session) => {
-      setUser(session?.user ??  null);
-    }
-  );
-
-  return () => subscription.unsubscribe();
-}, []);
+      } catch (error) {
+        console.error('Auth initialization failed:', error);
+      } finally {
         setLoading(false);
       }
     };
@@ -205,10 +188,8 @@ useEffect(() => {
     initAuth();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-      }
+    const { data: { subscription } } = supabase.auth. onAuthStateChange((_event, session) => {
+      setUser(session?. user ??  null);
     });
 
     return () => {
@@ -238,7 +219,7 @@ useEffect(() => {
   // Navigation handlers
   const navigate = useCallback((route, data = null) => {
     setCurrentRoute(route);
-    if (data) setGameData(prev => ({ ...prev, ...data }));
+    if (data) setGameData(prev => ({ ...prev, ... data }));
     setError(null);
   }, []);
 
@@ -246,15 +227,15 @@ useEffect(() => {
     try {
       // Disconnect from any active game
       if (multiplayerRef.current) {
-        await multiplayerRef.current.disconnect();
+        await multiplayerRef. current.disconnect();
         multiplayerRef.current = null;
       }
-      connectionManagerRef.current.reset();
+      connectionManagerRef.current. reset();
       
       await authService.signOut();
       setUser(null);
       setGameData(null);
-      setCurrentRoute(ROUTES.HOME);
+      setCurrentRoute(ROUTES. HOME);
     } catch (err) {
       console.error('Logout error:', err);
       setError('Failed to logout. Please try again.');
@@ -288,7 +269,7 @@ useEffect(() => {
           {user && (
             <div className="flex items-center gap-4">
               {/* Connection Status Indicator */}
-              {currentRoute === ROUTES.GAMEPLAY && (
+              {currentRoute === ROUTES. GAMEPLAY && (
                 <div className="flex items-center gap-2">
                   {connectionStatus === CONNECTION_STATUS.CONNECTED && (
                     <Wifi className="w-4 h-4 text-green-400" />
@@ -299,7 +280,7 @@ useEffect(() => {
                   {connectionStatus === CONNECTION_STATUS.RECONNECTING && (
                     <RefreshCw className="w-4 h-4 text-yellow-400 animate-spin" />
                   )}
-                  {connectionStatus === CONNECTION_STATUS.ERROR && (
+                  {connectionStatus === CONNECTION_STATUS. ERROR && (
                     <AlertCircle className="w-4 h-4 text-red-400" />
                   )}
                 </div>
@@ -337,7 +318,7 @@ useEffect(() => {
       )}
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {currentRoute === ROUTES.HOME && (
+        {currentRoute === ROUTES. HOME && (
           <HomeScreen 
             onNavigate={navigate}
             setIsHost={setIsHost}
@@ -348,10 +329,10 @@ useEffect(() => {
           <CreateGameScreen 
             user={user}
             multiplayerRef={multiplayerRef}
-            connectionManager={connectionManagerRef.current}
+            connectionManager={connectionManagerRef. current}
             onGameCreated={(data) => {
               setGameData(data);
-              navigate(ROUTES.WAITING_ROOM, data);
+              navigate(ROUTES. WAITING_ROOM, data);
             }}
             onBack={() => navigate(ROUTES.HOME)}
             setError={setError}
@@ -369,7 +350,7 @@ useEffect(() => {
               }
               navigate(ROUTES.HOME);
             }}
-            onGameStart={() => navigate(ROUTES.GAMEPLAY)}
+            onGameStart={() => navigate(ROUTES. GAMEPLAY)}
           />
         )}
         
@@ -377,7 +358,7 @@ useEffect(() => {
           <JoinGameScreen 
             user={user}
             multiplayerRef={multiplayerRef}
-            connectionManager={connectionManagerRef.current}
+            connectionManager={connectionManagerRef. current}
             onGameJoined={(data) => {
               setGameData(data);
               navigate(ROUTES.GAMEPLAY, data);
@@ -387,19 +368,19 @@ useEffect(() => {
           />
         )}
         
-        {currentRoute === ROUTES.GAMEPLAY && (
+        {currentRoute === ROUTES. GAMEPLAY && (
           <GameplayScreen 
             isHost={isHost}
             multiplayerRef={multiplayerRef}
             onGameEnd={(winner) => {
-              navigate(ROUTES.GAME_OVER, { winner });
+              navigate(ROUTES. GAME_OVER, { winner });
             }}
             onExit={async () => {
               if (multiplayerRef.current) {
-                await multiplayerRef.current.disconnect();
+                await multiplayerRef.current. disconnect();
                 multiplayerRef.current = null;
               }
-              connectionManagerRef.current.reset();
+              connectionManagerRef.current. reset();
               navigate(ROUTES.HOME);
             }}
             setError={setError}
@@ -467,7 +448,7 @@ const HomeScreen = ({ onNavigate, setIsHost }) => {
         <button
           onClick={() => {
             setIsHost(false);
-            onNavigate(ROUTES.JOIN_GAME);
+            onNavigate(ROUTES. JOIN_GAME);
           }}
           className="group bg-gradient-to-br from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-2xl p-8 text-left transition-all transform hover:scale-105 shadow-2xl"
         >
@@ -529,7 +510,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, onGameCreat
   const [progress, setProgress] = useState('');
 
   const handleImageSelect = (e) => {
-    const file = e.target.files[0];
+    const file = e. target.files[0];
     if (file && file.type.startsWith('image/')) {
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
@@ -540,23 +521,23 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, onGameCreat
     if (!imageFile || !user) return;
     
     setCreating(true);
-    setProgress('Initializing...');
+    setProgress('Initializing.. .');
     
     try {
       // Create multiplayer host instance
       const gameHost = new MultiplayerGameHost();
       multiplayerRef.current = gameHost;
 
-      setProgress('Creating game...');
+      setProgress('Creating game.. .');
       
       // Create the game using the multiplayer host
-      const result = await gameHost.createGame(imageFile, {
+      const result = await gameHost. createGame(imageFile, {
         gridSize,
         timeLimit: 600
       });
 
       // Setup connection manager for reconnection
-      connectionManager.setReconnectCallback(async () => {
+      connectionManager. setReconnectCallback(async () => {
         if (gameHost.realtimeChannel) {
           await gameHost.setupRealtimeChannel(result.gameId);
         }
@@ -566,17 +547,17 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, onGameCreat
       // Start lightweight heartbeat for connection monitoring
       connectionManager.startHeartbeat(
         createHeartbeatCheck(multiplayerRef),
-        HEARTBEAT_CONFIG.INTERVAL
+        HEARTBEAT_CONFIG. INTERVAL
       );
 
-      setProgress('Game created!');
+      setProgress('Game created! ');
       
       onGameCreated({
         gameId: result.gameId,
         gameCode: result.gameCode,
         game: result.game,
         pieces: result.pieces,
-        gridDimensions: result.gridDimensions,
+        gridDimensions: result. gridDimensions,
         imagePreview
       });
     } catch (err) {
@@ -586,7 +567,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, onGameCreat
       
       // Cleanup on error
       if (multiplayerRef.current) {
-        await multiplayerRef.current.disconnect();
+        await multiplayerRef. current.disconnect();
         multiplayerRef.current = null;
       }
     } finally {
@@ -634,7 +615,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, onGameCreat
             <div className="w-full h-64 border-2 border-dashed border-white/20 rounded-lg flex items-center justify-center hover:border-cyan-400 transition-colors">
               <div className="text-center text-purple-300">
                 <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4. 586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1. 586a2 2 0 012. 828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <p>Click to upload image</p>
               </div>
@@ -652,7 +633,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, onGameCreat
           min="5"
           max="15"
           value={gridSize}
-          onChange={(e) => setGridSize(Number(e.target.value))}
+          onChange={(e) => setGridSize(Number(e.target. value))}
           disabled={creating}
           className="w-full"
         />
@@ -665,9 +646,9 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, onGameCreat
 
       <button
         onClick={handleCreate}
-        disabled={!imageFile || creating}
+        disabled={! imageFile || creating}
         className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-          imageFile && !creating
+          imageFile && ! creating
             ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white'
             : 'bg-white/10 text-white/40 cursor-not-allowed'
         }`}
@@ -694,7 +675,7 @@ const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
 
   // Setup callbacks for opponent joining
   useEffect(() => {
-    if (!multiplayerRef.current) return;
+    if (! multiplayerRef.current) return;
 
     const gameHost = multiplayerRef.current;
 
@@ -708,14 +689,14 @@ const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
     };
 
     // Listen for presence updates
-    gameHost.onPresenceUpdate = (playerList) => {
+    gameHost. onPresenceUpdate = (playerList) => {
       setPlayers(playerList);
     };
 
     // Listen for game updates
-    gameHost.onGameUpdate = (game) => {
+    gameHost. onGameUpdate = (game) => {
       if (game.status === 'active' && game.player_b_id) {
-        setOpponentName(game.player_b_name || 'Opponent');
+        setOpponentName(game. player_b_name || 'Opponent');
         setTimeout(() => {
           onGameStart();
         }, 1500);
@@ -743,7 +724,7 @@ const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
       document.body.appendChild(textArea);
       textArea.select();
       try {
-        document.execCommand('copy');
+        document. execCommand('copy');
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch (fallbackErr) {
@@ -756,12 +737,12 @@ const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
   return (
     <div className="max-w-2xl mx-auto text-center">
       <div className="bg-white/5 backdrop-blur-md rounded-xl p-8 border border-white/10">
-        {opponentName ? (
+        {opponentName ?  (
           <>
             <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Users className="w-8 h-8 text-green-400" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">{opponentName} joined!</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">{opponentName} joined! </h2>
             <p className="text-purple-200 mb-6">Starting game...</p>
             <RefreshCw className="w-8 h-8 text-purple-400 animate-spin mx-auto" />
           </>
@@ -771,7 +752,7 @@ const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
               <Users className="w-8 h-8 text-cyan-400 animate-pulse" />
             </div>
             
-            <h2 className="text-2xl font-bold text-white mb-2">Waiting for Opponent...</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">Waiting for Opponent... </h2>
             <p className="text-purple-200 mb-6">Share this code to start playing</p>
 
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 mb-6">
@@ -784,7 +765,7 @@ const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
             {/* Connected players indicator */}
             {players.length > 0 && (
               <div className="mb-4 text-purple-200 text-sm">
-                <p>Connected: {players.map(p => p.user_name).join(', ')}</p>
+                <p>Connected: {players.map(p => p. user_name).join(', ')}</p>
               </div>
             )}
 
@@ -818,7 +799,7 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
     if (gameCode.length !== 6 || !user) return;
     
     setJoining(true);
-    setProgress('Finding game...');
+    setProgress('Finding game.. .');
     
     try {
       // Create multiplayer guest instance
@@ -833,7 +814,7 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
       // Setup connection manager for reconnection
       connectionManager.setReconnectCallback(async () => {
         if (gameGuest.realtimeChannel) {
-          await gameGuest.setupRealtimeChannel(result.gameId);
+          await gameGuest.setupRealtimeChannel(result. gameId);
         }
       });
       connectionManager.updateStatus(CONNECTION_STATUS.CONNECTED);
@@ -844,7 +825,7 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
         HEARTBEAT_CONFIG.INTERVAL
       );
 
-      setProgress('Game joined!');
+      setProgress('Game joined! ');
       
       onGameJoined({
         gameId: result.gameId,
@@ -853,11 +834,11 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
       });
     } catch (err) {
       console.error('Error joining game:', err);
-      setError('Failed to join game: ' + (err.message || 'Game not found'));
-      connectionManager.updateStatus(CONNECTION_STATUS.ERROR);
+      setError('Failed to join game: ' + (err. message || 'Game not found'));
+      connectionManager.updateStatus(CONNECTION_STATUS. ERROR);
       
       // Cleanup on error
-      if (multiplayerRef.current) {
+      if (multiplayerRef. current) {
         await multiplayerRef.current.disconnect();
         multiplayerRef.current = null;
       }
@@ -888,26 +869,26 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
         <input
           type="text"
           value={gameCode}
-          onChange={(e) => setGameCode(e.target.value.toUpperCase().slice(0, 6))}
+          onChange={(e) => setGameCode(e.target.value. toUpperCase(). slice(0, 6))}
           placeholder="ABC123"
           maxLength={6}
           disabled={joining}
-          className="w-full bg-white/5 border-2 border-white/20 focus:border-cyan-400 rounded-xl px-6 py-4 text-white text-center text-3xl font-mono font-bold uppercase tracking-wider focus:outline-none mb-4 disabled:opacity-50"
+          className="w-full bg-white/5 border-2 border-white/20 focus:border-cyan-400 rounded-xl px-6 py-4 text-white text-center text-3xl font-mono font-bold uppercase tracking-wider focus:outline-none mb-4"
         />
 
         <button
           onClick={handleJoin}
           disabled={gameCode.length !== 6 || joining}
           className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-            gameCode.length === 6 && !joining
+            gameCode. length === 6 && ! joining
               ? 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white'
               : 'bg-white/10 text-white/40 cursor-not-allowed'
           }`}
         >
-          {joining ? (
+          {joining ?  (
             <span className="flex items-center justify-center gap-2">
               <RefreshCw className="w-5 h-5 animate-spin" />
-              {progress || 'Joining...'}
+              {progress || 'Joining... '}
             </span>
           ) : 'Join Game'}
         </button>
@@ -933,22 +914,22 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
 
   // Initialize game state from multiplayer instance
   useEffect(() => {
-    if (!multiplayerRef.current) return;
+    if (! multiplayerRef. current) return;
 
     const multiplayer = multiplayerRef.current;
 
     // Get initial game state
     if (multiplayer.gameLogic) {
-      setGameState(multiplayer.gameLogic.getGameState());
+      setGameState(multiplayer.gameLogic. getGameState());
     }
 
     // Setup state update callback
-    multiplayer.onStateUpdate = (newState) => {
+    multiplayer. onStateUpdate = (newState) => {
       setGameState(newState);
       
       // Check for game completion
       if (newState.isComplete) {
-        const winner = newState.winner;
+        const winner = newState. winner;
         if (winner === myPlayer) {
           onGameEnd('you');
         } else if (winner === opponentPlayer) {
@@ -993,21 +974,21 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString(). padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   // Handle piece selection
   const handlePieceSelect = (piece) => {
-    if (!isMyTurn || awaitingDecision) return;
+    if (! isMyTurn || awaitingDecision) return;
     setSelectedPiece(piece);
   };
 
   // Handle piece placement
   const handlePlacement = async (gridIndex) => {
-    if (!selectedPiece || !multiplayerRef.current || !isMyTurn) return;
+    if (!selectedPiece || ! multiplayerRef. current || !isMyTurn) return;
 
     try {
-      const result = await multiplayerRef.current.makeMove(selectedPiece.id, gridIndex);
+      const result = await multiplayerRef.current. makeMove(selectedPiece. id, gridIndex);
       setSelectedPiece(null);
       
       if (result.awaitingCheck) {
@@ -1032,20 +1013,20 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
       });
       setAwaitingDecision(null);
     } catch (err) {
-      console.error('Check error:', err);
+      console. error('Check error:', err);
       setError('Failed to respond: ' + err.message);
     }
   };
 
   // Get game state values
-  const myScore = gameState?.scores?.[myPlayer]?.score || 0;
+  const myScore = gameState?.scores? .[myPlayer]?.score || 0;
   const opponentScore = gameState?.scores?.[opponentPlayer]?.score || 0;
-  const myStreak = gameState?.scores?.[myPlayer]?.streak || 0;
-  const myAccuracy = gameState?.scores?.[myPlayer]?.accuracy || 100;
+  const myStreak = gameState?. scores?.[myPlayer]?.streak || 0;
+  const myAccuracy = gameState?. scores?.[myPlayer]?.accuracy || 100;
   const isMyTurn = gameState?.currentTurn === myPlayer && !awaitingDecision;
   const myRack = isHost ? (gameState?.playerARack || []) : (gameState?.playerBRack || []);
   const grid = gameState?.grid || [];
-  const gridSize = Math.sqrt(grid.length) || 10;
+  const gridSize = Math.sqrt(grid. length) || 10;
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -1059,14 +1040,14 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
         
         <div className="text-center px-4">
           <p className="text-2xl font-mono font-bold text-white">{formatTime(timer)}</p>
-          {isMyTurn ? (
+          {isMyTurn ?  (
             <p className="text-yellow-400 font-bold animate-pulse">Your Turn</p>
           ) : (
             <p className="text-cyan-400">Opponent&apos;s Turn</p>
           )}
         </div>
         
-        <div className={`flex-1 text-right ${!isMyTurn && !awaitingDecision ? 'ring-2 ring-cyan-400 rounded-lg p-2' : 'opacity-70 p-2'}`}>
+        <div className={`flex-1 text-right ${! isMyTurn && ! awaitingDecision ? 'ring-2 ring-cyan-400 rounded-lg p-2' : 'opacity-70 p-2'}`}>
           <p className="text-white font-bold">Opponent</p>
           <p className="text-purple-300">Score: {opponentScore}</p>
         </div>
@@ -1089,7 +1070,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
       {awaitingDecision && (
         <div className="mb-6 bg-yellow-500/20 rounded-xl p-6 border border-yellow-500/30">
           <h3 className="text-xl font-bold text-white mb-4 text-center">
-            Opponent placed a piece! What do you want to do?
+            Opponent placed a piece!  What do you want to do?
           </h3>
           <div className="flex gap-4 justify-center">
             <button
@@ -1121,7 +1102,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
                 <button
                   key={index}
                   onClick={() => handlePlacement(index)}
-                  disabled={!selectedPiece || piece !== null || !isMyTurn}
+                  disabled={! selectedPiece || piece !== null || ! isMyTurn}
                   className={`aspect-square rounded border transition-all ${
                     piece 
                       ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-white/40' 
@@ -1165,7 +1146,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
                           : 'border-white/10 opacity-50'
                     }`}
                   >
-                    {piece.imageData ? (
+                    {piece.imageData ?  (
                       <img 
                         src={piece.imageData} 
                         alt={`Piece ${piece.id}`}
@@ -1235,7 +1216,7 @@ const GameOverScreen = ({ winner, gameData, onPlayAgain }) => {
           isWinner ? 'bg-yellow-500/20' : isTie ? 'bg-purple-500/20' : 'bg-gray-500/20'
         }`}>
           <Trophy className={`w-12 h-12 ${
-            isWinner ? 'text-yellow-400' : isTie ? 'text-purple-400' : 'text-gray-400'
+            isWinner ?  'text-yellow-400' : isTie ? 'text-purple-400' : 'text-gray-400'
           }`} />
         </div>
 
@@ -1263,7 +1244,7 @@ const GameOverScreen = ({ winner, gameData, onPlayAgain }) => {
               </div>
               <div className="text-purple-400 self-center">VS</div>
               <div>
-                <p className="text-purple-300 text-sm">{gameData.game.player_b_name || 'Player B'}</p>
+                <p className="text-purple-300 text-sm">{gameData. game.player_b_name || 'Player B'}</p>
                 <p className="text-2xl font-bold text-white">{gameData.game.player_b_score || 0}</p>
               </div>
             </div>
