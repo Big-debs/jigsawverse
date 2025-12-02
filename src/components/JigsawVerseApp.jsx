@@ -1014,9 +1014,19 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
   const handlePlacement = async (gridIndex) => {
     if (!selectedPiece || !multiplayerRef.current || !isMyTurn) return;
 
+    // UI-level check: ensure position is empty
+    const currentGrid = gameState?.grid || [];
+    if (currentGrid[gridIndex] !== null && currentGrid[gridIndex] !== undefined) {
+      console.warn('Position already occupied at UI level');
+      setError('This position is already occupied. Please choose an empty spot.');
+      return;
+    }
+
+    const pieceToPlace = selectedPiece;
+    setSelectedPiece(null); // Clear selection immediately for better UX
+
     try {
-      const result = await multiplayerRef.current.makeMove(selectedPiece.id, gridIndex);
-      setSelectedPiece(null);
+      const result = await multiplayerRef.current.makeMove(pieceToPlace.id, gridIndex);
       
       if (result.awaitingCheck) {
         setLastAction({ type: 'placed', correct: result.correct });
@@ -1024,6 +1034,8 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
     } catch (err) {
       console.error('Move error:', err);
       setError('Failed to place piece: ' + err.message);
+      // Restore selection on error
+      setSelectedPiece(pieceToPlace);
     }
   };
 

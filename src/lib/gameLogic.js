@@ -172,12 +172,23 @@ export class GameLogic {
   }
 
   isValidPlacement(pieceId, gridIndex) {
-    if (this.grid[gridIndex] !== null) {
+    // Bounds check
+    if (gridIndex < 0 || gridIndex >= this.totalPieces) {
+      console.log('Invalid grid index:', gridIndex);
+      return { valid: false, reason: 'Invalid grid position' };
+    }
+
+    // Check if grid position is empty (check both null AND undefined)
+    const currentCell = this.grid[gridIndex];
+    if (currentCell !== null && currentCell !== undefined) {
+      console.log('Position occupied:', { gridIndex, currentCell });
       return { valid: false, reason: 'Position occupied' };
     }
 
+    // Find the piece
     const piece = this.pieces.find(p => p.id === pieceId);
     if (!piece) {
+      console.log('Piece not found:', pieceId);
       return { valid: false, reason: 'Piece not found' };
     }
 
@@ -191,7 +202,7 @@ export class GameLogic {
   }
 
   placePiece(player, pieceId, gridIndex) {
-    // Add bounds check
+    // Bounds check
     if (gridIndex < 0 || gridIndex >= this.totalPieces) {
       return { success: false, message: 'Invalid grid position' };
     }
@@ -202,14 +213,17 @@ export class GameLogic {
       return { success: false, message: validation.reason };
     }
 
+    // Place piece on grid
     this.grid[gridIndex] = validation.piece;
 
+    // Remove from rack
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
     const pieceIndex = rack.findIndex(p => p && p.id === pieceId);
     if (pieceIndex !== -1) {
       rack[pieceIndex] = null;
     }
 
+    // Record move
     const move = {
       player,
       pieceId,
@@ -220,6 +234,14 @@ export class GameLogic {
     this.moveHistory.push(move);
 
     this.pendingCheck = move;
+
+    // Check if rack needs refilling (when all pieces used)
+    const activeRack = player === 'playerA' ? this.playerARack : this.playerBRack;
+    const remainingPieces = activeRack.filter(p => p !== null).length;
+    if (remainingPieces === 0 && this.piecePool.length > 0) {
+      console.log('Rack empty, refilling...');
+      this.fillRack(player);
+    }
 
     return {
       success: true,
@@ -430,34 +452,50 @@ export class GameLogic {
       return;
     }
     
-    if (!pieces || !Array.isArray(pieces)) {
-      console.error('importGameState: pieces is undefined or not an array', pieces);
+    if (!this.pieces || !Array.isArray(this.pieces) || this.pieces.length === 0) {
+      console.error('importGameState: no valid pieces array');
       return;
     }
 
     console.log('importGameState data:', data);
-    console.log('importGameState pieces count:', pieces.length);
+    console.log('importGameState pieces count:', this.pieces.length);
 
     // Use this.pieces for lookups (which now has imageData)
     const piecesArray = this.pieces;
 
-    // Safely import grid (handle both snake_case and camelCase)
+    // FIX: More robust grid import
     const gridData = data.grid;
     if (Array.isArray(gridData)) {
-      this.grid = gridData.map(p => {
-        // Only consider it a placed piece if p is an object with a valid numeric id
-        if (p && typeof p === 'object' && typeof p.id === 'number') {
-          return piecesArray.find(piece => piece.id === p.id) || null;
+      this.grid = gridData.map((cell, index) => {
+        // Explicitly check for null/undefined - these are empty cells
+        if (cell === null || cell === undefined) {
+          return null;
         }
+        
+        // Only treat as placed piece if it's an object with valid id AND correctPosition
+        // This ensures we only import actually placed pieces, not just any object
+        if (typeof cell === 'object' && 
+            typeof cell.id === 'number' && 
+            typeof cell.correctPosition === 'number') {
+          const foundPiece = piecesArray.find(piece => piece.id === cell.id);
+          if (foundPiece) {
+            console.log(`Grid[${index}]: Found placed piece ${cell.id}`);
+            return foundPiece;
+          }
+        }
+        
+        // Any other value (empty object, malformed data) = empty cell
+        console.log(`Grid[${index}]: Treating as empty (value: ${JSON.stringify(cell)})`);
         return null;
       });
-      
-      // Debug logging
-      console.log('Grid data from DB:', JSON.stringify(gridData?.slice(0, 5)));
-      console.log('Grid after import:', this.grid.filter(p => p !== null).length, 'pieces placed');
     } else {
+      // No grid data - initialize empty grid
       this.grid = Array(this.totalPieces).fill(null);
     }
+
+    // Log grid state for debugging
+    const placedCount = this.grid.filter(p => p !== null).length;
+    console.log(`Grid imported: ${placedCount} pieces placed out of ${this.grid.length}`);
 
     this.currentTurn = data.current_turn || data.currentTurn || 'playerA';
     
