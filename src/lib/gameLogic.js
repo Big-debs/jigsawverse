@@ -146,6 +146,7 @@ export class GameLogic {
     this.gameState = 'setup';
     this. moveHistory = [];
     this.pendingCheck = null;
+    this.timerRemaining = 600; // Default 10 minutes
   }
 
   initialize() {
@@ -391,7 +392,8 @@ export class GameLogic {
       isComplete: this.isGameComplete(),
       winner: this.getWinner(),
       pendingCheck: this.pendingCheck,
-      moveHistory: [...this.moveHistory]
+      moveHistory: [...this.moveHistory],
+      timerRemaining: this.timerRemaining
     };
   }
 
@@ -405,25 +407,26 @@ export class GameLogic {
       piecePool: this.piecePool.map(p => p.id),
       gameState: this.gameState,
       pendingCheck: this.pendingCheck,
-      moveHistory: this. moveHistory
+      moveHistory: this.moveHistory,
+      timerRemaining: this.timerRemaining
     };
   }
 
-  // Import game data from Firebase/Supabase
-  importFromFirebase(data, pieces) {
+  // Import game data from Firebase/Supabase (renamed from importFromFirebase)
+  importGameState(data, pieces) {
     // Guard against undefined data
     if (!data) {
-      console.error('importFromFirebase: data is undefined');
+      console.error('importGameState: data is undefined');
       return;
     }
     
     if (!pieces || !Array.isArray(pieces)) {
-      console.error('importFromFirebase: pieces is undefined or not an array', pieces);
+      console.error('importGameState: pieces is undefined or not an array', pieces);
       return;
     }
 
-    console.log('importFromFirebase data:', data);
-    console.log('importFromFirebase pieces count:', pieces.length);
+    console.log('importGameState data:', data);
+    console.log('importGameState pieces count:', pieces.length);
 
     // Safely import grid (handle both snake_case and camelCase)
     const gridData = data.grid;
@@ -456,17 +459,19 @@ export class GameLogic {
       : [];
 
     this.gameState = data.game_state || data.gameState || 'active';
-    this. pendingCheck = data.pending_check || data.pendingCheck || null;
-    this.moveHistory = data.move_history || data. moveHistory || [];
+    this.pendingCheck = data.pending_check || data.pendingCheck || null;
+    this.moveHistory = data.move_history || data.moveHistory || [];
+    this.timerRemaining = data.timer_remaining || data.timerRemaining || 600;
     
     // Store pieces reference
-    this. pieces = pieces;
+    this.pieces = pieces;
 
-    console.log('importFromFirebase complete:', {
+    console.log('importGameState complete:', {
       gridLength: this.grid.length,
       playerARackLength: this.playerARack.length,
-      playerBRackLength: this. playerBRack. length,
-      piecePoolLength: this.piecePool. length
+      playerBRackLength: this.playerBRack.length,
+      piecePoolLength: this.piecePool.length,
+      timerRemaining: this.timerRemaining
     });
   }
 }
