@@ -4,11 +4,16 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env. VITE_SUPABASE_URL;
+const supabaseAnonKey = import. meta.env. VITE_SUPABASE_ANON_KEY;
 
-// Use placeholder values if environment variables are not set
-const url = supabaseUrl || 'https://placeholder.supabase.co';
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('Missing Supabase environment variables! ');
+  console.error('VITE_SUPABASE_URL:', supabaseUrl ?  'SET' : 'MISSING');
+  console. error('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'SET' : 'MISSING');
+}
+
+const url = supabaseUrl || 'https://placeholder.supabase. co';
 const key = supabaseAnonKey || 'placeholder-key';
 
 export const supabase = createClient(url, key, {
@@ -34,10 +39,42 @@ export const supabase = createClient(url, key, {
   }
 });
 
+/**
+ * Set up the realtime client to use the current access token
+ * This ensures WebSocket connections are authenticated
+ */
+export const setupRealtimeAuth = async () => {
+  const { data: { session } } = await supabase.auth. getSession();
+  
+  if (session?. access_token) {
+    supabase.realtime.setAuth(session.access_token);
+    console.log('Realtime auth token set');
+    return true;
+  }
+  
+  console.warn('No session available for realtime auth');
+  return false;
+};
+
+// Listen for auth changes and update realtime token
+supabase. auth.onAuthStateChange(async (event, session) => {
+  console.log('Auth state changed:', event);
+  
+  if (session?. access_token) {
+    // Update the realtime client with the new token
+    supabase.realtime.setAuth(session.access_token);
+    console.log('Realtime auth token updated after', event);
+  } else if (event === 'SIGNED_OUT') {
+    // Clear realtime auth on sign out
+    supabase.realtime.setAuth(null);
+    console. log('Realtime auth cleared');
+  }
+});
+
 // Helper to check if user is authenticated
 export const isAuthenticated = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  return !!session;
+  const { data: { session } } = await supabase. auth.getSession();
+  return !! session;
 };
 
 // Helper to get current user
@@ -80,13 +117,13 @@ export const createGameChannel = (gameId) => {
 };
 
 export const createPresenceChannel = () => {
-  return supabase.channel('presence');
+  return supabase. channel('presence');
 };
 
 // Helper to check connection
 export const checkConnection = async () => {
   try {
-    const { error } = await supabase.auth.getSession();
+    const { error } = await supabase.auth. getSession();
     return !error;
   } catch (err) {
     console.error('Supabase connection failed:', err);
@@ -107,7 +144,7 @@ export const handleApiError = (error) => {
   }
   
   if (error.message?.includes('JWT')) {
-    return 'Session expired. Please login again.';
+    return 'Session expired. Please login again. ';
   }
   
   return error.message || 'An unexpected error occurred';
