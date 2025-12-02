@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Eye } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import { authService } from '../services/auth.service';
 import { MultiplayerGameHost, MultiplayerGameGuest } from '../lib/multiplayer';
@@ -372,6 +372,7 @@ const JigsawVerseApp = () => {
           <GameplayScreen 
             isHost={isHost}
             multiplayerRef={multiplayerRef}
+            gameData={gameData}
             onGameEnd={(winner) => {
               navigate(ROUTES.GAME_OVER, { winner });
             }}
@@ -901,12 +902,13 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
 // GAMEPLAY SCREEN - INTEGRATED WITH GAME LOGIC
 // =====================================================
 
-const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError }) => {
+const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, setError }) => {
   const [gameState, setGameState] = useState(null);
   const [selectedPiece, setSelectedPiece] = useState(null);
   const [awaitingDecision, setAwaitingDecision] = useState(null);
   const [lastAction, setLastAction] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Get player identifier
   const myPlayer = isHost ? 'playerA' : 'playerB';
@@ -1248,6 +1250,31 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
             </div>
           </div>
 
+          {/* Puzzle Thumbnail */}
+          {(gameData?.imagePreview || multiplayerRef.current?.imageUrl) && (
+            <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
+              <h3 className="text-white font-semibold mb-3">Reference</h3>
+              <img 
+                src={gameData?.imagePreview || multiplayerRef.current?.imageUrl}
+                alt="Puzzle"
+                className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setShowPreview(true)}
+              />
+              <p className="text-purple-300 text-xs mt-2 text-center">Click to enlarge</p>
+            </div>
+          )}
+
+          {/* Preview Button */}
+          {(gameData?.imagePreview || multiplayerRef.current?.imageUrl) && (
+            <button
+              onClick={() => setShowPreview(true)}
+              className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded-xl py-3 font-medium transition-colors flex items-center justify-center gap-2"
+            >
+              <Eye className="w-5 h-5" />
+              Preview Image
+            </button>
+          )}
+
           {/* Exit Button */}
           <button
             onClick={onExit}
@@ -1257,6 +1284,32 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
           </button>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowPreview(false)}
+        >
+          <div 
+            className="relative max-w-4xl max-h-[90vh] bg-slate-800 rounded-2xl p-4 border border-white/20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowPreview(false)}
+              className="absolute -top-3 -right-3 w-8 h-8 bg-red-500 hover:bg-red-400 rounded-full flex items-center justify-center text-white font-bold shadow-lg"
+            >
+              ×
+            </button>
+            <h3 className="text-white font-semibold mb-3 text-center">Puzzle Preview</h3>
+            <img 
+              src={gameData?.imagePreview || multiplayerRef.current?.imageUrl}
+              alt="Puzzle Preview"
+              className="max-w-full max-h-[70vh] object-contain rounded-lg"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

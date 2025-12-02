@@ -101,6 +101,9 @@ export class MultiplayerGameHost {
         imageFile
       );
 
+      // Store image URL for preview
+      this.imageUrl = imageUrl;
+
       console.log('Step 2: Processing image into pieces...');
       const processor = new ImageProcessor(imageUrl, settings.gridSize || 10);
       await processor.loadImage();
@@ -485,6 +488,9 @@ export class MultiplayerGameGuest {
       }
 
       this.gameId = game.id;
+
+      // Store image URL for preview
+      this.imageUrl = game.images?.storage_url || null;
 
       console.log('Step 2: Joining game as Player B...');
       await gameService.joinGame(gameCode, this.userId, this.userName);
