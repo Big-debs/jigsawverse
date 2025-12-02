@@ -48,23 +48,25 @@ export const authService = {
 
   // Sign in anonymously (Guest)
   async signInAnonymously() {
-    const randomId = Math.random().toString(36).substring(7);
-    const guestEmail = `guest_${randomId}@jigsawverse.temp`;
-    const guestPassword = Math.random().toString(36);
-
-    const { data, error } = await supabase.auth.signUp({
-      email: guestEmail,
-      password: guestPassword,
-      options: {
-        data: {
-          username: `Guest_${randomId}`,
-          display_name: `Guest Player`,
-          is_anonymous: true
-        }
+    // Use Supabase's built-in anonymous sign-in
+    const { data, error } = await supabase.auth.signInAnonymously();
+    
+    if (error) throw error;
+    
+    // Update user metadata with guest name (timestamp-based to reduce collisions)
+    const guestNumber = Date.now() % 10000;
+    const { error: updateError } = await supabase.auth.updateUser({
+      data: {
+        username: `Guest_${guestNumber}`,
+        display_name: `Guest Player`,
+        is_anonymous: true
       }
     });
-
-    if (error) throw error;
+    
+    if (updateError) {
+      console.warn('Failed to update guest metadata:', updateError);
+    }
+    
     return data;
   },
 
