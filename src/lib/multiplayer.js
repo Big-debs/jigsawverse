@@ -2,7 +2,7 @@
 // MULTIPLAYER GAME FLOW - COMPLETE IMPLEMENTATION
 // =====================================================
 
-import { supabase } from '../config/supabase';
+import { supabase, setupRealtimeAuth } from '../config/supabase';
 import { gameService, realtimeService, storageService } from '../services';
 import { ImageProcessor, GameLogic } from './gameLogic';
 
