@@ -24,13 +24,6 @@ const RECONNECT_CONFIG = {
   CHANNEL_TIMEOUT: 30000
 };
 
-function calculateReconnectDelay(attempt) {
-  return Math.min(
-    RECONNECT_CONFIG.BASE_DELAY * Math.pow(2, attempt),
-    RECONNECT_CONFIG.MAX_DELAY
-  );
-}
-
 /**
  * Ensure user has a valid session and realtime is authenticated
  */
@@ -319,7 +312,7 @@ export class MultiplayerGameHost {
 
   handleGameStateUpdate(newState) {
     if (! this.gameLogic) return;
-    this.gameLogic. importFromFirebase(newState, newState.pieces);
+    this.gameLogic. importGameState(newState, newState.pieces);
     if (this.onStateUpdate) {
       this.onStateUpdate(this.gameLogic. getGameState());
     }
@@ -394,7 +387,8 @@ export class MultiplayerGameHost {
       current_turn: this.gameLogic. currentTurn,
       pending_check: this.gameLogic.pendingCheck,
       awaiting_decision: result.awaitingCheck ?  'opponent_check' : null,
-      move_history: this. gameLogic.moveHistory
+      move_history: this. gameLogic.moveHistory,
+      timer_remaining: this.gameLogic.timerRemaining
     });
 
     await gameService.updateGame(this.gameId, {
@@ -500,7 +494,7 @@ export class MultiplayerGameGuest {
 
       console.log('Step 4: Initializing game logic.. .');
       this. gameLogic = new GameLogic(game.grid_size, gameState.pieces);
-      this.gameLogic.importFromFirebase(gameState, gameState. pieces);
+      this.gameLogic.importGameState(gameState, gameState. pieces);
 
       console.log('Step 5: Setting up realtime channel (broadcast)...');
       this.realtimeChannel = await this.setupBroadcastChannel(game. id);
@@ -671,7 +665,7 @@ export class MultiplayerGameGuest {
 
   handleGameStateUpdate(newState) {
     if (!this.gameLogic) return;
-    this.gameLogic.importFromFirebase(newState, newState.pieces);
+    this.gameLogic.importGameState(newState, newState.pieces);
     if (this.onStateUpdate) {
       this.onStateUpdate(this.gameLogic.getGameState());
     }
@@ -712,7 +706,8 @@ export class MultiplayerGameGuest {
       current_turn: this.gameLogic. currentTurn,
       pending_check: this.gameLogic.pendingCheck,
       awaiting_decision: result.awaitingCheck ? 'opponent_check' : null,
-      move_history: this.gameLogic. moveHistory
+      move_history: this.gameLogic. moveHistory,
+      timer_remaining: this.gameLogic.timerRemaining
     });
 
     await gameService.updateGame(this.gameId, {

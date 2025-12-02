@@ -904,9 +904,9 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
 const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError }) => {
   const [gameState, setGameState] = useState(null);
   const [selectedPiece, setSelectedPiece] = useState(null);
-  const [timer, setTimer] = useState(600);
   const [awaitingDecision, setAwaitingDecision] = useState(null);
   const [lastAction, setLastAction] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Get player identifier
   const myPlayer = isHost ? 'playerA' : 'playerB';
@@ -920,12 +920,25 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
 
     // Get initial game state
     if (multiplayer.gameLogic) {
-      setGameState(multiplayer.gameLogic.getGameState());
+      const initialState = multiplayer.gameLogic.getGameState();
+      console.log('Initial game state:', {
+        gridLength: initialState.grid?.length,
+        playerARackLength: initialState.playerARack?.length,
+        playerBRackLength: initialState.playerBRack?.length
+      });
+      setGameState(initialState);
+      setLoading(false);
     }
 
     // Setup state update callback
     multiplayer.onStateUpdate = (newState) => {
+      console.log('Game state updated:', {
+        gridLength: newState.grid?.length,
+        currentTurn: newState.currentTurn,
+        timerRemaining: newState.timerRemaining
+      });
       setGameState(newState);
+      setLoading(false);
       
       // Check for game completion
       if (newState.isComplete) {
@@ -954,21 +967,6 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
       multiplayer.onStateUpdate = null;
     };
   }, [multiplayerRef, myPlayer, opponentPlayer, onGameEnd]);
-
-  // Timer countdown
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimer(t => {
-        if (t <= 0) {
-          onGameEnd('timeout');
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [onGameEnd]);
 
   // Format time display
   const formatTime = (seconds) => {
@@ -1026,7 +1024,29 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
   const isMyTurn = gameState?.currentTurn === myPlayer && !awaitingDecision;
   const myRack = isHost ? (gameState?.playerARack || []) : (gameState?.playerBRack || []);
   const grid = gameState?.grid || [];
-  const gridSize = Math.sqrt(grid.length) || 10;
+  
+  // Calculate grid size with proper fallback
+  const calculateGridSize = () => {
+    if (!grid || grid.length === 0) return 10;
+    const size = Math.sqrt(grid.length);
+    return Number.isInteger(size) && size > 0 ? size : 10;
+  };
+  const gridSize = calculateGridSize();
+  
+  // Get timer from game state (synced from database)
+  const timer = gameState?.timerRemaining || 600;
+
+  // Show loading state while game initializes
+  if (loading || !gameState) {
+    return (
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-white/5 backdrop-blur-md rounded-xl p-8 text-center">
+          <RefreshCw className="w-12 h-12 text-purple-400 animate-spin mx-auto mb-4" />
+          <p className="text-purple-200">Loading game...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto">
