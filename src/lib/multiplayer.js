@@ -17,7 +17,6 @@ const CHANNEL_STATUS = {
   TIMED_OUT: 'TIMED_OUT'
 };
 
-// Reconnection configuration constants
 const RECONNECT_CONFIG = {
   BASE_DELAY: 1000,
   MAX_DELAY: 30000,
@@ -25,9 +24,6 @@ const RECONNECT_CONFIG = {
   CHANNEL_TIMEOUT: 30000
 };
 
-/**
- * Calculate exponential backoff delay for reconnection
- */
 function calculateReconnectDelay(attempt) {
   return Math.min(
     RECONNECT_CONFIG.BASE_DELAY * Math.pow(2, attempt),
@@ -36,10 +32,43 @@ function calculateReconnectDelay(attempt) {
 }
 
 /**
- * Generate a unique channel ID to prevent conflicts
+ * Ensure user has a valid session before connecting to Realtime
+ * This fixes the race condition where WebSocket connects before auth is ready
  */
-function generateChannelId(prefix, gameId) {
-  return `${prefix}:${gameId}:${Date.now()}`;
+async function ensureAuthenticated() {
+  const { data: { session }, error } = await supabase. auth.getSession();
+  
+  if (error) {
+    throw new Error('Failed to get session: ' + error.message);
+  }
+  
+  if (!session) {
+    // Try to sign in anonymously if no session
+    console.log('No session found, signing in anonymously.. .');
+    const { data, error: signInError } = await supabase. auth.signInAnonymously();
+    
+    if (signInError) {
+      throw new Error('Anonymous sign-in failed: ' + signInError.message);
+    }
+    
+    if (!data.session) {
+      throw new Error('No session after anonymous sign-in');
+    }
+    
+    // Update metadata
+    await supabase.auth.updateUser({
+      data: {
+        username: `Guest_${Date.now() % 10000}`,
+        display_name: 'Guest Player',
+        is_anonymous: true
+      }
+    });
+    
+    console.log('Anonymous sign-in successful');
+    return data.user;
+  }
+  
+  return session. user;
 }
 
 // =====================================================
@@ -49,31 +78,28 @@ function generateChannelId(prefix, gameId) {
 export class MultiplayerGameHost {
   constructor() {
     this. gameId = null;
-    this.oderId = null;
+    this.userId = null;
     this.gameLogic = null;
     this. realtimeChannel = null;
     this.presenceChannel = null;
     this.isConnected = false;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = RECONNECT_CONFIG. MAX_ATTEMPTS;
-    this.channelId = null; // Track unique channel ID
+    this.channelId = null;
   }
 
-  /**
-   * Create a new multiplayer game
-   */
   async createGame(imageFile, settings = {}) {
     try {
-      const user = await supabase.auth. getUser();
-      if (!user. data.user) throw new Error('User not authenticated');
+      // CRITICAL: Ensure authenticated before any operations
+      const user = await ensureAuthenticated();
+      this.userId = user. id;
+      const userName = user.user_metadata?.username || 'Player A';
 
-      const userId = user.data. user.id;
-      this.userId = userId;
-      const userName = user.data. user.user_metadata?.username || 'Player A';
+      console.log('Authenticated as:', userName, '(ID:', this.userId, ')');
 
       console.log('Step 1: Uploading image.. .');
       const { id: imageId, url: imageUrl } = await storageService.uploadPuzzleImage(
-        userId,
+        this.userId,
         imageFile
       );
 
@@ -83,7 +109,7 @@ export class MultiplayerGameHost {
       const { pieces, gridDimensions } = await processor.sliceImage();
 
       console.log('Step 3: Creating game record...');
-      const game = await gameService.createGame(userId, {
+      const game = await gameService.createGame(this.userId, {
         mode: 'multiplayer',
         gridSize: gridDimensions. totalPieces,
         timeLimit: settings.timeLimit || 600,
@@ -98,7 +124,7 @@ export class MultiplayerGameHost {
       this.gameLogic.initialize();
 
       console.log('Step 5: Setting up realtime state...');
-      await realtimeService.initializeGameState(
+      await realtimeService. initializeGameState(
         game.id,
         pieces,
         gridDimensions.totalPieces
@@ -108,7 +134,7 @@ export class MultiplayerGameHost {
       this.realtimeChannel = await this.setupRealtimeChannel(game.id);
 
       console. log('Step 7: Setting up presence tracking...');
-      this.presenceChannel = await realtimeService.trackPresence(game.id, userId, userName);
+      this.presenceChannel = await realtimeService.trackPresence(game.id, this.userId, userName);
 
       console. log('✅ Game created successfully!');
       return {
@@ -121,27 +147,23 @@ export class MultiplayerGameHost {
 
     } catch (error) {
       console.error('Error creating game:', error);
-      // Cleanup any partial subscriptions
       await this.disconnect();
       throw error;
     }
   }
 
-  /**
-   * Setup realtime channel for game updates
-   */
   setupRealtimeChannel(gameId) {
     return new Promise((resolve, reject) => {
-      // Generate unique channel ID to prevent conflicts
-      this.channelId = generateChannelId('game_host', gameId);
+      // Use a simpler channel name - timestamp not needed, gameId is unique
+      this.channelId = `host:${gameId}`;
       
       let channel = null;
       let isResolved = false;
 
       const timeoutId = setTimeout(() => {
-        if (! isResolved) {
+        if (!isResolved) {
           isResolved = true;
-          // Clean up the channel on timeout
+          console.error('Channel subscription timeout - cleaning up');
           if (channel) {
             supabase.removeChannel(channel). catch(console.error);
           }
@@ -149,11 +171,13 @@ export class MultiplayerGameHost {
         }
       }, RECONNECT_CONFIG. CHANNEL_TIMEOUT);
 
+      console.log('Creating channel:', this.channelId);
+
       channel = supabase
         .channel(this.channelId, {
           config: {
             broadcast: { self: false },
-            presence: { key: this. userId } // Use userId, not gameId
+            presence: { key: this.userId }
           }
         })
         .on(
@@ -187,7 +211,7 @@ export class MultiplayerGameHost {
           console.log('Presence sync:', state);
           this.handlePresenceSync(state);
         })
-        . on('presence', { event: 'join' }, ({ newPresences }) => {
+        .on('presence', { event: 'join' }, ({ newPresences }) => {
           console.log('Player joined:', newPresences);
           this.handlePlayerJoin(newPresences);
         })
@@ -195,26 +219,26 @@ export class MultiplayerGameHost {
           console.log('Player left:', leftPresences);
           this.handlePlayerLeave(leftPresences);
         })
-        .subscribe(async (status) => {
-          console.log('Channel status:', status);
+        .subscribe(async (status, err) => {
+          console.log('Channel status:', status, err ?  `Error: ${err. message}` : '');
           
-          if (isResolved) return; // Prevent multiple resolutions
+          if (isResolved) return;
           
           if (status === CHANNEL_STATUS. SUBSCRIBED) {
             isResolved = true;
             clearTimeout(timeoutId);
             this.isConnected = true;
             this.reconnectAttempts = 0;
-            console.log('Subscribed to game channel');
+            console.log('✅ Subscribed to game channel');
             
-            // Track presence after successful subscription
+            // Track presence
             try {
               await channel.track({
                 user_id: this.userId,
                 online_at: new Date().toISOString()
               });
-            } catch (err) {
-              console.warn('Failed to track presence:', err);
+            } catch (trackErr) {
+              console.warn('Failed to track presence:', trackErr);
             }
             
             if (this.onConnectionChange) {
@@ -223,25 +247,30 @@ export class MultiplayerGameHost {
             
             resolve(channel);
           } else if (status === CHANNEL_STATUS. CHANNEL_ERROR || status === CHANNEL_STATUS.TIMED_OUT) {
+            console.error('Channel error:', status, err);
             this.isConnected = false;
-            console.error('Channel error:', status);
             
             if (this. onConnectionChange) {
               this.onConnectionChange('error');
             }
             
-            // Only attempt reconnect if not already resolved/rejected
             if (! isResolved) {
               isResolved = true;
               clearTimeout(timeoutId);
-              // Clean up failed channel
               supabase.removeChannel(channel).catch(console.error);
-              this.attemptReconnect();
+              
+              // Don't reject immediately - try to reconnect
+              this.attemptReconnect(). then(() => {
+                if (this.realtimeChannel) {
+                  resolve(this.realtimeChannel);
+                } else {
+                  reject(new Error('Failed to connect after retries'));
+                }
+              }).catch(reject);
             }
           } else if (status === CHANNEL_STATUS.CLOSED) {
             this.isConnected = false;
-            
-            if (this. onConnectionChange) {
+            if (this.onConnectionChange) {
               this.onConnectionChange('disconnected');
             }
           }
@@ -249,19 +278,16 @@ export class MultiplayerGameHost {
     });
   }
 
-  /**
-   * Attempt to reconnect to the channel
-   */
   async attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('Max reconnection attempts reached');
       if (this.onConnectionChange) {
         this.onConnectionChange('failed');
       }
-      return;
+      throw new Error('Max reconnection attempts reached');
     }
 
-    this. reconnectAttempts++;
+    this.reconnectAttempts++;
     const delay = calculateReconnectDelay(this.reconnectAttempts);
     
     console.log(`Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
@@ -272,25 +298,32 @@ export class MultiplayerGameHost {
 
     await new Promise(resolve => setTimeout(resolve, delay));
 
+    // Re-verify authentication before reconnecting
     try {
-      // Remove old channel first
+      await ensureAuthenticated();
+    } catch (authErr) {
+      console.error('Auth check failed during reconnect:', authErr);
+      throw authErr;
+    }
+
+    try {
       if (this.realtimeChannel) {
         try {
           await supabase.removeChannel(this.realtimeChannel);
         } catch (err) {
-          console. warn('Error removing old channel:', err);
+          console.warn('Error removing old channel:', err);
         }
         this.realtimeChannel = null;
       }
       
-      this.realtimeChannel = await this.setupRealtimeChannel(this.gameId);
+      this. realtimeChannel = await this.setupRealtimeChannel(this. gameId);
       console.log('Reconnection successful');
     } catch (err) {
       console.error('Reconnection failed:', err);
-      // Continue attempting if we haven't hit max
-      if (this. reconnectAttempts < this.maxReconnectAttempts) {
-        this.attemptReconnect();
+      if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        return this.attemptReconnect();
       }
+      throw err;
     }
   }
 
@@ -298,7 +331,7 @@ export class MultiplayerGameHost {
     if (! this.gameLogic) return;
     this.gameLogic. importFromFirebase(newState, newState.pieces);
     if (this.onStateUpdate) {
-      this.onStateUpdate(this.gameLogic.getGameState());
+      this.onStateUpdate(this.gameLogic. getGameState());
     }
   }
 
@@ -308,7 +341,7 @@ export class MultiplayerGameHost {
     }
 
     if (game.status === 'active' && game.player_b_id) {
-      console.log('Player B joined!  Game starting...');
+      console.log('Player B joined!  Game starting.. .');
       if (this.onOpponentJoin) {
         this.onOpponentJoin(game.player_b_name);
       }
@@ -340,17 +373,17 @@ export class MultiplayerGameHost {
     const currentPlayer = 'playerA';
     const result = this.gameLogic. placePiece(currentPlayer, pieceId, gridIndex);
 
-    if (! result.success) {
+    if (! result. success) {
       throw new Error(result.message);
     }
 
-    await realtimeService.updateGameState(this. gameId, {
-      grid: this.gameLogic. grid. map(p => p ?  { 
+    await realtimeService.updateGameState(this.gameId, {
+      grid: this.gameLogic.grid. map(p => p ?  { 
         id: p.id, 
         correctPosition: p.correctPosition 
       } : null),
       player_a_rack: this.gameLogic.playerARack. map(p => p ? p.id : null),
-      player_b_rack: this. gameLogic.playerBRack.map(p => p ?  p.id : null),
+      player_b_rack: this.gameLogic.playerBRack.map(p => p ? p. id : null),
       piece_pool: this.gameLogic.piecePool.map(p => p. id),
       current_turn: this.gameLogic.currentTurn,
       pending_check: this.gameLogic.pendingCheck,
@@ -373,27 +406,23 @@ export class MultiplayerGameHost {
     const result = this.gameLogic.handleOpponentCheck('playerA', decision);
 
     await realtimeService. updateGameState(this.gameId, {
-      ... this.gameLogic.exportForFirebase(),
+      ... this.gameLogic. exportForFirebase(),
       awaiting_decision: result.awaitingPlacerDecision ? 'placer_check' : null
     });
 
     await gameService.updateGame(this.gameId, {
-      player_a_score: this.gameLogic. scores.playerA. score,
-      player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
+      player_a_score: this. gameLogic.scores.playerA.score,
+      player_a_accuracy: this.gameLogic. scores.playerA. accuracy,
       player_a_streak: this.gameLogic.scores.playerA.streak
     });
 
     return result;
   }
 
-  /**
-   * Cleanup and disconnect - prevents memory leaks
-   */
   async disconnect() {
     this.isConnected = false;
     
-    // Cleanup presence channel
-    if (this.presenceChannel) {
+    if (this. presenceChannel) {
       try {
         if (this.presenceChannel.cleanup) {
           await this.presenceChannel.cleanup();
@@ -406,7 +435,6 @@ export class MultiplayerGameHost {
       this.presenceChannel = null;
     }
 
-    // Cleanup realtime channel
     if (this.realtimeChannel) {
       try {
         await supabase.removeChannel(this.realtimeChannel);
@@ -416,7 +444,6 @@ export class MultiplayerGameHost {
       this.realtimeChannel = null;
     }
 
-    // Clear all callbacks to prevent memory leaks
     this.onStateUpdate = null;
     this.onGameUpdate = null;
     this.onPresenceUpdate = null;
@@ -424,8 +451,6 @@ export class MultiplayerGameHost {
     this. onPlayerLeave = null;
     this.onOpponentJoin = null;
     this.onConnectionChange = null;
-    
-    // Reset channel ID
     this.channelId = null;
 
     console.log('Disconnected from game');
@@ -433,33 +458,33 @@ export class MultiplayerGameHost {
 }
 
 // =====================================================
-// 2.  JOIN GAME (Guest)
+// 2. JOIN GAME (Guest)
 // =====================================================
 
 export class MultiplayerGameGuest {
   constructor() {
-    this. gameId = null;
-    this.userId = null;
+    this.gameId = null;
+    this. userId = null;
     this.gameLogic = null;
     this.realtimeChannel = null;
     this.presenceChannel = null;
     this.isConnected = false;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = RECONNECT_CONFIG. MAX_ATTEMPTS;
-    this.channelId = null;
+    this.maxReconnectAttempts = RECONNECT_CONFIG.MAX_ATTEMPTS;
+    this. channelId = null;
   }
 
   async joinGame(gameCode) {
     try {
-      const user = await supabase. auth.getUser();
-      if (!user.data.user) throw new Error('User not authenticated');
+      // CRITICAL: Ensure authenticated before any operations
+      const user = await ensureAuthenticated();
+      this.userId = user.id;
+      const userName = user. user_metadata?.username || 'Player B';
 
-      const userId = user. data.user.id;
-      this. userId = userId;
-      const userName = user.data.user. user_metadata?.username || 'Player B';
+      console. log('Authenticated as:', userName, '(ID:', this. userId, ')');
 
-      console. log('Step 1: Finding game by code.. .');
-      const game = await gameService. getGameByCode(gameCode);
+      console.log('Step 1: Finding game by code...');
+      const game = await gameService.getGameByCode(gameCode);
       
       if (!game) {
         throw new Error('Game not found');
@@ -472,7 +497,7 @@ export class MultiplayerGameGuest {
       this.gameId = game.id;
 
       console.log('Step 2: Joining game as Player B...');
-      await gameService.joinGame(gameCode, userId, userName);
+      await gameService.joinGame(gameCode, this.userId, userName);
 
       console.log('Step 3: Loading game state...');
       const gameState = await realtimeService.getGameState(game.id);
@@ -484,10 +509,10 @@ export class MultiplayerGameGuest {
       console.log('Step 5: Setting up realtime channel...');
       this.realtimeChannel = await this.setupRealtimeChannel(game.id);
 
-      console. log('Step 6: Tracking presence...');
-      this.presenceChannel = await realtimeService.trackPresence(game.id, userId, userName);
+      console.log('Step 6: Tracking presence...');
+      this.presenceChannel = await realtimeService.trackPresence(game.id, this.userId, userName);
 
-      console.log('✅ Successfully joined game! ');
+      console. log('✅ Successfully joined game! ');
       return {
         gameId: game.id,
         game: game,
@@ -503,8 +528,7 @@ export class MultiplayerGameGuest {
 
   setupRealtimeChannel(gameId) {
     return new Promise((resolve, reject) => {
-      // Generate unique channel ID to prevent conflicts with host
-      this.channelId = generateChannelId('game_guest', gameId);
+      this.channelId = `guest:${gameId}`;
       
       let channel = null;
       let isResolved = false;
@@ -512,18 +536,21 @@ export class MultiplayerGameGuest {
       const timeoutId = setTimeout(() => {
         if (!isResolved) {
           isResolved = true;
+          console.error('Channel subscription timeout - cleaning up');
           if (channel) {
-            supabase. removeChannel(channel). catch(console.error);
+            supabase.removeChannel(channel).catch(console.error);
           }
           reject(new Error('Channel subscription timeout'));
         }
-      }, RECONNECT_CONFIG.CHANNEL_TIMEOUT);
+      }, RECONNECT_CONFIG. CHANNEL_TIMEOUT);
+
+      console. log('Creating channel:', this.channelId);
 
       channel = supabase
-        .channel(this.channelId, {
+        .channel(this. channelId, {
           config: {
             broadcast: { self: false },
-            presence: { key: this. userId } // Use userId for presence
+            presence: { key: this.userId }
           }
         })
         .on(
@@ -535,8 +562,8 @@ export class MultiplayerGameGuest {
             filter: `game_id=eq.${gameId}`
           },
           (payload) => {
-            console. log('Game state updated:', payload.new);
-            this.handleGameStateUpdate(payload.new);
+            console.log('Game state updated:', payload.new);
+            this.handleGameStateUpdate(payload. new);
           }
         )
         .on(
@@ -548,35 +575,34 @@ export class MultiplayerGameGuest {
             filter: `id=eq.${gameId}`
           },
           (payload) => {
-            console. log('Game metadata updated:', payload.new);
-            this.handleGameUpdate(payload. new);
+            console.log('Game metadata updated:', payload.new);
+            this.handleGameUpdate(payload.new);
           }
         )
-        .on('presence', { event: 'sync' }, () => {
+        . on('presence', { event: 'sync' }, () => {
           const state = channel.presenceState();
-          console.log('Presence sync:', state);
+          console. log('Presence sync:', state);
           this.handlePresenceSync(state);
         })
-        .subscribe(async (status) => {
-          console.log('Channel status:', status);
+        . subscribe(async (status, err) => {
+          console.log('Channel status:', status, err ? `Error: ${err.message}` : '');
           
           if (isResolved) return;
           
           if (status === CHANNEL_STATUS. SUBSCRIBED) {
             isResolved = true;
             clearTimeout(timeoutId);
-            this.isConnected = true;
-            this.reconnectAttempts = 0;
-            console.log('Subscribed to game channel');
+            this. isConnected = true;
+            this. reconnectAttempts = 0;
+            console.log('✅ Subscribed to game channel');
             
-            // Track presence
             try {
               await channel.track({
                 user_id: this.userId,
                 online_at: new Date().toISOString()
               });
-            } catch (err) {
-              console.warn('Failed to track presence:', err);
+            } catch (trackErr) {
+              console.warn('Failed to track presence:', trackErr);
             }
             
             if (this.onConnectionChange) {
@@ -585,22 +611,28 @@ export class MultiplayerGameGuest {
             
             resolve(channel);
           } else if (status === CHANNEL_STATUS.CHANNEL_ERROR || status === CHANNEL_STATUS. TIMED_OUT) {
+            console.error('Channel error:', status, err);
             this.isConnected = false;
-            console.error('Channel error:', status);
             
             if (this.onConnectionChange) {
-              this. onConnectionChange('error');
+              this.onConnectionChange('error');
             }
             
-            if (! isResolved) {
+            if (!isResolved) {
               isResolved = true;
               clearTimeout(timeoutId);
-              supabase.removeChannel(channel).catch(console.error);
-              this.attemptReconnect();
+              supabase. removeChannel(channel). catch(console.error);
+              
+              this.attemptReconnect(). then(() => {
+                if (this. realtimeChannel) {
+                  resolve(this.realtimeChannel);
+                } else {
+                  reject(new Error('Failed to connect after retries'));
+                }
+              }).catch(reject);
             }
           } else if (status === CHANNEL_STATUS. CLOSED) {
             this.isConnected = false;
-            
             if (this.onConnectionChange) {
               this.onConnectionChange('disconnected');
             }
@@ -611,11 +643,11 @@ export class MultiplayerGameGuest {
 
   async attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console. error('Max reconnection attempts reached');
+      console.error('Max reconnection attempts reached');
       if (this.onConnectionChange) {
-        this.onConnectionChange('failed');
+        this. onConnectionChange('failed');
       }
-      return;
+      throw new Error('Max reconnection attempts reached');
     }
 
     this.reconnectAttempts++;
@@ -630,27 +662,35 @@ export class MultiplayerGameGuest {
     await new Promise(resolve => setTimeout(resolve, delay));
 
     try {
+      await ensureAuthenticated();
+    } catch (authErr) {
+      console.error('Auth check failed during reconnect:', authErr);
+      throw authErr;
+    }
+
+    try {
       if (this.realtimeChannel) {
         try {
-          await supabase.removeChannel(this.realtimeChannel);
+          await supabase. removeChannel(this. realtimeChannel);
         } catch (err) {
           console.warn('Error removing old channel:', err);
         }
         this.realtimeChannel = null;
       }
       
-      this. realtimeChannel = await this.setupRealtimeChannel(this.gameId);
+      this.realtimeChannel = await this.setupRealtimeChannel(this. gameId);
       console.log('Reconnection successful');
     } catch (err) {
       console.error('Reconnection failed:', err);
       if (this.reconnectAttempts < this.maxReconnectAttempts) {
-        this. attemptReconnect();
+        return this.attemptReconnect();
       }
+      throw err;
     }
   }
 
   handleGameStateUpdate(newState) {
-    if (! this.gameLogic) return;
+    if (!this. gameLogic) return;
     this. gameLogic.importFromFirebase(newState, newState. pieces);
     if (this.onStateUpdate) {
       this.onStateUpdate(this.gameLogic.getGameState());
@@ -708,15 +748,15 @@ export class MultiplayerGameGuest {
 
     const result = this.gameLogic.handleOpponentCheck('playerB', decision);
 
-    await realtimeService.updateGameState(this.gameId, {
-      ...this.gameLogic. exportForFirebase(),
+    await realtimeService.updateGameState(this. gameId, {
+      ...this.gameLogic.exportForFirebase(),
       awaiting_decision: result.awaitingPlacerDecision ? 'placer_check' : null
     });
 
     await gameService.updateGame(this.gameId, {
-      player_b_score: this. gameLogic.scores.playerB.score,
-      player_b_accuracy: this.gameLogic. scores.playerB. accuracy,
-      player_b_streak: this.gameLogic.scores.playerB.streak
+      player_b_score: this.gameLogic.scores.playerB.score,
+      player_b_accuracy: this.gameLogic.scores. playerB.accuracy,
+      player_b_streak: this. gameLogic.scores.playerB.streak
     });
 
     return result;
@@ -725,12 +765,12 @@ export class MultiplayerGameGuest {
   async disconnect() {
     this.isConnected = false;
     
-    if (this.presenceChannel) {
+    if (this. presenceChannel) {
       try {
-        if (this.presenceChannel.cleanup) {
-          await this. presenceChannel.cleanup();
+        if (this. presenceChannel.cleanup) {
+          await this.presenceChannel.cleanup();
         } else {
-          await supabase.removeChannel(this.presenceChannel);
+          await supabase. removeChannel(this. presenceChannel);
         }
       } catch (err) {
         console.error('Error cleaning up presence channel:', err);
@@ -742,7 +782,7 @@ export class MultiplayerGameGuest {
       try {
         await supabase.removeChannel(this.realtimeChannel);
       } catch (err) {
-        console.error('Error cleaning up realtime channel:', err);
+        console. error('Error cleaning up realtime channel:', err);
       }
       this.realtimeChannel = null;
     }
@@ -750,7 +790,7 @@ export class MultiplayerGameGuest {
     this.onStateUpdate = null;
     this.onGameUpdate = null;
     this.onPresenceUpdate = null;
-    this. onConnectionChange = null;
+    this.onConnectionChange = null;
     this.channelId = null;
 
     console.log('Disconnected from game');
