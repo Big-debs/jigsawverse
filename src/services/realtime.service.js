@@ -7,11 +7,17 @@ import { supabase } from '../config/supabase';
 export const realtimeService = {
   // Initialize game state
   async initializeGameState(gameId, pieces, gridSize) {
+    // Ensure we're creating an array of null values, not undefined
+    const emptyGrid = [];
+    for (let i = 0; i < gridSize; i++) {
+      emptyGrid.push(null);
+    }
+    
     const { data, error } = await supabase
       .from('game_state')
       .insert({
         game_id: gameId,
-        grid: Array(gridSize).fill(null),
+        grid: emptyGrid,  // Explicit null array
         player_a_rack: pieces.slice(0, 10).map(p => p.id),
         player_b_rack: pieces.slice(10, 20).map(p => p.id),
         piece_pool: pieces.slice(20).map(p => p.id),
