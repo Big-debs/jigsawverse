@@ -36,16 +36,15 @@ function calculateReconnectDelay(attempt) {
  * This fixes the race condition where WebSocket connects before auth is ready
  */
 async function ensureAuthenticated() {
-  const { data: { session }, error } = await supabase. auth.getSession();
+  const { data: { session }, error } = await supabase.auth. getSession();
   
   if (error) {
     throw new Error('Failed to get session: ' + error.message);
   }
   
   if (!session) {
-    // Try to sign in anonymously if no session
     console.log('No session found, signing in anonymously.. .');
-    const { data, error: signInError } = await supabase. auth.signInAnonymously();
+    const { data, error: signInError } = await supabase.auth.signInAnonymously();
     
     if (signInError) {
       throw new Error('Anonymous sign-in failed: ' + signInError.message);
@@ -64,11 +63,17 @@ async function ensureAuthenticated() {
       }
     });
     
+    // CRITICAL: Set the realtime auth token
+    await setupRealtimeAuth();
+    
     console.log('Anonymous sign-in successful');
     return data.user;
   }
   
-  return session. user;
+  // CRITICAL: Ensure realtime has the token even for existing sessions
+  await setupRealtimeAuth();
+  
+  return session.user;
 }
 
 // =====================================================
