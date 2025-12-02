@@ -968,6 +968,35 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
     };
   }, [multiplayerRef, myPlayer, opponentPlayer, onGameEnd]);
 
+  // Timer countdown effect
+  useEffect(() => {
+    if (!multiplayerRef.current?.gameLogic) return;
+    
+    const interval = setInterval(() => {
+      const gameLogic = multiplayerRef.current?.gameLogic;
+      if (!gameLogic) {
+        clearInterval(interval);
+        return;
+      }
+      
+      gameLogic.timerRemaining -= 1;
+      
+      if (gameLogic.timerRemaining <= 0) {
+        clearInterval(interval);
+        onGameEnd('timeout');
+        return;
+      }
+      
+      // Update state with new timer value
+      setGameState(prev => ({
+        ...prev,
+        timerRemaining: gameLogic.timerRemaining
+      }));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [multiplayerRef, onGameEnd]); // Only depend on refs that don't change
+
   // Format time display
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -977,7 +1006,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
 
   // Handle piece selection
   const handlePieceSelect = (piece) => {
-    if (! isMyTurn || awaitingDecision) return;
+    if (!isMyTurn || awaitingDecision) return;
     setSelectedPiece(piece);
   };
 

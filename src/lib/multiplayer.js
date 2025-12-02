@@ -28,21 +28,21 @@ const RECONNECT_CONFIG = {
  * Ensure user has a valid session and realtime is authenticated
  */
 async function ensureAuthenticated() {
-  const { data: { session }, error } = await supabase. auth.getSession();
+  const { data: { session }, error } = await supabase.auth.getSession();
   
   if (error) {
     throw new Error('Failed to get session: ' + error.message);
   }
   
   if (!session) {
-    console.log('No session found, signing in anonymously.. .');
+    console.log('No session found, signing in anonymously...');
     const { data, error: signInError } = await supabase.auth.signInAnonymously();
     
     if (signInError) {
       throw new Error('Anonymous sign-in failed: ' + signInError.message);
     }
     
-    if (! data.session) {
+    if (!data.session) {
       throw new Error('No session after anonymous sign-in');
     }
     
@@ -54,16 +54,16 @@ async function ensureAuthenticated() {
       }
     });
     
-    if (data.session?. access_token) {
+    if (data.session?.access_token) {
       supabase.realtime.setAuth(data.session.access_token);
       console.log('Realtime auth token set for new session');
     }
     
     console.log('Anonymous sign-in successful');
-    return data. user;
+    return data.user;
   }
   
-  if (session?. access_token) {
+  if (session?.access_token) {
     supabase.realtime.setAuth(session.access_token);
     console.log('Realtime auth token set for existing session');
   }
@@ -77,23 +77,23 @@ async function ensureAuthenticated() {
 
 export class MultiplayerGameHost {
   constructor() {
-    this. gameId = null;
+    this.gameId = null;
     this.userId = null;
     this.userName = null;
     this.gameLogic = null;
-    this. realtimeChannel = null;
-    this. isConnected = false;
-    this. reconnectAttempts = 0;
-    this.maxReconnectAttempts = RECONNECT_CONFIG. MAX_ATTEMPTS;
+    this.realtimeChannel = null;
+    this.isConnected = false;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = RECONNECT_CONFIG.MAX_ATTEMPTS;
   }
 
   async createGame(imageFile, settings = {}) {
     try {
       const user = await ensureAuthenticated();
-      this.userId = user. id;
-      this.userName = user. user_metadata?.username || 'Player A';
+      this.userId = user.id;
+      this.userName = user.user_metadata?.username || 'Player A';
 
-      console.log('Authenticated as:', this.userName, '(ID:', this. userId, ')');
+      console.log('Authenticated as:', this.userName, '(ID:', this.userId, ')');
 
       console.log('Step 1: Uploading image...');
       const { id: imageId, url: imageUrl } = await storageService.uploadPuzzleImage(
@@ -102,14 +102,14 @@ export class MultiplayerGameHost {
       );
 
       console.log('Step 2: Processing image into pieces...');
-      const processor = new ImageProcessor(imageUrl, settings. gridSize || 10);
+      const processor = new ImageProcessor(imageUrl, settings.gridSize || 10);
       await processor.loadImage();
       const { pieces, gridDimensions } = await processor.sliceImage();
 
       console.log('Step 3: Creating game record...');
       const game = await gameService.createGame(this.userId, {
         mode: 'multiplayer',
-        gridSize: gridDimensions. totalPieces,
+        gridSize: gridDimensions.totalPieces,
         timeLimit: settings.timeLimit || 600,
         imageId: imageId,
         playerAName: this.userName
@@ -118,7 +118,7 @@ export class MultiplayerGameHost {
       this.gameId = game.id;
 
       console.log('Step 4: Initializing game logic...');
-      this.gameLogic = new GameLogic(gridDimensions. totalPieces, pieces);
+      this.gameLogic = new GameLogic(gridDimensions.totalPieces, pieces);
       this.gameLogic.initialize();
 
       console.log('Step 5: Setting up realtime state...');
@@ -432,7 +432,7 @@ export class MultiplayerGameHost {
       try {
         await supabase.removeChannel(this.realtimeChannel);
       } catch (err) {
-        console. error('Error cleaning up channel:', err);
+        console.error('Error cleaning up channel:', err);
       }
       this.realtimeChannel = null;
     }
@@ -455,11 +455,11 @@ export class MultiplayerGameHost {
 
 export class MultiplayerGameGuest {
   constructor() {
-    this. gameId = null;
+    this.gameId = null;
     this.userId = null;
     this.userName = null;
-    this. gameLogic = null;
-    this. realtimeChannel = null;
+    this.gameLogic = null;
+    this.realtimeChannel = null;
     this.isConnected = false;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = RECONNECT_CONFIG.MAX_ATTEMPTS;
@@ -468,10 +468,10 @@ export class MultiplayerGameGuest {
   async joinGame(gameCode) {
     try {
       const user = await ensureAuthenticated();
-      this. userId = user.id;
-      this. userName = user.user_metadata?.username || 'Player B';
+      this.userId = user.id;
+      this.userName = user.user_metadata?.username || 'Player B';
 
-      console. log('Authenticated as:', this.userName, '(ID:', this.userId, ')');
+      console.log('Authenticated as:', this.userName, '(ID:', this.userId, ')');
 
       console.log('Step 1: Finding game by code...');
       const game = await gameService.getGameByCode(gameCode);
@@ -497,20 +497,20 @@ export class MultiplayerGameGuest {
       this.gameLogic.importGameState(gameState, gameState.pieces);
 
       console.log('Step 5: Setting up realtime channel (broadcast)...');
-      this.realtimeChannel = await this.setupBroadcastChannel(game. id);
+      this.realtimeChannel = await this.setupBroadcastChannel(game.id);
 
       // Notify host that we joined
-      await this. notifyPlayerJoined();
+      await this.notifyPlayerJoined();
 
-      console.log('✅ Successfully joined game! ');
+      console.log('✅ Successfully joined game!');
       return {
         gameId: game.id,
         game: game,
-        gameState: this.gameLogic. getGameState()
+        gameState: this.gameLogic.getGameState()
       };
 
     } catch (error) {
-      console. error('Error joining game:', error);
+      console.error('Error joining game:', error);
       await this.disconnect();
       throw error;
     }
@@ -527,7 +527,7 @@ export class MultiplayerGameGuest {
       const timeoutId = setTimeout(() => {
         if (!isResolved) {
           isResolved = true;
-          console. error('Channel subscription timeout');
+          console.error('Channel subscription timeout');
           if (channel) {
             supabase.removeChannel(channel).catch(console.error);
           }
@@ -537,7 +537,7 @@ export class MultiplayerGameGuest {
 
       console.log('Creating broadcast channel for game:', gameId);
 
-      channel = supabase. channel(`game:${gameId}`, {
+      channel = supabase.channel(`game:${gameId}`, {
         config: {
           broadcast: { self: false },
           presence: { key: this.userId }
@@ -545,7 +545,7 @@ export class MultiplayerGameGuest {
       });
 
       // Listen for game state updates via broadcast
-      channel. on('broadcast', { event: 'game_state' }, (payload) => {
+      channel.on('broadcast', { event: 'game_state' }, (payload) => {
         console.log('Received game state broadcast:', payload);
         if (payload.payload) {
           this.handleGameStateUpdate(payload.payload);
@@ -553,7 +553,7 @@ export class MultiplayerGameGuest {
       });
 
       // Listen for game metadata updates via broadcast
-      channel. on('broadcast', { event: 'game_meta' }, (payload) => {
+      channel.on('broadcast', { event: 'game_meta' }, (payload) => {
         console.log('Received game meta broadcast:', payload);
         if (payload.payload) {
           this.handleGameUpdate(payload.payload);
@@ -569,7 +569,7 @@ export class MultiplayerGameGuest {
 
       // Subscribe to the channel
       channel.subscribe(async (status, err) => {
-        console.log('Channel status:', status, err ?  `Error: ${err.message}` : '');
+        console.log('Channel status:', status, err ? `Error: ${err.message}` : '');
         
         if (isResolved) return;
         
