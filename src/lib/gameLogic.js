@@ -4,15 +4,14 @@
 
 export class ImageProcessor {
   constructor(imageSource, gridSize = 10) {
-    this.imageSource = imageSource; // URL or File object
-    this.gridSize = gridSize; // e.g., 10x10 = 100 pieces
+    this.imageSource = imageSource;
+    this.gridSize = gridSize;
     this.image = null;
     this.pieces = [];
     this.canvas = document.createElement('canvas');
-    this.ctx = this.canvas.getContext('2d');
+    this.ctx = this.canvas. getContext('2d');
   }
 
-  // Load and process image
   async loadImage() {
     return new Promise((resolve, reject) => {
       const img = new window.Image();
@@ -28,38 +27,33 @@ export class ImageProcessor {
       if (typeof this.imageSource === 'string') {
         img.src = this.imageSource;
       } else {
-        // Handle File object
         const reader = new FileReader();
-        reader.onload = (e) => { img.src = e.target.result; };
+        reader. onload = (e) => { img.src = e.target.result; };
         reader.readAsDataURL(this.imageSource);
       }
     });
   }
 
-  // Calculate optimal grid dimensions based on image aspect ratio
   calculateGridDimensions() {
-    const aspectRatio = this.image.width / this.image.height;
+    const aspectRatio = this. image.width / this.image.height;
     let cols = this.gridSize;
     let rows = this.gridSize;
 
     if (aspectRatio > 1) {
-      // Landscape - more columns
       rows = Math.round(this.gridSize / aspectRatio);
     } else if (aspectRatio < 1) {
-      // Portrait - more rows
-      cols = Math.round(this.gridSize * aspectRatio);
+      cols = Math. round(this.gridSize * aspectRatio);
     }
 
     return { cols, rows, totalPieces: cols * rows };
   }
 
-  // Slice image into rectangular pieces
   async sliceImage() {
-    if (!this.image) await this.loadImage();
+    if (! this.image) await this.loadImage();
 
     const { cols, rows, totalPieces } = this.calculateGridDimensions();
-    const pieceWidth = this.image.width / cols;
-    const pieceHeight = this.image.height / rows;
+    const pieceWidth = this.image. width / cols;
+    const pieceHeight = this. image.height / rows;
 
     this.pieces = [];
 
@@ -67,28 +61,24 @@ export class ImageProcessor {
       for (let col = 0; col < cols; col++) {
         const index = row * cols + col;
         
-        // Set canvas size for this piece
         this.canvas.width = pieceWidth;
         this.canvas.height = pieceHeight;
 
-        // Draw piece portion
         this.ctx.drawImage(
           this.image,
-          col * pieceWidth,      // source x
-          row * pieceHeight,     // source y
-          pieceWidth,            // source width
-          pieceHeight,           // source height
-          0,                     // dest x
-          0,                     // dest y
-          pieceWidth,            // dest width
-          pieceHeight            // dest height
+          col * pieceWidth,
+          row * pieceHeight,
+          pieceWidth,
+          pieceHeight,
+          0,
+          0,
+          pieceWidth,
+          pieceHeight
         );
 
-        // Convert to data URL
         const dataUrl = this.canvas.toDataURL('image/png');
 
-        // Create piece object
-        this.pieces.push({
+        this.pieces. push({
           id: index,
           correctPosition: index,
           row,
@@ -107,12 +97,10 @@ export class ImageProcessor {
     };
   }
 
-  // Determine if piece is on edge
   isEdgePiece(row, col, rows, cols) {
     return row === 0 || row === rows - 1 || col === 0 || col === cols - 1;
   }
 
-  // Get edge types (for logic deduction)
   getEdgeTypes(row, col, rows, cols) {
     return {
       top: row === 0,
@@ -122,9 +110,8 @@ export class ImageProcessor {
     };
   }
 
-  // Shuffle pieces
   shufflePieces() {
-    const shuffled = [...this.pieces];
+    const shuffled = [...this. pieces];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
@@ -132,7 +119,6 @@ export class ImageProcessor {
     return shuffled;
   }
 
-  // Get subset of pieces for player rack
   getPiecesForRack(count = 10) {
     const shuffled = this.shufflePieces();
     return shuffled.slice(0, count);
@@ -147,36 +133,34 @@ export class GameLogic {
   constructor(gridSize = 10, pieces = []) {
     this.gridSize = gridSize;
     this.totalPieces = gridSize * gridSize;
-    this.pieces = pieces; // Array of piece objects
-    this.grid = Array(this.totalPieces).fill(null); // Placed pieces
-    this.piecePool = [...pieces]; // Available pieces
-    this.playerARack = [];
+    this.pieces = pieces;
+    this.grid = Array(this. totalPieces). fill(null);
+    this.piecePool = [... pieces];
+    this. playerARack = [];
     this.playerBRack = [];
     this.currentTurn = 'playerA';
     this.scores = {
       playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 },
       playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 }
     };
-    this.gameState = 'setup'; // setup, active, paused, completed
-    this.moveHistory = [];
-    this.pendingCheck = null; // For pass/check flow
+    this.gameState = 'setup';
+    this. moveHistory = [];
+    this.pendingCheck = null;
   }
 
-  // Initialize game
   initialize() {
     this.fillRack('playerA');
     this.fillRack('playerB');
     this.gameState = 'active';
   }
 
-  // Fill player rack with pieces from pool
   fillRack(player) {
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
-    const needed = 10 - rack.filter(p => p !== null).length;
+    const needed = 10 - rack. filter(p => p !== null).length;
 
-    for (let i = 0; i < needed && this.piecePool.length > 0; i++) {
+    for (let i = 0; i < needed && this.piecePool. length > 0; i++) {
       const piece = this.piecePool.shift();
-      rack.push(piece);
+      rack. push(piece);
     }
 
     if (player === 'playerA') {
@@ -186,20 +170,16 @@ export class GameLogic {
     }
   }
 
-  // Validate piece placement
   isValidPlacement(pieceId, gridIndex) {
-    // Check if grid position is empty
     if (this.grid[gridIndex] !== null) {
       return { valid: false, reason: 'Position occupied' };
     }
 
-    // Find the piece
-    const piece = this.pieces.find(p => p.id === pieceId);
+    const piece = this.pieces. find(p => p.id === pieceId);
     if (!piece) {
       return { valid: false, reason: 'Piece not found' };
     }
 
-    // Check if placement is correct
     const isCorrect = piece.correctPosition === gridIndex;
 
     return { 
@@ -209,25 +189,21 @@ export class GameLogic {
     };
   }
 
-  // Place piece on grid
   placePiece(player, pieceId, gridIndex) {
     const validation = this.isValidPlacement(pieceId, gridIndex);
     
-    if (!validation.valid) {
+    if (!validation. valid) {
       return { success: false, message: validation.reason };
     }
 
-    // Place piece
     this.grid[gridIndex] = validation.piece;
 
-    // Remove from rack
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
-    const pieceIndex = rack.findIndex(p => p && p.id === pieceId);
+    const pieceIndex = rack. findIndex(p => p && p.id === pieceId);
     if (pieceIndex !== -1) {
       rack[pieceIndex] = null;
     }
 
-    // Record move
     const move = {
       player,
       pieceId,
@@ -237,7 +213,6 @@ export class GameLogic {
     };
     this.moveHistory.push(move);
 
-    // Set pending check
     this.pendingCheck = move;
 
     return {
@@ -248,46 +223,41 @@ export class GameLogic {
     };
   }
 
-  // Pass/Check Flow Implementation
   handleOpponentCheck(opponent, checkDecision) {
-    if (!this.pendingCheck) {
+    if (! this.pendingCheck) {
       return { success: false, message: 'No pending move to check' };
     }
 
     const move = this.pendingCheck;
     
     if (checkDecision === 'check') {
-      // Opponent checks the placement
       if (move.correct) {
-        // Placement was correct - opponent loses points
         this.updateScore(opponent, -5, false);
         this.pendingCheck = null;
         this.switchTurn();
         return {
           success: true,
           result: 'failed_check',
-          message: 'Piece was correct! Opponent loses 5 points.',
+          message: 'Piece was correct!  Opponent loses 5 points.',
           correctPlacement: true
         };
       } else {
-        // Placement was incorrect - opponent gains points
         this.updateScore(opponent, 5, false);
-        this.grid[move.gridIndex] = null; // Remove incorrect piece
+        this.grid[move.gridIndex] = null;
         this.pendingCheck = null;
         this.switchTurn();
         return {
           success: true,
           result: 'successful_check',
-          message: 'Piece was incorrect! Opponent gains 5 points.',
+          message: 'Piece was incorrect!  Opponent gains 5 points.',
           correctPlacement: false
         };
       }
     } else {
-      // Opponent passes - placer gets to check themselves
       return {
         success: true,
         result: 'opponent_passed',
-        message: 'Opponent passed. Your turn to check or pass.',
+        message: 'Opponent passed.  Your turn to check or pass.',
         awaitingPlacerDecision: true
       };
     }
@@ -301,19 +271,17 @@ export class GameLogic {
     const move = this.pendingCheck;
     
     if (checkDecision === 'check') {
-      // Placer self-checks
       if (move.correct) {
         this.updateScore(placer, 10, true);
-        this.pendingCheck = null;
-        this.switchTurn();
+        this. pendingCheck = null;
+        this. switchTurn();
         return {
           success: true,
           result: 'correct_placement',
-          message: 'Correct! +10 points.',
+          message: 'Correct!  +10 points.',
           correctPlacement: true
         };
       } else {
-        // Self-check reveals error
         this.grid[move.gridIndex] = null;
         this.pendingCheck = null;
         this.switchTurn();
@@ -325,11 +293,9 @@ export class GameLogic {
         };
       }
     } else {
-      // Both passed - hidden penalty
       const opponent = placer === 'playerA' ? 'playerB' : 'playerA';
       
-      if (!move.correct) {
-        // Incorrect piece stayed - opponent gets penalty bonus
+      if (! move.correct) {
         this.updateScore(opponent, 3, false);
       }
       
@@ -338,13 +304,12 @@ export class GameLogic {
       return {
         success: true,
         result: 'both_passed',
-        message: move.correct ? 'Both passed.' : 'Both passed. Opponent gains 3 points for hidden mistake.',
-        hiddenPenalty: !move.correct
+        message: move.correct ? 'Both passed.' : 'Both passed.  Opponent gains 3 points for hidden mistake.',
+        hiddenPenalty: ! move.correct
       };
     }
   }
 
-  // Update player score
   updateScore(player, points, isCorrectPlacement) {
     const score = this.scores[player];
     score.score += points;
@@ -357,76 +322,66 @@ export class GameLogic {
       score.streak = 0;
     }
 
-    // Calculate accuracy
     score.accuracy = score.totalPlacements > 0
       ? Math.round((score.correctPlacements / score.totalPlacements) * 100)
       : 100;
 
-    // Apply streak bonus
     if (score.streak >= 3) {
-      const bonus = Math.floor(score.streak / 3) * 2;
+      const bonus = Math.floor(score. streak / 3) * 2;
       score.score += bonus;
     }
   }
 
-  // Switch turn
   switchTurn() {
     this.currentTurn = this.currentTurn === 'playerA' ? 'playerB' : 'playerA';
     
-    // Refill rack if empty
     const rack = this.currentTurn === 'playerA' ? this.playerARack : this.playerBRack;
     if (rack.every(p => p === null)) {
-      this.fillRack(this.currentTurn);
+      this.fillRack(this. currentTurn);
     }
   }
 
-  // Check if game is complete
   isGameComplete() {
     const allPlaced = this.grid.every(cell => cell !== null);
-    const noMorePieces = this.piecePool.length === 0 && 
+    const noMorePieces = this. piecePool.length === 0 && 
                          this.playerARack.every(p => p === null) &&
-                         this.playerBRack.every(p => p === null);
+                         this. playerBRack. every(p => p === null);
     
     return allPlaced || noMorePieces;
   }
 
-  // Get winner
   getWinner() {
-    if (!this.isGameComplete()) return null;
+    if (! this.isGameComplete()) return null;
 
-    const scoreA = this.scores.playerA.score;
-    const scoreB = this.scores.playerB.score;
+    const scoreA = this.scores.playerA. score;
+    const scoreB = this. scores.playerB. score;
 
     if (scoreA > scoreB) return 'playerA';
     if (scoreB > scoreA) return 'playerB';
     return 'tie';
   }
 
-  // Get hint (reveal correct position for a piece)
   getHint(player) {
-    const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
+    const rack = player === 'playerA' ? this. playerARack : this.playerBRack;
     const availablePieces = rack.filter(p => p !== null);
     
     if (availablePieces.length === 0) return null;
 
-    // Find a piece that hasn't been placed yet
     const hintPiece = availablePieces[0];
     return {
-      pieceId: hintPiece.id,
+      pieceId: hintPiece. id,
       correctPosition: hintPiece.correctPosition
     };
   }
 
-  // Peek opponent rack (temporary view)
   peekOpponentRack(player) {
-    const opponentRack = player === 'playerA' ? this.playerBRack : this.playerARack;
-    return [...opponentRack]; // Return copy
+    const opponentRack = player === 'playerA' ?  this.playerBRack : this.playerARack;
+    return [...opponentRack];
   }
 
-  // Get game state snapshot
   getGameState() {
     return {
-      grid: [...this.grid],
+      grid: [... this.grid],
       currentTurn: this.currentTurn,
       scores: { ...this.scores },
       playerARack: [...this.playerARack],
@@ -440,32 +395,79 @@ export class GameLogic {
     };
   }
 
-  // Export game data for Firebase
   exportForFirebase() {
     return {
-      grid: this.grid.map(p => p ? { id: p.id, correctPosition: p.correctPosition } : null),
-      currentTurn: this.currentTurn,
-      scores: this.scores,
-      playerARack: this.playerARack.map(p => p ? p.id : null),
-      playerBRack: this.playerBRack.map(p => p ? p.id : null),
+      grid: this.grid.map(p => p ?  { id: p.id, correctPosition: p.correctPosition } : null),
+      currentTurn: this. currentTurn,
+      scores: this. scores,
+      playerARack: this. playerARack.map(p => p ?  p.id : null),
+      playerBRack: this.playerBRack.map(p => p ?  p.id : null),
       piecePool: this.piecePool.map(p => p.id),
       gameState: this.gameState,
       pendingCheck: this.pendingCheck,
-      moveHistory: this.moveHistory
+      moveHistory: this. moveHistory
     };
   }
 
-  // Import game data from Firebase
+  // Import game data from Firebase/Supabase
   importFromFirebase(data, pieces) {
-    this.grid = data.grid.map(p => p ? pieces.find(piece => piece.id === p.id) : null);
-    this.currentTurn = data.currentTurn;
-    this.scores = data.scores;
-    this.playerARack = data.playerARack.map(id => id !== null ? pieces.find(p => p.id === id) : null);
-    this.playerBRack = data.playerBRack.map(id => id !== null ? pieces.find(p => p.id === id) : null);
-    this.piecePool = data.piecePool.map(id => pieces.find(p => p.id === id));
-    this.gameState = data.gameState;
-    this.pendingCheck = data.pendingCheck;
-    this.moveHistory = data.moveHistory || [];
+    // Guard against undefined data
+    if (!data) {
+      console.error('importFromFirebase: data is undefined');
+      return;
+    }
+    
+    if (!pieces || !Array.isArray(pieces)) {
+      console.error('importFromFirebase: pieces is undefined or not an array', pieces);
+      return;
+    }
+
+    console.log('importFromFirebase data:', data);
+    console.log('importFromFirebase pieces count:', pieces.length);
+
+    // Safely import grid (handle both snake_case and camelCase)
+    const gridData = data.grid;
+    this.grid = Array. isArray(gridData) 
+      ?  gridData.map(p => p ? pieces.find(piece => piece.id === p.id) : null)
+      : Array(this.totalPieces).fill(null);
+
+    this.currentTurn = data.current_turn || data.currentTurn || 'playerA';
+    
+    this.scores = data.scores || {
+      playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 },
+      playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 }
+    };
+
+    // Safely import player racks (handle both snake_case and camelCase)
+    const playerARackData = data.player_a_rack || data.playerARack || [];
+    this. playerARack = Array.isArray(playerARackData) 
+      ? playerARackData.map(id => id !== null ? pieces.find(p => p.id === id) : null)
+      : [];
+      
+    const playerBRackData = data.player_b_rack || data.playerBRack || [];
+    this.playerBRack = Array.isArray(playerBRackData)
+      ? playerBRackData.map(id => id !== null ? pieces.find(p => p. id === id) : null)
+      : [];
+
+    // Safely import piece pool (handle both snake_case and camelCase)
+    const piecePoolData = data. piece_pool || data.piecePool || [];
+    this. piecePool = Array.isArray(piecePoolData)
+      ? piecePoolData.map(id => pieces.find(p => p.id === id)). filter(Boolean)
+      : [];
+
+    this.gameState = data.game_state || data.gameState || 'active';
+    this. pendingCheck = data.pending_check || data.pendingCheck || null;
+    this.moveHistory = data.move_history || data. moveHistory || [];
+    
+    // Store pieces reference
+    this. pieces = pieces;
+
+    console.log('importFromFirebase complete:', {
+      gridLength: this.grid.length,
+      playerARackLength: this.playerARack.length,
+      playerBRackLength: this. playerBRack. length,
+      piecePoolLength: this.piecePool. length
+    });
   }
 }
 
