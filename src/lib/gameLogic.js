@@ -435,7 +435,7 @@ export class GameLogic {
       current_turn: this.currentTurn,
       timer_remaining: this.timerRemaining,
       pending_check: this.pendingCheck,
-      move_history: this.moveHistory
+      move_history: this.moveHistory,
       // NOTE: 'scores' and 'game_state' columns DO NOT EXIST - removed
       // NOTE: 'pieces' exists but we don't update it after initialization
       // NOTE: 'awaiting_decision' exists and is set separately in makeMove/respondToCheck
