@@ -38,7 +38,25 @@ export const supabase = createClient(url, key, {
     }
   }
 });
+// DEBUG: Log when auth state changes
+supabase.auth.onAuthStateChange(async (event, session) => {
+  console.log('=== AUTH STATE CHANGE ===');
+  console.log('Event:', event);
+  console.log('Session exists:', !!session);
+  console.log('Access token exists:', !!session?.access_token);
+  console.log('Token preview:', session?.access_token?.substring(0, 50) + '...');
+  
+  if (session?. access_token) {
+    console.log('Setting realtime auth.. .');
+    supabase.realtime.setAuth(session.access_token);
+    console. log('Realtime auth set! ');
+    
+    // DEBUG: Check if realtime has the token
+    console.log('Realtime accessToken set:', !!supabase. realtime.accessToken);
+  }
+});
 
+export default supabase;
 /**
  * Set up the realtime client to use the current access token
  * This ensures WebSocket connections are authenticated
