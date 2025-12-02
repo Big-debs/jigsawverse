@@ -9,7 +9,7 @@ export class ImageProcessor {
     this.image = null;
     this.pieces = [];
     this.canvas = document.createElement('canvas');
-    this.ctx = this.canvas. getContext('2d');
+    this.ctx = this.canvas.getContext('2d');
   }
 
   async loadImage() {
@@ -28,32 +28,32 @@ export class ImageProcessor {
         img.src = this.imageSource;
       } else {
         const reader = new FileReader();
-        reader. onload = (e) => { img.src = e.target.result; };
+        reader.onload = (e) => { img.src = e.target.result; };
         reader.readAsDataURL(this.imageSource);
       }
     });
   }
 
   calculateGridDimensions() {
-    const aspectRatio = this. image.width / this.image.height;
+    const aspectRatio = this.image.width / this.image.height;
     let cols = this.gridSize;
     let rows = this.gridSize;
 
     if (aspectRatio > 1) {
       rows = Math.round(this.gridSize / aspectRatio);
     } else if (aspectRatio < 1) {
-      cols = Math. round(this.gridSize * aspectRatio);
+      cols = Math.round(this.gridSize * aspectRatio);
     }
 
     return { cols, rows, totalPieces: cols * rows };
   }
 
   async sliceImage() {
-    if (! this.image) await this.loadImage();
+    if (!this.image) await this.loadImage();
 
     const { cols, rows, totalPieces } = this.calculateGridDimensions();
-    const pieceWidth = this.image. width / cols;
-    const pieceHeight = this. image.height / rows;
+    const pieceWidth = this.image.width / cols;
+    const pieceHeight = this.image.height / rows;
 
     this.pieces = [];
 
@@ -78,7 +78,7 @@ export class ImageProcessor {
 
         const dataUrl = this.canvas.toDataURL('image/png');
 
-        this.pieces. push({
+        this.pieces.push({
           id: index,
           correctPosition: index,
           row,
@@ -111,7 +111,7 @@ export class ImageProcessor {
   }
 
   shufflePieces() {
-    const shuffled = [...this. pieces];
+    const shuffled = [...this.pieces];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
@@ -130,13 +130,13 @@ export class ImageProcessor {
 // =====================================================
 
 export class GameLogic {
-  constructor(gridSize = 10, pieces = []) {
-    this.gridSize = gridSize;
-    this.totalPieces = gridSize * gridSize;
+  constructor(totalPieces = 100, pieces = []) {
+    this.totalPieces = totalPieces;
+    this.gridSize = Math.round(Math.sqrt(totalPieces));
     this.pieces = pieces;
-    this.grid = Array(this. totalPieces). fill(null);
-    this.piecePool = [... pieces];
-    this. playerARack = [];
+    this.grid = Array(this.totalPieces).fill(null);
+    this.piecePool = [...pieces];
+    this.playerARack = [];
     this.playerBRack = [];
     this.currentTurn = 'playerA';
     this.scores = {
@@ -144,7 +144,7 @@ export class GameLogic {
       playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 }
     };
     this.gameState = 'setup';
-    this. moveHistory = [];
+    this.moveHistory = [];
     this.pendingCheck = null;
     this.timerRemaining = 600; // Default 10 minutes
   }
@@ -157,11 +157,11 @@ export class GameLogic {
 
   fillRack(player) {
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
-    const needed = 10 - rack. filter(p => p !== null).length;
+    const needed = 10 - rack.filter(p => p !== null).length;
 
-    for (let i = 0; i < needed && this.piecePool. length > 0; i++) {
+    for (let i = 0; i < needed && this.piecePool.length > 0; i++) {
       const piece = this.piecePool.shift();
-      rack. push(piece);
+      rack.push(piece);
     }
 
     if (player === 'playerA') {
@@ -176,7 +176,7 @@ export class GameLogic {
       return { valid: false, reason: 'Position occupied' };
     }
 
-    const piece = this.pieces. find(p => p.id === pieceId);
+    const piece = this.pieces.find(p => p.id === pieceId);
     if (!piece) {
       return { valid: false, reason: 'Piece not found' };
     }
@@ -191,16 +191,21 @@ export class GameLogic {
   }
 
   placePiece(player, pieceId, gridIndex) {
+    // Add bounds check
+    if (gridIndex < 0 || gridIndex >= this.totalPieces) {
+      return { success: false, message: 'Invalid grid position' };
+    }
+    
     const validation = this.isValidPlacement(pieceId, gridIndex);
     
-    if (!validation. valid) {
+    if (!validation.valid) {
       return { success: false, message: validation.reason };
     }
 
     this.grid[gridIndex] = validation.piece;
 
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
-    const pieceIndex = rack. findIndex(p => p && p.id === pieceId);
+    const pieceIndex = rack.findIndex(p => p && p.id === pieceId);
     if (pieceIndex !== -1) {
       rack[pieceIndex] = null;
     }
@@ -225,7 +230,7 @@ export class GameLogic {
   }
 
   handleOpponentCheck(opponent, checkDecision) {
-    if (! this.pendingCheck) {
+    if (!this.pendingCheck) {
       return { success: false, message: 'No pending move to check' };
     }
 
@@ -274,8 +279,8 @@ export class GameLogic {
     if (checkDecision === 'check') {
       if (move.correct) {
         this.updateScore(placer, 10, true);
-        this. pendingCheck = null;
-        this. switchTurn();
+        this.pendingCheck = null;
+        this.switchTurn();
         return {
           success: true,
           result: 'correct_placement',
@@ -296,7 +301,7 @@ export class GameLogic {
     } else {
       const opponent = placer === 'playerA' ? 'playerB' : 'playerA';
       
-      if (! move.correct) {
+      if (!move.correct) {
         this.updateScore(opponent, 3, false);
       }
       
@@ -306,7 +311,7 @@ export class GameLogic {
         success: true,
         result: 'both_passed',
         message: move.correct ? 'Both passed.' : 'Both passed.  Opponent gains 3 points for hidden mistake.',
-        hiddenPenalty: ! move.correct
+        hiddenPenalty: !move.correct
       };
     }
   }
@@ -328,7 +333,7 @@ export class GameLogic {
       : 100;
 
     if (score.streak >= 3) {
-      const bonus = Math.floor(score. streak / 3) * 2;
+      const bonus = Math.floor(score.streak / 3) * 2;
       score.score += bonus;
     }
   }
@@ -338,24 +343,24 @@ export class GameLogic {
     
     const rack = this.currentTurn === 'playerA' ? this.playerARack : this.playerBRack;
     if (rack.every(p => p === null)) {
-      this.fillRack(this. currentTurn);
+      this.fillRack(this.currentTurn);
     }
   }
 
   isGameComplete() {
     const allPlaced = this.grid.every(cell => cell !== null);
-    const noMorePieces = this. piecePool.length === 0 && 
+    const noMorePieces = this.piecePool.length === 0 && 
                          this.playerARack.every(p => p === null) &&
-                         this. playerBRack. every(p => p === null);
+                         this.playerBRack.every(p => p === null);
     
     return allPlaced || noMorePieces;
   }
 
   getWinner() {
-    if (! this.isGameComplete()) return null;
+    if (!this.isGameComplete()) return null;
 
-    const scoreA = this.scores.playerA. score;
-    const scoreB = this. scores.playerB. score;
+    const scoreA = this.scores.playerA.score;
+    const scoreB = this.scores.playerB.score;
 
     if (scoreA > scoreB) return 'playerA';
     if (scoreB > scoreA) return 'playerB';
@@ -363,26 +368,26 @@ export class GameLogic {
   }
 
   getHint(player) {
-    const rack = player === 'playerA' ? this. playerARack : this.playerBRack;
+    const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
     const availablePieces = rack.filter(p => p !== null);
     
     if (availablePieces.length === 0) return null;
 
     const hintPiece = availablePieces[0];
     return {
-      pieceId: hintPiece. id,
+      pieceId: hintPiece.id,
       correctPosition: hintPiece.correctPosition
     };
   }
 
   peekOpponentRack(player) {
-    const opponentRack = player === 'playerA' ?  this.playerBRack : this.playerARack;
+    const opponentRack = player === 'playerA' ? this.playerBRack : this.playerARack;
     return [...opponentRack];
   }
 
   getGameState() {
     return {
-      grid: [... this.grid],
+      grid: [...this.grid],
       currentTurn: this.currentTurn,
       scores: { ...this.scores },
       playerARack: [...this.playerARack],
@@ -399,11 +404,11 @@ export class GameLogic {
 
   exportForFirebase() {
     return {
-      grid: this.grid.map(p => p ?  { id: p.id, correctPosition: p.correctPosition } : null),
-      currentTurn: this. currentTurn,
-      scores: this. scores,
-      playerARack: this. playerARack.map(p => p ?  p.id : null),
-      playerBRack: this.playerBRack.map(p => p ?  p.id : null),
+      grid: this.grid.map(p => p ? { id: p.id, correctPosition: p.correctPosition } : null),
+      currentTurn: this.currentTurn,
+      scores: this.scores,
+      playerARack: this.playerARack.map(p => p ? p.id : null),
+      playerBRack: this.playerBRack.map(p => p ? p.id : null),
       piecePool: this.piecePool.map(p => p.id),
       gameState: this.gameState,
       pendingCheck: this.pendingCheck,
@@ -414,6 +419,11 @@ export class GameLogic {
 
   // Import game data from Firebase/Supabase (renamed from importFromFirebase)
   importGameState(data, pieces) {
+    // Store pieces reference first
+    if (pieces && Array.isArray(pieces) && pieces.length > 0) {
+      this.pieces = pieces;
+    }
+    
     // Guard against undefined data
     if (!data) {
       console.error('importGameState: data is undefined');
@@ -428,10 +438,13 @@ export class GameLogic {
     console.log('importGameState data:', data);
     console.log('importGameState pieces count:', pieces.length);
 
+    // Use this.pieces for lookups (which now has imageData)
+    const piecesArray = this.pieces;
+
     // Safely import grid (handle both snake_case and camelCase)
     const gridData = data.grid;
-    this.grid = Array. isArray(gridData) 
-      ?  gridData.map(p => p ? pieces.find(piece => piece.id === p.id) : null)
+    this.grid = Array.isArray(gridData) 
+      ? gridData.map(p => p ? piecesArray.find(piece => piece.id === p.id) : null)
       : Array(this.totalPieces).fill(null);
 
     this.currentTurn = data.current_turn || data.currentTurn || 'playerA';
@@ -443,28 +456,25 @@ export class GameLogic {
 
     // Safely import player racks (handle both snake_case and camelCase)
     const playerARackData = data.player_a_rack || data.playerARack || [];
-    this. playerARack = Array.isArray(playerARackData) 
-      ? playerARackData.map(id => id !== null ? pieces.find(p => p.id === id) : null)
+    this.playerARack = Array.isArray(playerARackData) 
+      ? playerARackData.map(id => id !== null ? piecesArray.find(p => p.id === id) : null)
       : [];
       
     const playerBRackData = data.player_b_rack || data.playerBRack || [];
     this.playerBRack = Array.isArray(playerBRackData)
-      ? playerBRackData.map(id => id !== null ? pieces.find(p => p. id === id) : null)
+      ? playerBRackData.map(id => id !== null ? piecesArray.find(p => p.id === id) : null)
       : [];
 
     // Safely import piece pool (handle both snake_case and camelCase)
-    const piecePoolData = data. piece_pool || data.piecePool || [];
-    this. piecePool = Array.isArray(piecePoolData)
-      ? piecePoolData.map(id => pieces.find(p => p.id === id)). filter(Boolean)
+    const piecePoolData = data.piece_pool || data.piecePool || [];
+    this.piecePool = Array.isArray(piecePoolData)
+      ? piecePoolData.map(id => piecesArray.find(p => p.id === id)).filter(Boolean)
       : [];
 
     this.gameState = data.game_state || data.gameState || 'active';
     this.pendingCheck = data.pending_check || data.pendingCheck || null;
     this.moveHistory = data.move_history || data.moveHistory || [];
     this.timerRemaining = data.timer_remaining || data.timerRemaining || 600;
-    
-    // Store pieces reference
-    this.pieces = pieces;
 
     console.log('importGameState complete:', {
       gridLength: this.grid.length,

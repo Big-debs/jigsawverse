@@ -968,6 +968,30 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
     };
   }, [multiplayerRef, myPlayer, opponentPlayer, onGameEnd]);
 
+  // Timer countdown effect
+  useEffect(() => {
+    if (!gameState || !multiplayerRef.current) return;
+    
+    const interval = setInterval(() => {
+      if (multiplayerRef.current?.gameLogic) {
+        multiplayerRef.current.gameLogic.timerRemaining -= 1;
+        
+        if (multiplayerRef.current.gameLogic.timerRemaining <= 0) {
+          onGameEnd('timeout');
+          clearInterval(interval);
+          return;
+        }
+        
+        setGameState(prev => ({
+          ...prev,
+          timerRemaining: multiplayerRef.current.gameLogic.timerRemaining
+        }));
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameState, multiplayerRef, onGameEnd]);
+
   // Format time display
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -977,7 +1001,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
 
   // Handle piece selection
   const handlePieceSelect = (piece) => {
-    if (! isMyTurn || awaitingDecision) return;
+    if (!isMyTurn || awaitingDecision) return;
     setSelectedPiece(piece);
   };
 
