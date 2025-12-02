@@ -53,10 +53,11 @@ export const authService = {
     
     if (error) throw error;
     
-    // Update user metadata with guest name
+    // Update user metadata with guest name (timestamp-based to reduce collisions)
+    const guestNumber = Date.now() % 10000;
     const { error: updateError } = await supabase.auth.updateUser({
       data: {
-        username: `Guest_${Math.floor(Math.random() * 10000)}`,
+        username: `Guest_${guestNumber}`,
         display_name: `Guest Player`,
         is_anonymous: true
       }
