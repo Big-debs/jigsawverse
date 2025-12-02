@@ -153,31 +153,51 @@ const JigsawVerseApp = () => {
   const [loading, setLoading] = useState(true);
 
   // Refs for multiplayer instances and connection manager
-  const multiplayerRef = useRef(null);
-  const connectionManagerRef = useRef(new ConnectionManager());
+ // Find and update the guest/anonymous user initialization in JigsawVerseApp.jsx
+// In the useEffect that checks for auth state, ensure anonymous sign-in happens if no user exists
 
-  // Initialize user authentication
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        setLoading(true);
-        // Check for existing session
-        const session = await authService.getSession();
-        if (session?.user) {
-          setUser(session.user);
-        } else {
-          // Create anonymous user for demo purposes
-          const { user: anonUser } = await authService.signInAnonymously();
-          setUser(anonUser);
+// Around line 156-180, update the auth check to auto-sign in anonymously:
+
+useEffect(() => {
+  const initAuth = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?. user) {
+        setUser(session.user);
+      } else {
+        // Auto sign-in anonymously if no session exists
+        const { data, error } = await supabase.auth. signInAnonymously();
+        if (! error && data. user) {
+          // Update with guest metadata
+          await supabase.auth.updateUser({
+            data: {
+              username: `Guest_${Date.now() % 10000}`,
+              display_name: 'Guest Player',
+              is_anonymous: true
+            }
+          });
+          setUser(data. user);
         }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-        // Create a local fallback user for offline/demo mode
-        setUser({
-          id: 'local-' + Math.random().toString(36).substr(2, 9),
-          user_metadata: { username: 'Player' + Math.floor(Math.random() * 1000) }
-        });
-      } finally {
+      }
+    } catch (error) {
+      console. error('Auth initialization failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  initAuth();
+
+  // Listen for auth changes
+  const { data: { subscription } } = supabase.auth. onAuthStateChange(
+    (_event, session) => {
+      setUser(session?.user ??  null);
+    }
+  );
+
+  return () => subscription.unsubscribe();
+}, []);
         setLoading(false);
       }
     };
