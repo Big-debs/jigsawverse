@@ -8,6 +8,7 @@
 5. [Storage APIs](#storage-apis)
 6. [Realtime APIs](#realtime-apis)
 7. [Complete Integration Flow](#complete-integration-flow)
+8. [Deployment Configuration](#deployment-configuration)
 
 ---
 
@@ -112,23 +113,28 @@ export const authService = {
 
   /**
    * Guest login (anonymous)
-   * API: POST /auth/v1/signup (with anonymous flag)
+   * API: POST /auth/v1/signup?type=anonymous
+   * Note: Anonymous Sign-Ins must be enabled in Supabase Dashboard
+   * (Authentication → Sign In / Providers → Anonymous Sign-Ins)
    */
   async loginAsGuest() {
-    const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Use Supabase's built-in anonymous sign-in
+    const { data, error } = await supabase.auth.signInAnonymously();
     
-    const { data, error } = await supabase.auth.signUp({
-      email: `${guestId}@guest.jigsawverse.com`,
-      password: Math.random().toString(36).substr(2, 15),
-      options: {
-        data: {
-          username: `Guest_${Math.floor(Math.random() * 10000)}`,
-          is_guest: true
-        }
+    if (error) throw error;
+    
+    // Update user metadata with guest name
+    const { error: updateError } = await supabase.auth.updateUser({
+      data: {
+        username: `Guest_${Math.floor(Math.random() * 10000)}`,
+        is_guest: true
       }
     });
-
-    if (error) throw error;
+    
+    if (updateError) {
+      console.warn('Failed to update guest metadata:', updateError);
+    }
+    
     return data;
   },
 
@@ -848,6 +854,7 @@ async function makeMove(gameId, pieceId, gridIndex) {
 - `POST /auth/v1/signup` - Sign up
 - `POST /auth/v1/token` - Login
 - `GET /auth/v1/authorize` - OAuth login
+- `POST /auth/v1/signup?type=anonymous` - Anonymous sign-in (Guest)
 - `POST /auth/v1/logout` - Logout
 - `GET /auth/v1/user` - Get current user
 - `PUT /auth/v1/user` - Update profile
@@ -899,5 +906,31 @@ export const handleApiError = (error) => {
   return error.message || 'An unexpected error occurred';
 };
 ```
+
+---
+
+## 6. Deployment Configuration
+
+### Supabase Dashboard Settings
+
+**⚠️ Important: Anonymous Sign-Ins Configuration**
+
+For guest authentication to work properly, **Anonymous Sign-Ins must be enabled in the Supabase Dashboard**:
+
+1. Navigate to your Supabase project dashboard
+2. Go to **Authentication** → **Providers**
+3. Find **Anonymous Sign-Ins** in the list
+4. Toggle it **ON** to enable anonymous authentication
+
+Without this setting enabled, calls to `supabase.auth.signInAnonymously()` will fail with an error.
+
+**Benefits of Anonymous Authentication:**
+- No email confirmation required
+- Provides proper authenticated sessions for WebSocket connections
+- Enables realtime features (multiplayer game sync) for guest users
+- Eliminates 401 Unauthorized errors on `/realtime/v1/websocket` endpoint
+- Users can later convert their anonymous account to a permanent account
+
+---
 
 This comprehensive guide shows ALL API calls needed for your JigsawVerse multiplayer game! 🚀
