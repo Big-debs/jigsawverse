@@ -1251,11 +1251,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
           </div>
 
           {/* Puzzle Thumbnail */}
-          {(gameData?.imagePreview || multiplayerRef.current?.imageUrl) && (
+          {(gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
             <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
               <h3 className="text-white font-semibold mb-3">Reference</h3>
               <img 
-                src={gameData?.imagePreview || multiplayerRef.current?.imageUrl}
+                src={gameData?.imagePreview || multiplayerRef?.current?.imageUrl}
                 alt="Puzzle"
                 className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => setShowPreview(true)}
@@ -1265,7 +1265,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
           )}
 
           {/* Preview Button */}
-          {(gameData?.imagePreview || multiplayerRef.current?.imageUrl) && (
+          {(gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
             <button
               onClick={() => setShowPreview(true)}
               className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded-xl py-3 font-medium transition-colors flex items-center justify-center gap-2"
@@ -1303,7 +1303,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
             </button>
             <h3 className="text-white font-semibold mb-3 text-center">Puzzle Preview</h3>
             <img 
-              src={gameData?.imagePreview || multiplayerRef.current?.imageUrl}
+              src={gameData?.imagePreview || multiplayerRef?.current?.imageUrl}
               alt="Puzzle Preview"
               className="max-w-full max-h-[70vh] object-contain rounded-lg"
             />
