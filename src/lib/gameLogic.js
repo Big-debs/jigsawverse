@@ -443,9 +443,21 @@ export class GameLogic {
 
     // Safely import grid (handle both snake_case and camelCase)
     const gridData = data.grid;
-    this.grid = Array.isArray(gridData) 
-      ? gridData.map(p => p ? piecesArray.find(piece => piece.id === p.id) : null)
-      : Array(this.totalPieces).fill(null);
+    if (Array.isArray(gridData)) {
+      this.grid = gridData.map(p => {
+        // Only consider it a placed piece if p is an object with a valid numeric id
+        if (p && typeof p === 'object' && typeof p.id === 'number') {
+          return piecesArray.find(piece => piece.id === p.id) || null;
+        }
+        return null;
+      });
+      
+      // Debug logging
+      console.log('Grid data from DB:', JSON.stringify(gridData?.slice(0, 5)));
+      console.log('Grid after import:', this.grid.filter(p => p !== null).length, 'pieces placed');
+    } else {
+      this.grid = Array(this.totalPieces).fill(null);
+    }
 
     this.currentTurn = data.current_turn || data.currentTurn || 'playerA';
     
