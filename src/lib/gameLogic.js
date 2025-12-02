@@ -407,7 +407,7 @@ export class GameLogic {
       piecePool: this.piecePool.map(p => p.id),
       gameState: this.gameState,
       pendingCheck: this.pendingCheck,
-      moveHistory: this. moveHistory,
+      moveHistory: this.moveHistory,
       timerRemaining: this.timerRemaining
     };
   }
@@ -459,18 +459,18 @@ export class GameLogic {
       : [];
 
     this.gameState = data.game_state || data.gameState || 'active';
-    this. pendingCheck = data.pending_check || data.pendingCheck || null;
-    this.moveHistory = data.move_history || data. moveHistory || [];
+    this.pendingCheck = data.pending_check || data.pendingCheck || null;
+    this.moveHistory = data.move_history || data.moveHistory || [];
     this.timerRemaining = data.timer_remaining || data.timerRemaining || 600;
     
     // Store pieces reference
-    this. pieces = pieces;
+    this.pieces = pieces;
 
     console.log('importGameState complete:', {
       gridLength: this.grid.length,
       playerARackLength: this.playerARack.length,
-      playerBRackLength: this. playerBRack. length,
-      piecePoolLength: this.piecePool. length,
+      playerBRackLength: this.playerBRack.length,
+      piecePoolLength: this.piecePool.length,
       timerRemaining: this.timerRemaining
     });
   }

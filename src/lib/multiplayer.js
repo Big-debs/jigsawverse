@@ -311,10 +311,10 @@ export class MultiplayerGameHost {
   }
 
   handleGameStateUpdate(newState) {
-    if (! this.gameLogic) return;
-    this.gameLogic. importGameState(newState, newState.pieces);
+    if (!this.gameLogic) return;
+    this.gameLogic.importGameState(newState, newState.pieces);
     if (this.onStateUpdate) {
-      this.onStateUpdate(this.gameLogic. getGameState());
+      this.onStateUpdate(this.gameLogic.getGameState());
     }
   }
 
@@ -383,11 +383,11 @@ export class MultiplayerGameHost {
       } : null),
       player_a_rack: this.gameLogic.playerARack. map(p => p ? p.id : null),
       player_b_rack: this. gameLogic.playerBRack.map(p => p ?  p.id : null),
-      piece_pool: this.gameLogic.piecePool.map(p => p. id),
-      current_turn: this.gameLogic. currentTurn,
+      piece_pool: this.gameLogic.piecePool.map(p => p.id),
+      current_turn: this.gameLogic.currentTurn,
       pending_check: this.gameLogic.pendingCheck,
-      awaiting_decision: result.awaitingCheck ?  'opponent_check' : null,
-      move_history: this. gameLogic.moveHistory,
+      awaiting_decision: result.awaitingCheck ? 'opponent_check' : null,
+      move_history: this.gameLogic.moveHistory,
       timer_remaining: this.gameLogic.timerRemaining
     });
 
@@ -490,11 +490,11 @@ export class MultiplayerGameGuest {
       await gameService.joinGame(gameCode, this.userId, this.userName);
 
       console.log('Step 3: Loading game state...');
-      const gameState = await realtimeService.getGameState(game. id);
+      const gameState = await realtimeService.getGameState(game.id);
 
-      console.log('Step 4: Initializing game logic.. .');
-      this. gameLogic = new GameLogic(game.grid_size, gameState.pieces);
-      this.gameLogic.importGameState(gameState, gameState. pieces);
+      console.log('Step 4: Initializing game logic...');
+      this.gameLogic = new GameLogic(game.grid_size, gameState.pieces);
+      this.gameLogic.importGameState(gameState, gameState.pieces);
 
       console.log('Step 5: Setting up realtime channel (broadcast)...');
       this.realtimeChannel = await this.setupBroadcastChannel(game. id);
@@ -702,11 +702,11 @@ export class MultiplayerGameGuest {
       } : null),
       player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
       player_b_rack: this.gameLogic.playerBRack.map(p => p ? p. id : null),
-      piece_pool: this.gameLogic.piecePool. map(p => p.id),
-      current_turn: this.gameLogic. currentTurn,
+      piece_pool: this.gameLogic.piecePool.map(p => p.id),
+      current_turn: this.gameLogic.currentTurn,
       pending_check: this.gameLogic.pendingCheck,
       awaiting_decision: result.awaitingCheck ? 'opponent_check' : null,
-      move_history: this.gameLogic. moveHistory,
+      move_history: this.gameLogic.moveHistory,
       timer_remaining: this.gameLogic.timerRemaining
     });
 
