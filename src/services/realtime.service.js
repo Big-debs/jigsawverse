@@ -8,6 +8,7 @@ export const realtimeService = {
   // Initialize game state
   async initializeGameState(gameId, pieces, gridSize) {
     // Store only piece metadata, not the full imageData
+    // imageData is NOT stored - it's reconstructed client-side
     const piecesMetadata = pieces.map(p => ({
       id: p.id,
       correctPosition: p.correctPosition,
@@ -15,7 +16,6 @@ export const realtimeService = {
       col: p.col,
       isEdge: p.isEdge,
       edges: p.edges
-      // imageData is NOT stored - it's reconstructed client-side
     }));
 
     // Ensure we're creating an array of null values, not undefined
