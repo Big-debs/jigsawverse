@@ -9,8 +9,6 @@ const supabaseAnonKey = import. meta.env. VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables! ');
-  console.error('VITE_SUPABASE_URL:', supabaseUrl ?  'SET' : 'MISSING');
-  console. error('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'SET' : 'MISSING');
 }
 
 const url = supabaseUrl || 'https://placeholder.supabase. co';
@@ -38,6 +36,7 @@ export const supabase = createClient(url, key, {
     }
   }
 });
+
 // DEBUG: Log when auth state changes
 supabase.auth.onAuthStateChange(async (event, session) => {
   console.log('=== AUTH STATE CHANGE ===');
