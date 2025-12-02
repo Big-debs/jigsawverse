@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Upload, Users, User, Play, ChevronRight, Image, Eye, Shuffle, RotateCcw, Maximize2, Check, X, Zap, Mail, Lock, LogIn, UserPlus } from 'lucide-react';
+import { authService } from '../services/auth.service';
 
 const JigsawRedesign = () => {
   const [currentScreen, setCurrentScreen] = useState('welcome');
@@ -218,15 +219,23 @@ const JigsawRedesign = () => {
             </button>
           </div>
 
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setCurrentScreen('home')}
-              className="text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors"
-            >
-              Continue as Guest →
-            </button>
-          </div>
-        </div>
+         <div className="mt-6 text-center">
+  <button
+    onClick={async () => {
+      try {
+        await authService.signInAnonymously();
+        setCurrentScreen('home');
+      } catch (error) {
+        console. error('Guest sign-in failed:', error);
+        // Still allow navigation but log the error
+        setCurrentScreen('home');
+      }
+    }}
+    className="text-purple-400 hover:text-purple-300 text-sm font-medium transition-colors"
+  >
+    Continue as Guest →
+  </button>
+</div>
       </div>
     </div>
   );
