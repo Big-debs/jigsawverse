@@ -7,6 +7,17 @@ import { supabase } from '../config/supabase';
 export const realtimeService = {
   // Initialize game state
   async initializeGameState(gameId, pieces, gridSize) {
+    // Store only piece metadata, not the full imageData
+    const piecesMetadata = pieces.map(p => ({
+      id: p.id,
+      correctPosition: p.correctPosition,
+      row: p.row,
+      col: p.col,
+      isEdge: p.isEdge,
+      edges: p.edges
+      // imageData is NOT stored - it's reconstructed client-side
+    }));
+
     // Ensure we're creating an array of null values, not undefined
     const emptyGrid = [];
     for (let i = 0; i < gridSize; i++) {
@@ -21,7 +32,7 @@ export const realtimeService = {
         player_a_rack: pieces.slice(0, 10).map(p => p.id),
         player_b_rack: pieces.slice(10, 20).map(p => p.id),
         piece_pool: pieces.slice(20).map(p => p.id),
-        pieces: pieces,
+        pieces: piecesMetadata,  // Smaller payload without imageData
         current_turn: 'playerA',
         timer_remaining: 600
       })

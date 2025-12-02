@@ -19,15 +19,29 @@ const CHANNEL_STATUS = {
 
 const RECONNECT_CONFIG = {
   BASE_DELAY: 1000,
-  MAX_DELAY: 30000,
-  MAX_ATTEMPTS: 5,
-  CHANNEL_TIMEOUT: 30000
+  MAX_DELAY: 15000,      // Reduced from 30000
+  MAX_ATTEMPTS: 3,        // Reduced from 5
+  CHANNEL_TIMEOUT: 10000  // Reduced from 30000
 };
+
+// Cache the authenticated user at module level
+let cachedUser = null;
+let cachedUserId = null;
 
 /**
  * Ensure user has a valid session and realtime is authenticated
  */
 async function ensureAuthenticated() {
+  // Return cached user if available and session is valid
+  if (cachedUser && cachedUserId) {
+    // Quick session check without network call
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.id === cachedUserId) {
+      return cachedUser;
+    }
+  }
+
+  // Full authentication flow only when needed
   const { data: { session }, error } = await supabase.auth.getSession();
   
   if (error) {
@@ -60,6 +74,8 @@ async function ensureAuthenticated() {
     }
     
     console.log('Anonymous sign-in successful');
+    cachedUser = data.user;
+    cachedUserId = data.user.id;
     return data.user;
   }
   
@@ -68,6 +84,8 @@ async function ensureAuthenticated() {
     console.log('Realtime auth token set for existing session');
   }
   
+  cachedUser = session.user;
+  cachedUserId = session.user.id;
   return session.user;
 }
 
@@ -372,35 +390,36 @@ export class MultiplayerGameHost {
     if (!this.gameLogic) throw new Error('Game not initialized');
 
     const currentPlayer = 'playerA';
-    const result = this.gameLogic. placePiece(currentPlayer, pieceId, gridIndex);
+    const result = this.gameLogic.placePiece(currentPlayer, pieceId, gridIndex);
 
-    if (! result. success) {
+    if (!result.success) {
       throw new Error(result.message);
     }
 
-    // Update database
-    await realtimeService.updateGameState(this. gameId, {
-      grid: this.gameLogic.grid. map(p => p ?  { 
-        id: p.id, 
-        correctPosition: p.correctPosition 
-      } : null),
-      player_a_rack: this.gameLogic.playerARack. map(p => p ? p.id : null),
-      player_b_rack: this. gameLogic.playerBRack.map(p => p ?  p.id : null),
-      piece_pool: this.gameLogic.piecePool.map(p => p.id),
-      current_turn: this.gameLogic.currentTurn,
-      pending_check: this.gameLogic.pendingCheck,
-      awaiting_decision: result.awaitingCheck ? 'opponent_check' : null,
-      move_history: this.gameLogic.moveHistory,
-      timer_remaining: this.gameLogic.timerRemaining
-    });
+    // Run database updates in PARALLEL instead of sequential
+    await Promise.all([
+      realtimeService.updateGameState(this.gameId, {
+        grid: this.gameLogic.grid.map(p => p ? { 
+          id: p.id, 
+          correctPosition: p.correctPosition 
+        } : null),
+        player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
+        player_b_rack: this.gameLogic.playerBRack.map(p => p ? p.id : null),
+        piece_pool: this.gameLogic.piecePool.map(p => p.id),
+        current_turn: this.gameLogic.currentTurn,
+        pending_check: this.gameLogic.pendingCheck,
+        awaiting_decision: result.awaitingCheck ? 'opponent_check' : null,
+        move_history: this.gameLogic.moveHistory,
+        timer_remaining: this.gameLogic.timerRemaining
+      }),
+      gameService.updateGame(this.gameId, {
+        player_a_score: this.gameLogic.scores.playerA.score,
+        player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
+        player_a_streak: this.gameLogic.scores.playerA.streak
+      })
+    ]);
 
-    await gameService.updateGame(this.gameId, {
-      player_a_score: this.gameLogic.scores.playerA. score,
-      player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
-      player_a_streak: this.gameLogic.scores.playerA.streak
-    });
-
-    // Broadcast state to opponent
+    // Broadcast state to opponent after DB updates complete
     await this.broadcastGameState();
 
     return result;
@@ -411,8 +430,8 @@ export class MultiplayerGameHost {
 
     const result = this.gameLogic.handleOpponentCheck('playerA', decision);
 
-    await realtimeService.updateGameState(this. gameId, {
-      ... this.gameLogic.exportForFirebase(),
+    await realtimeService.updateGameState(this.gameId, {
+      ...this.gameLogic.exportForDatabase(),
       awaiting_decision: result.awaitingPlacerDecision ? 'placer_check' : null
     });
 
@@ -700,30 +719,31 @@ export class MultiplayerGameGuest {
       throw new Error(result.message);
     }
 
-    // Update database
-    await realtimeService.updateGameState(this.gameId, {
-      grid: this.gameLogic.grid.map(p => p ?  { 
-        id: p.id, 
-        correctPosition: p.correctPosition 
-      } : null),
-      player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
-      player_b_rack: this.gameLogic.playerBRack.map(p => p ? p. id : null),
-      piece_pool: this.gameLogic.piecePool.map(p => p.id),
-      current_turn: this.gameLogic.currentTurn,
-      pending_check: this.gameLogic.pendingCheck,
-      awaiting_decision: result.awaitingCheck ? 'opponent_check' : null,
-      move_history: this.gameLogic.moveHistory,
-      timer_remaining: this.gameLogic.timerRemaining
-    });
+    // Run database updates in PARALLEL instead of sequential
+    await Promise.all([
+      realtimeService.updateGameState(this.gameId, {
+        grid: this.gameLogic.grid.map(p => p ? { 
+          id: p.id, 
+          correctPosition: p.correctPosition 
+        } : null),
+        player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
+        player_b_rack: this.gameLogic.playerBRack.map(p => p ? p.id : null),
+        piece_pool: this.gameLogic.piecePool.map(p => p.id),
+        current_turn: this.gameLogic.currentTurn,
+        pending_check: this.gameLogic.pendingCheck,
+        awaiting_decision: result.awaitingCheck ? 'opponent_check' : null,
+        move_history: this.gameLogic.moveHistory,
+        timer_remaining: this.gameLogic.timerRemaining
+      }),
+      gameService.updateGame(this.gameId, {
+        player_b_score: this.gameLogic.scores.playerB.score,
+        player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
+        player_b_streak: this.gameLogic.scores.playerB.streak
+      })
+    ]);
 
-    await gameService.updateGame(this.gameId, {
-      player_b_score: this. gameLogic.scores.playerB.score,
-      player_b_accuracy: this. gameLogic.scores.playerB.accuracy,
-      player_b_streak: this.gameLogic. scores.playerB. streak
-    });
-
-    // Broadcast state to host
-    await this. broadcastGameState();
+    // Broadcast state to host after DB updates complete
+    await this.broadcastGameState();
 
     return result;
   }
@@ -734,7 +754,7 @@ export class MultiplayerGameGuest {
     const result = this.gameLogic.handleOpponentCheck('playerB', decision);
 
     await realtimeService.updateGameState(this.gameId, {
-      ...this.gameLogic. exportForFirebase(),
+      ...this.gameLogic.exportForDatabase(),
       awaiting_decision: result.awaitingPlacerDecision ? 'placer_check' : null
     });
 
