@@ -970,27 +970,32 @@ const GameplayScreen = ({ isHost, multiplayerRef, onGameEnd, onExit, setError })
 
   // Timer countdown effect
   useEffect(() => {
-    if (!gameState || !multiplayerRef.current) return;
+    if (!multiplayerRef.current?.gameLogic) return;
     
     const interval = setInterval(() => {
-      if (multiplayerRef.current?.gameLogic) {
-        multiplayerRef.current.gameLogic.timerRemaining -= 1;
-        
-        if (multiplayerRef.current.gameLogic.timerRemaining <= 0) {
-          onGameEnd('timeout');
-          clearInterval(interval);
-          return;
-        }
-        
-        setGameState(prev => ({
-          ...prev,
-          timerRemaining: multiplayerRef.current.gameLogic.timerRemaining
-        }));
+      const gameLogic = multiplayerRef.current?.gameLogic;
+      if (!gameLogic) {
+        clearInterval(interval);
+        return;
       }
+      
+      gameLogic.timerRemaining -= 1;
+      
+      if (gameLogic.timerRemaining <= 0) {
+        clearInterval(interval);
+        onGameEnd('timeout');
+        return;
+      }
+      
+      // Update state with new timer value
+      setGameState(prev => ({
+        ...prev,
+        timerRemaining: gameLogic.timerRemaining
+      }));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameState, multiplayerRef, onGameEnd]);
+  }, [multiplayerRef, onGameEnd]); // Only depend on refs that don't change
 
   // Format time display
   const formatTime = (seconds) => {
