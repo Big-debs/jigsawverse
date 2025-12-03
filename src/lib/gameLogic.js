@@ -266,7 +266,7 @@ export class GameLogic {
         return {
           success: true,
           result: 'failed_check',
-          message: 'Piece was correct!  Opponent loses 5 points.',
+          message: 'Piece was correct! Opponent loses 5 points.',
           correctPlacement: true
         };
       } else {
@@ -277,7 +277,7 @@ export class GameLogic {
         return {
           success: true,
           result: 'successful_check',
-          message: 'Piece was incorrect!  Opponent gains 5 points.',
+          message: 'Piece was incorrect! Opponent gains 5 points.',
           correctPlacement: false
         };
       }
@@ -285,7 +285,7 @@ export class GameLogic {
       return {
         success: true,
         result: 'opponent_passed',
-        message: 'Opponent passed.  Your turn to check or pass.',
+        message: 'Opponent passed. Your turn to check or pass.',
         awaitingPlacerDecision: true
       };
     }
@@ -306,7 +306,7 @@ export class GameLogic {
         return {
           success: true,
           result: 'correct_placement',
-          message: 'Correct!  +10 points.',
+          message: 'Correct! +10 points.',
           correctPlacement: true
         };
       } else {
@@ -332,7 +332,7 @@ export class GameLogic {
       return {
         success: true,
         result: 'both_passed',
-        message: move.correct ? 'Both passed.' : 'Both passed.  Opponent gains 3 points for hidden mistake.',
+        message: move.correct ? 'Both passed.' : 'Both passed. Opponent gains 3 points for hidden mistake.',
         hiddenPenalty: !move.correct
       };
     }
@@ -435,8 +435,8 @@ export class GameLogic {
       current_turn: this.currentTurn,
       timer_remaining: this.timerRemaining,
       pending_check: this.pendingCheck,
-      move_history: this.moveHistory,
-      // NOTE: 'scores' and 'game_state' columns DO NOT EXIST - removed
+      move_history: this.moveHistory
+      // NOTE: 'scores' and 'game_state' columns DO NOT EXIST in database - removed
       // NOTE: 'pieces' exists but we don't update it after initialization
       // NOTE: 'awaiting_decision' exists and is set separately in makeMove/respondToCheck
     };
