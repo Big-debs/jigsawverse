@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Eye } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import { authService } from '../services/auth.service';
+import { gameService } from '../services/game.service';
 import { MultiplayerGameHost, MultiplayerGameGuest } from '../lib/multiplayer';
 
 // =====================================================
@@ -373,8 +374,35 @@ const JigsawVerseApp = () => {
             isHost={isHost}
             multiplayerRef={multiplayerRef}
             gameData={gameData}
-            onGameEnd={(winner) => {
-              navigate(ROUTES.GAME_OVER, { winner });
+            onGameEnd={async (winner) => {
+              // Save final scores when game ends
+              if (multiplayerRef.current?.gameLogic && multiplayerRef.current?.gameId) {
+                const finalState = multiplayerRef.current.gameLogic.getGameState();
+                try {
+                  const updatedGame = await gameService.updateGame(multiplayerRef.current.gameId, {
+                    status: 'completed',
+                    player_a_score: finalState.scores.playerA.score,
+                    player_b_score: finalState.scores.playerB.score,
+                    player_a_accuracy: finalState.scores.playerA.accuracy,
+                    player_b_accuracy: finalState.scores.playerB.accuracy
+                  });
+                  // Update gameData with final scores
+                  navigate(ROUTES.GAME_OVER, { 
+                    winner,
+                    game: updatedGame,
+                    finalScores: finalState.scores
+                  });
+                } catch (err) {
+                  console.error('Failed to save final scores:', err);
+                  // Still navigate to game over screen even if save fails
+                  navigate(ROUTES.GAME_OVER, { 
+                    winner,
+                    finalScores: finalState.scores
+                  });
+                }
+              } else {
+                navigate(ROUTES.GAME_OVER, { winner });
+              }
             }}
             onExit={async () => {
               if (multiplayerRef.current) {
