@@ -412,7 +412,10 @@ export class GameLogic {
     
     const rack = this.currentTurn === 'playerA' ? this.playerARack : this.playerBRack;
     // Check for empty or all null/undefined
-    const hasNoPieces = !rack || rack.length === 0 || rack.every(p => p === null || p === undefined);
+    let hasNoPieces = !rack || rack.length === 0;
+    if (rack && !hasNoPieces) {
+      hasNoPieces = rack.every(p => p === null || p === undefined);
+    }
     
     if (hasNoPieces && this.piecePool.length > 0) {
       console.log(`${this.currentTurn} rack is empty, refilling...`);
