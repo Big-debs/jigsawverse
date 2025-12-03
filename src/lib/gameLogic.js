@@ -266,7 +266,7 @@ export class GameLogic {
         return {
           success: true,
           result: 'failed_check',
-          message: 'Piece was correct!  Opponent loses 5 points.',
+          message: 'Piece was correct! Opponent loses 5 points.',
           correctPlacement: true
         };
       } else {
@@ -277,7 +277,7 @@ export class GameLogic {
         return {
           success: true,
           result: 'successful_check',
-          message: 'Piece was incorrect!  Opponent gains 5 points.',
+          message: 'Piece was incorrect! Opponent gains 5 points.',
           correctPlacement: false
         };
       }
@@ -285,7 +285,7 @@ export class GameLogic {
       return {
         success: true,
         result: 'opponent_passed',
-        message: 'Opponent passed.  Your turn to check or pass.',
+        message: 'Opponent passed. Your turn to check or pass.',
         awaitingPlacerDecision: true
       };
     }
@@ -306,7 +306,7 @@ export class GameLogic {
         return {
           success: true,
           result: 'correct_placement',
-          message: 'Correct!  +10 points.',
+          message: 'Correct! +10 points.',
           correctPlacement: true
         };
       } else {
@@ -332,7 +332,7 @@ export class GameLogic {
       return {
         success: true,
         result: 'both_passed',
-        message: move.correct ? 'Both passed.' : 'Both passed.  Opponent gains 3 points for hidden mistake.',
+        message: move.correct ? 'Both passed.' : 'Both passed. Opponent gains 3 points for hidden mistake.',
         hiddenPenalty: !move.correct
       };
     }
@@ -427,15 +427,20 @@ export class GameLogic {
   exportForDatabase() {
     return {
       grid: this.grid.map(p => p ? { id: p.id, correctPosition: p.correctPosition } : null),
-      current_turn: this.currentTurn,
-      scores: this.scores,
       player_a_rack: this.playerARack.map(p => p ? p.id : null),
       player_b_rack: this.playerBRack.map(p => p ? p.id : null),
       piece_pool: this.piecePool.map(p => p.id),
       pending_check: this.pendingCheck,
-      move_history: this.moveHistory,
-      timer_remaining: this.timerRemaining
+      move_history: this.moveHistory
+      // NOTE: 'scores' and 'game_state' columns DO NOT EXIST in database - removed
+      // NOTE: 'pieces' exists but we don't update it after initialization
+      // NOTE: 'awaiting_decision' exists and is set separately in makeMove/respondToCheck
     };
+  }
+
+  // Backward compatibility alias
+  exportForFirebase() {
+    return this.exportForDatabase();
   }
 
   // Import game data from Firebase/Supabase (renamed from importFromFirebase)
