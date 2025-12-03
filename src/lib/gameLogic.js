@@ -147,6 +147,7 @@ export class GameLogic {
     this.moveHistory = [];
     this.pendingCheck = null;
     this.timerRemaining = 600; // Default 10 minutes
+    this.isPlacementInProgress = false; // Add placement lock
   }
 
   initialize() {
@@ -157,18 +158,30 @@ export class GameLogic {
 
   fillRack(player) {
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
-    const needed = 10 - rack.filter(p => p !== null).length;
+    
+    // Filter out null AND undefined, then count actual pieces
+    const actualPieces = rack.filter(p => p !== null && p !== undefined);
+    const needed = 10 - actualPieces.length;
 
+    // Create new rack with actual pieces first
+    const newRack = [...actualPieces];
+    
+    // Add pieces from pool
     for (let i = 0; i < needed && this.piecePool.length > 0; i++) {
       const piece = this.piecePool.shift();
-      rack.push(piece);
+      if (piece) {
+        newRack.push(piece);
+      }
     }
 
+    // Update the rack
     if (player === 'playerA') {
-      this.playerARack = rack;
+      this.playerARack = newRack;
     } else {
-      this.playerBRack = rack;
+      this.playerBRack = newRack;
     }
+    
+    console.log(`Refilled ${player} rack: now has ${newRack.length} pieces`);
   }
 
   isValidPlacement(pieceId, gridIndex) {
@@ -202,14 +215,29 @@ export class GameLogic {
   }
 
   placePiece(player, pieceId, gridIndex) {
+    // Check if it's this player's turn
+    if (this.currentTurn !== player) {
+      return { success: false, message: "Not your turn" };
+    }
+    
+    // Check placement lock
+    if (this.isPlacementInProgress) {
+      return { success: false, message: "Placement in progress, please wait" };
+    }
+    
+    // Set lock
+    this.isPlacementInProgress = true;
+    
     // Bounds check
     if (gridIndex < 0 || gridIndex >= this.totalPieces) {
+      this.isPlacementInProgress = false; // Release lock on error
       return { success: false, message: 'Invalid grid position' };
     }
     
     const validation = this.isValidPlacement(pieceId, gridIndex);
     
     if (!validation.valid) {
+      this.isPlacementInProgress = false; // Release lock on error
       return { success: false, message: validation.reason };
     }
 
@@ -300,6 +328,7 @@ export class GameLogic {
     
     if (checkDecision === 'check') {
       if (move.correct) {
+        // Placer checked their own correct placement - award points
         this.updateScore(placer, 10, true);
         this.pendingCheck = null;
         this.switchTurn();
@@ -310,31 +339,46 @@ export class GameLogic {
           correctPlacement: true
         };
       } else {
+        // Placer checked their own incorrect placement - remove piece, no points
         this.grid[move.gridIndex] = null;
         this.pendingCheck = null;
         this.switchTurn();
         return {
           success: true,
           result: 'incorrect_placement',
-          message: 'Incorrect placement detected.',
+          message: 'Incorrect placement detected. Piece removed.',
           correctPlacement: false
         };
       }
     } else {
+      // Placer passed (both players passed)
       const opponent = placer === 'playerA' ? 'playerB' : 'playerA';
       
-      if (!move.correct) {
-        this.updateScore(opponent, 3, false);
+      if (move.correct) {
+        // Both passed, piece was correct - award placer points for correct placement
+        this.updateScore(placer, 5, true);  // Award 5 points for sneaking a correct piece
+        this.pendingCheck = null;
+        this.switchTurn();
+        return {
+          success: true,
+          result: 'both_passed_correct',
+          message: 'Both passed. Piece was correct! +5 points.',
+          correctPlacement: true
+        };
+      } else {
+        // Both passed, piece was WRONG - remove piece and penalize opponent for missing it
+        this.grid[move.gridIndex] = null;  // REMOVE THE INCORRECT PIECE
+        this.updateScore(opponent, 3, false);  // Opponent gets 3 points for hidden mistake
+        this.pendingCheck = null;
+        this.switchTurn();
+        return {
+          success: true,
+          result: 'both_passed_incorrect',
+          message: 'Both passed. Piece was incorrect and removed. Opponent gains 3 points.',
+          hiddenPenalty: true,
+          correctPlacement: false
+        };
       }
-      
-      this.pendingCheck = null;
-      this.switchTurn();
-      return {
-        success: true,
-        result: 'both_passed',
-        message: move.correct ? 'Both passed.' : 'Both passed. Opponent gains 3 points for hidden mistake.',
-        hiddenPenalty: !move.correct
-      };
     }
   }
 
@@ -363,8 +407,18 @@ export class GameLogic {
   switchTurn() {
     this.currentTurn = this.currentTurn === 'playerA' ? 'playerB' : 'playerA';
     
+    // Release placement lock
+    this.isPlacementInProgress = false;
+    
     const rack = this.currentTurn === 'playerA' ? this.playerARack : this.playerBRack;
-    if (rack.every(p => p === null)) {
+    // Check for empty or all null/undefined
+    let hasNoPieces = !rack || rack.length === 0;
+    if (rack && !hasNoPieces) {
+      hasNoPieces = rack.every(p => p === null || p === undefined);
+    }
+    
+    if (hasNoPieces && this.piecePool.length > 0) {
+      console.log(`${this.currentTurn} rack is empty, refilling...`);
       this.fillRack(this.currentTurn);
     }
   }
