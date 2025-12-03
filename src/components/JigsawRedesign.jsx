@@ -226,7 +226,7 @@ const JigsawRedesign = () => {
         await authService.signInAnonymously();
         setCurrentScreen('home');
       } catch (error) {
-        console. error('Guest sign-in failed:', error);
+        console.error('Guest sign-in failed:', error);
         // Still allow navigation but log the error
         setCurrentScreen('home');
       }
@@ -236,6 +236,7 @@ const JigsawRedesign = () => {
     Continue as Guest →
   </button>
 </div>
+        </div>
       </div>
     </div>
   );
