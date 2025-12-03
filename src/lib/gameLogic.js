@@ -430,6 +430,8 @@ export class GameLogic {
       player_a_rack: this.playerARack.map(p => p ? p.id : null),
       player_b_rack: this.playerBRack.map(p => p ? p.id : null),
       piece_pool: this.piecePool.map(p => p.id),
+      current_turn: this.currentTurn,
+      timer_remaining: this.timerRemaining,
       pending_check: this.pendingCheck,
       move_history: this.moveHistory
       // NOTE: 'scores' and 'game_state' columns DO NOT EXIST in database - removed
@@ -461,81 +463,74 @@ export class GameLogic {
       return;
     }
 
-    console.log('importGameState data:', data);
-    console.log('importGameState pieces count:', this.pieces.length);
-
     // Use this.pieces for lookups (which now has imageData)
     const piecesArray = this.pieces;
 
-    // FIX: More robust grid import
+    // Helper function to get piece from ID or object
+    const getPieceFromIdOrObject = (item) => {
+      if (item === null || item === undefined) return null;
+      
+      // Already a full piece with imageData - use it directly
+      if (typeof item === 'object' && item.imageData) {
+        return item;
+      }
+      
+      // Object with just id (from DB) - find full piece with imageData
+      if (typeof item === 'object' && typeof item.id === 'number') {
+        return piecesArray.find(p => p.id === item.id) || null;
+      }
+      
+      // Just a number (piece ID) - find full piece
+      if (typeof item === 'number') {
+        return piecesArray.find(p => p.id === item) || null;
+      }
+      
+      return null;
+    };
+
+    // Import grid using helper
     const gridData = data.grid;
     if (Array.isArray(gridData)) {
-      this.grid = gridData.map((cell, index) => {
-        // Explicitly check for null/undefined - these are empty cells
-        if (cell === null || cell === undefined) {
-          return null;
-        }
-        
-        // Only treat as placed piece if it's an object with valid id AND correctPosition
-        // This ensures we only import actually placed pieces, not just any object
-        if (typeof cell === 'object' && 
-            typeof cell.id === 'number' && 
-            typeof cell.correctPosition === 'number') {
-          const foundPiece = piecesArray.find(piece => piece.id === cell.id);
-          if (foundPiece) {
-            console.log(`Grid[${index}]: Found placed piece ${cell.id}`);
-            return foundPiece;
-          }
-        }
-        
-        // Any other value (empty object, malformed data) = empty cell
-        console.log(`Grid[${index}]: Treating as empty (value: ${JSON.stringify(cell)})`);
-        return null;
-      });
+      this.grid = gridData.map((cell) => getPieceFromIdOrObject(cell));
     } else {
-      // No grid data - initialize empty grid
       this.grid = Array(this.totalPieces).fill(null);
     }
 
-    // Log grid state for debugging
-    const placedCount = this.grid.filter(p => p !== null).length;
-    console.log(`Grid imported: ${placedCount} pieces placed out of ${this.grid.length}`);
-
-    this.currentTurn = data.current_turn || data.currentTurn || 'playerA';
-    
-    this.scores = data.scores || {
-      playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 },
-      playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 }
-    };
-
-    // Safely import player racks (handle both snake_case and camelCase)
+    // Import racks using helper
     const playerARackData = data.player_a_rack || data.playerARack || [];
     this.playerARack = Array.isArray(playerARackData) 
-      ? playerARackData.map(id => id !== null ? piecesArray.find(p => p.id === id) : null)
+      ? playerARackData.map(item => getPieceFromIdOrObject(item))
       : [];
       
     const playerBRackData = data.player_b_rack || data.playerBRack || [];
     this.playerBRack = Array.isArray(playerBRackData)
-      ? playerBRackData.map(id => id !== null ? piecesArray.find(p => p.id === id) : null)
+      ? playerBRackData.map(item => getPieceFromIdOrObject(item))
       : [];
 
-    // Safely import piece pool (handle both snake_case and camelCase)
+    // Import piece pool using helper
     const piecePoolData = data.piece_pool || data.piecePool || [];
     this.piecePool = Array.isArray(piecePoolData)
-      ? piecePoolData.map(id => piecesArray.find(p => p.id === id)).filter(Boolean)
+      ? piecePoolData.map(item => getPieceFromIdOrObject(item)).filter(Boolean)
       : [];
 
+    // Import other state
+    this.currentTurn = data.current_turn || data.currentTurn || 'playerA';
+    this.timerRemaining = data.timer_remaining || data.timerRemaining || 600;
+    this.scores = data.scores || {
+      playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 },
+      playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 }
+    };
     this.gameState = data.game_state || data.gameState || 'active';
     this.pendingCheck = data.pending_check || data.pendingCheck || null;
     this.moveHistory = data.move_history || data.moveHistory || [];
-    this.timerRemaining = data.timer_remaining || data.timerRemaining || 600;
 
     console.log('importGameState complete:', {
       gridLength: this.grid.length,
-      playerARackLength: this.playerARack.length,
-      playerBRackLength: this.playerBRack.length,
+      gridPlaced: this.grid.filter(p => p !== null).length,
+      playerARackLength: this.playerARack.filter(p => p !== null).length,
+      playerBRackLength: this.playerBRack.filter(p => p !== null).length,
       piecePoolLength: this.piecePool.length,
-      timerRemaining: this.timerRemaining
+      currentTurn: this.currentTurn
     });
   }
 }
