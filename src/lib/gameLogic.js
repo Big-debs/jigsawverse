@@ -424,16 +424,12 @@ export class GameLogic {
     };
   }
 
-  // Export game state for database storage
-  // Only includes columns that exist in the game_state table
   exportForDatabase() {
     return {
       grid: this.grid.map(p => p ? { id: p.id, correctPosition: p.correctPosition } : null),
       player_a_rack: this.playerARack.map(p => p ? p.id : null),
       player_b_rack: this.playerBRack.map(p => p ? p.id : null),
       piece_pool: this.piecePool.map(p => p.id),
-      current_turn: this.currentTurn,
-      timer_remaining: this.timerRemaining,
       pending_check: this.pendingCheck,
       move_history: this.moveHistory
       // NOTE: 'scores' and 'game_state' columns DO NOT EXIST in database - removed
