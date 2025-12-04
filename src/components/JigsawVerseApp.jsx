@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Eye } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import { authService } from '../services/auth.service';
@@ -930,6 +930,9 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
 // GAMEPLAY SCREEN - INTEGRATED WITH GAME LOGIC
 // =====================================================
 
+// Game constants
+const RACK_SIZE = 10; // Maximum number of pieces in a player's rack
+
 const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, setError }) => {
   const [gameState, setGameState] = useState(null);
   const [selectedPiece, setSelectedPiece] = useState(null);
@@ -1063,7 +1066,8 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
       const result = await multiplayerRef.current.makeMove(pieceToPlace.id, gridIndex);
       
       if (result.awaitingCheck) {
-        setAwaitingDecision('opponent_check');
+        // We placed a piece, now waiting for opponent to check
+        // Don't set awaitingDecision for ourselves - the opponent will see it
         setLastAction({ 
           type: 'placed', 
           correct: result.correct,
@@ -1134,7 +1138,21 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
   const myStreak = gameState?.scores?.[myPlayer]?.streak || 0;
   const myAccuracy = gameState?.scores?.[myPlayer]?.accuracy || 100;
   const isMyTurn = gameState?.currentTurn === myPlayer && !awaitingDecision;
-  const myRack = isHost ? (gameState?.playerARack || []) : (gameState?.playerBRack || []);
+  
+  // Memoize rack selection to prevent unnecessary re-renders
+  const myRack = useMemo(() => {
+    return isHost ? (gameState?.playerARack || []) : (gameState?.playerBRack || []);
+  }, [isHost, gameState?.playerARack, gameState?.playerBRack]);
+  
+  // Pad rack to exactly RACK_SIZE slots for consistent UI layout (memoized for performance)
+  const paddedRack = useMemo(() => {
+    // Slice to RACK_SIZE max (intentional - game logic maintains max 10 pieces per rack)
+    // Pad with nulls to reach exactly RACK_SIZE slots for consistent grid layout
+    const sliced = myRack.slice(0, RACK_SIZE);
+    const padding = Math.max(0, RACK_SIZE - sliced.length);
+    return [...sliced, ...Array(padding).fill(null)];
+  }, [myRack]);
+  
   const grid = gameState?.grid || [];
   
   // Calculate grid size with proper fallback
@@ -1226,32 +1244,34 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
         <div className="lg:col-span-2">
           <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
             <h3 className="text-white font-semibold mb-4">Puzzle Board</h3>
-            <div 
-              className="grid gap-1 aspect-square"
-              style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
-            >
-              {grid.map((piece, index) => (
-                <button
-                  key={index}
-                  onClick={() => handlePlacement(index)}
-                  disabled={! selectedPiece || piece !== null || ! isMyTurn}
-                  className={`aspect-square rounded border transition-all ${
-                    piece 
-                      ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-white/40' 
-                      : selectedPiece && isMyTurn
-                        ? 'bg-white/10 border-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
-                        : 'bg-white/5 border-white/10'
-                  }`}
-                >
-                  {piece && piece.imageData && (
-                    <img 
-                      src={piece.imageData} 
-                      alt={`Piece ${piece.id}`}
-                      className="w-full h-full object-cover rounded"
-                    />
-                  )}
-                </button>
-              ))}
+            <div className="w-full max-w-full overflow-hidden">
+              <div 
+                className="grid gap-1 aspect-square w-full"
+                style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
+              >
+                {grid.map((piece, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handlePlacement(index)}
+                    disabled={! selectedPiece || piece !== null || ! isMyTurn}
+                    className={`aspect-square rounded border transition-all overflow-hidden ${
+                      piece 
+                        ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-white/40' 
+                        : selectedPiece && isMyTurn
+                          ? 'bg-white/10 border-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
+                          : 'bg-white/5 border-white/10'
+                    }`}
+                  >
+                    {piece && piece.imageData && (
+                      <img 
+                        src={piece.imageData} 
+                        alt={`Piece ${piece.id}`}
+                        className="w-full h-full object-cover rounded"
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -1264,21 +1284,23 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
               Your Pieces ({myRack.filter(p => p !== null).length})
             </h3>
             <div className="grid grid-cols-5 gap-2">
-              {myRack.map((piece, index) => (
-                piece && (
-                  <button
-                    key={index}
-                    onClick={() => handlePieceSelect(piece)}
-                    disabled={!isMyTurn}
-                    className={`aspect-square rounded-lg border-2 transition-all ${
-                      selectedPiece?.id === piece.id
-                        ? 'border-yellow-400 ring-2 ring-yellow-400 scale-110'
-                        : isMyTurn 
-                          ? 'border-white/20 hover:border-cyan-400 cursor-pointer'
-                          : 'border-white/10 opacity-50'
-                    }`}
-                  >
-                    {piece.imageData ? (
+              {paddedRack.map((piece, index) => (
+                <button
+                  key={index}
+                  onClick={() => piece && handlePieceSelect(piece)}
+                  disabled={!isMyTurn || !piece}
+                  className={`aspect-square rounded-lg border-2 transition-all ${
+                    piece && selectedPiece?.id === piece.id
+                      ? 'border-yellow-400 ring-2 ring-yellow-400 scale-110'
+                      : piece && isMyTurn 
+                        ? 'border-white/20 hover:border-cyan-400 cursor-pointer'
+                        : piece
+                          ? 'border-white/10 opacity-50'
+                          : 'border-white/10 bg-white/5 opacity-30'
+                  }`}
+                >
+                  {piece ? (
+                    piece.imageData ? (
                       <img 
                         src={piece.imageData} 
                         alt={`Piece ${piece.id}`}
@@ -1288,9 +1310,13 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
                       <div className="w-full h-full bg-gradient-to-br from-purple-500/50 to-pink-500/50 rounded flex items-center justify-center text-white text-xs">
                         {piece.id}
                       </div>
-                    )}
-                  </button>
-                )
+                    )
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-white/20"></div>
+                    </div>
+                  )}
+                </button>
               ))}
             </div>
             {selectedPiece && (
