@@ -516,42 +516,23 @@ export class MultiplayerGameGuest {
       // Store image URL for preview
       this.imageUrl = game.images?.storage_url || null;
 
+      if (!this.imageUrl) {
+        throw new Error('Game image URL not found');
+      }
+
       console.log('Step 2: Joining game as Player B...');
       await gameService.joinGame(gameCode, this.userId, this.userName);
 
       console.log('Step 3: Loading game state...');
       const gameState = await realtimeService.getGameState(game.id);
 
-      console.log('Step 4: Processing image into pieces...');
-      // Guest needs to process the puzzle image to get pieces with imageData
-      // Calculate grid dimensions from piece metadata (which has row/col info)
-      const piecesMetadata = gameState.pieces || [];
-      const fallbackGridSize = Math.round(Math.sqrt(game.grid_size));
-      let gridSizeParam;
-      
-      if (piecesMetadata.length > 0) {
-        // Find max col from piece metadata to determine the grid size parameter
-        // Filter out any pieces with invalid col values
-        const validPieces = piecesMetadata.filter(p => typeof p.col === 'number');
-        if (validPieces.length > 0) {
-          // Use reduce to avoid max call stack with large arrays
-          const maxCol = validPieces.reduce((max, p) => Math.max(max, p.col), 0);
-          gridSizeParam = maxCol + 1;
-        } else {
-          // Fallback if no valid col values
-          gridSizeParam = fallbackGridSize;
-        }
-      } else {
-        // Fallback: assume square grid
-        gridSizeParam = fallbackGridSize;
-      }
-      
-      // Use gridSizeParam for ImageProcessor (it will adjust based on aspect ratio)
-      const processor = new ImageProcessor(this.imageUrl, gridSizeParam);
+      console.log('Step 4: Regenerating pieces with imageData from image URL...');
+      // Guest needs to reconstruct pieces with imageData since it's not stored in DB
+      const processor = new ImageProcessor(this.imageUrl, Math.round(Math.sqrt(game.grid_size)));
       await processor.loadImage();
       const { pieces } = await processor.sliceImage();
 
-      console.log('Step 5: Initializing game logic...');
+      console.log('Step 5: Initializing game logic with full pieces...');
       this.gameLogic = new GameLogic(game.grid_size, pieces);
       this.gameLogic.importGameState(gameState, pieces);
 

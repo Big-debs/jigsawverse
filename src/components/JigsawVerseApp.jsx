@@ -987,11 +987,12 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
 
       // Check for pending decisions
       if (newState.pendingCheck) {
-        // If the pending check is from the opponent, we need to check/pass
-        if (newState.pendingCheck.player === opponentPlayer) {
+        // If there's a pending check, the player who did NOT place should check/pass
+        // pendingCheck.player is the placer, so if it's NOT me, I need to check
+        if (newState.pendingCheck.player !== myPlayer) {
           setAwaitingDecision('opponent_check');
         } else {
-          // We placed the piece, waiting for opponent to check
+          // I'm the placer, waiting for opponent to check
           setAwaitingDecision(null);
         }
       } else {
