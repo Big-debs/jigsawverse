@@ -516,6 +516,10 @@ export class MultiplayerGameGuest {
       // Store image URL for preview
       this.imageUrl = game.images?.storage_url || null;
 
+      if (!this.imageUrl) {
+        throw new Error('Game image URL not found');
+      }
+
       console.log('Step 2: Joining game as Player B...');
       await gameService.joinGame(gameCode, this.userId, this.userName);
 
