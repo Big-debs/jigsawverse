@@ -941,8 +941,9 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
   const [loading, setLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   
-  // Track previous pending check state to detect when opponent responds
+  // Track previous pending check state and scores to detect when opponent responds
   const prevPendingCheckRef = useRef(null);
+  const prevScoresRef = useRef(null);
 
   // Get player identifier
   const myPlayer = isHost ? 'playerA' : 'playerB';
@@ -985,7 +986,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
       if (prevPendingCheck && !currentPendingCheck && prevPendingCheck.player === myPlayer) {
         // I was the placer, and the pending check has been resolved
         // Update lastAction to show the result
-        const prevScores = gameState?.scores || {};
+        const prevScores = prevScoresRef.current || {};
         const currentScores = newState.scores || {};
         const myScore = currentScores[myPlayer]?.score || 0;
         const opponentScore = currentScores[opponentPlayer]?.score || 0;
@@ -1011,7 +1012,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
           resultType = 'opponent_passed';
         } else if (myDelta < 0) {
           // Both penalized - opponent passed on wrong piece
-          message = `Opponent passed on wrong piece - both penalized ${myDelta} points.`;
+          message = `Opponent passed on wrong piece - both penalized ${Math.abs(myDelta)} points.`;
           resultType = 'opponent_passed_incorrect';
         }
         
@@ -1025,8 +1026,9 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
         }
       }
       
-      // Update ref for next comparison
+      // Update refs for next comparison
       prevPendingCheckRef.current = currentPendingCheck;
+      prevScoresRef.current = newState.scores;
       
       setGameState(newState);
       setLoading(false);
@@ -1063,7 +1065,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
     return () => {
       multiplayer.onStateUpdate = null;
     };
-  }, [multiplayerRef, myPlayer, opponentPlayer, onGameEnd, gameState?.scores]);
+  }, [multiplayerRef, myPlayer, opponentPlayer, onGameEnd]);
 
   // Timer countdown effect
   useEffect(() => {
