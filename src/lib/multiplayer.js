@@ -430,16 +430,21 @@ export class MultiplayerGameHost {
 
     const result = this.gameLogic.handleOpponentCheck('playerA', decision);
 
-    await realtimeService.updateGameState(this.gameId, {
-      ...this.gameLogic.exportForDatabase(),
-      awaiting_decision: result.awaitingPlacerDecision ? 'placer_check' : null
-    });
-
-    await gameService.updateGame(this.gameId, {
-      player_a_score: this.gameLogic. scores.playerA. score,
-      player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
-      player_a_streak: this.gameLogic.scores.playerA.streak
-    });
+    // Persist updated game state including current_turn and scores
+    await Promise.all([
+      realtimeService.updateGameState(this.gameId, {
+        ...this.gameLogic.exportForDatabase(),
+        awaiting_decision: null // Clear awaiting_decision after resolution
+      }),
+      gameService.updateGame(this.gameId, {
+        player_a_score: this.gameLogic.scores.playerA.score,
+        player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
+        player_a_streak: this.gameLogic.scores.playerA.streak,
+        player_b_score: this.gameLogic.scores.playerB.score,
+        player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
+        player_b_streak: this.gameLogic.scores.playerB.streak
+      })
+    ]);
 
     // Broadcast state to opponent
     await this.broadcastGameState();
@@ -753,16 +758,21 @@ export class MultiplayerGameGuest {
 
     const result = this.gameLogic.handleOpponentCheck('playerB', decision);
 
-    await realtimeService.updateGameState(this.gameId, {
-      ...this.gameLogic.exportForDatabase(),
-      awaiting_decision: result.awaitingPlacerDecision ? 'placer_check' : null
-    });
-
-    await gameService.updateGame(this.gameId, {
-      player_b_score: this.gameLogic.scores.playerB.score,
-      player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
-      player_b_streak: this.gameLogic.scores.playerB.streak
-    });
+    // Persist updated game state including current_turn and scores
+    await Promise.all([
+      realtimeService.updateGameState(this.gameId, {
+        ...this.gameLogic.exportForDatabase(),
+        awaiting_decision: null // Clear awaiting_decision after resolution
+      }),
+      gameService.updateGame(this.gameId, {
+        player_a_score: this.gameLogic.scores.playerA.score,
+        player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
+        player_a_streak: this.gameLogic.scores.playerA.streak,
+        player_b_score: this.gameLogic.scores.playerB.score,
+        player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
+        player_b_streak: this.gameLogic.scores.playerB.streak
+      })
+    ]);
 
     // Broadcast state to host
     await this.broadcastGameState();
