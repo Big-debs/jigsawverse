@@ -605,7 +605,8 @@ export class GameLogic {
       playerARackLength: this.playerARack.filter(p => p !== null).length,
       playerBRackLength: this.playerBRack.filter(p => p !== null).length,
       piecePoolLength: this.piecePool.length,
-      currentTurn: this.currentTurn
+      currentTurn: this.currentTurn,
+      pendingCheck: this.pendingCheck
     });
   }
 }

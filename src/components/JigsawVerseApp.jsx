@@ -965,10 +965,14 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
 
     // Setup state update callback
     multiplayer.onStateUpdate = (newState) => {
-      console.log('Game state updated:', {
+      console.log('🎮 Frontend received state:', {
         gridLength: newState.grid?.length,
         currentTurn: newState.currentTurn,
-        timerRemaining: newState.timerRemaining
+        timerRemaining: newState.timerRemaining,
+        hasPendingCheck: !!newState.pendingCheck,
+        pendingCheck: newState.pendingCheck,
+        myPlayer,
+        shouldShowCheckUI: newState.pendingCheck && newState.pendingCheck.player !== myPlayer
       });
       setGameState(newState);
       setLoading(false);
@@ -990,9 +994,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
         // If there's a pending check, the player who did NOT place should check/pass
         // pendingCheck.player is the placer, so if it's NOT me, I need to check
         if (newState.pendingCheck.player !== myPlayer) {
+          console.log('✅ Showing check/pass UI for opponent decision');
           setAwaitingDecision('opponent_check');
         } else {
           // I'm the placer, waiting for opponent to check
+          console.log('⏳ I am the placer, waiting for opponent');
           setAwaitingDecision(null);
         }
       } else {
