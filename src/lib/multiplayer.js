@@ -522,11 +522,19 @@ export class MultiplayerGameGuest {
       console.log('Step 3: Loading game state...');
       const gameState = await realtimeService.getGameState(game.id);
 
-      console.log('Step 4: Initializing game logic...');
-      this.gameLogic = new GameLogic(game.grid_size, gameState.pieces);
-      this.gameLogic.importGameState(gameState, gameState.pieces);
+      console.log('Step 4: Processing image into pieces...');
+      // Guest needs to process the image to get pieces with imageData
+      // Calculate grid size from total pieces
+      const gridSize = Math.round(Math.sqrt(game.grid_size));
+      const processor = new ImageProcessor(this.imageUrl, gridSize);
+      await processor.loadImage();
+      const { pieces } = await processor.sliceImage();
 
-      console.log('Step 5: Setting up realtime channel (broadcast)...');
+      console.log('Step 5: Initializing game logic...');
+      this.gameLogic = new GameLogic(game.grid_size, pieces);
+      this.gameLogic.importGameState(gameState, pieces);
+
+      console.log('Step 6: Setting up realtime channel (broadcast)...');
       this.realtimeChannel = await this.setupBroadcastChannel(game.id);
 
       // Notify host that we joined

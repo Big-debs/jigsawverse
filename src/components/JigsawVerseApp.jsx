@@ -984,9 +984,12 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
 
       // Check for pending decisions
       if (newState.pendingCheck) {
-        if (newState.currentTurn === opponentPlayer) {
-          // Opponent just placed, we need to check/pass
+        // If the pending check is from the opponent, we need to check/pass
+        if (newState.pendingCheck.player === opponentPlayer) {
           setAwaitingDecision('opponent_check');
+        } else {
+          // We placed the piece, waiting for opponent to check
+          setAwaitingDecision(null);
         }
       } else {
         setAwaitingDecision(null);
@@ -1222,32 +1225,34 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
         <div className="lg:col-span-2">
           <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
             <h3 className="text-white font-semibold mb-4">Puzzle Board</h3>
-            <div 
-              className="grid gap-1 aspect-square"
-              style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
-            >
-              {grid.map((piece, index) => (
-                <button
-                  key={index}
-                  onClick={() => handlePlacement(index)}
-                  disabled={! selectedPiece || piece !== null || ! isMyTurn}
-                  className={`aspect-square rounded border transition-all ${
-                    piece 
-                      ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-white/40' 
-                      : selectedPiece && isMyTurn
-                        ? 'bg-white/10 border-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
-                        : 'bg-white/5 border-white/10'
-                  }`}
-                >
-                  {piece && piece.imageData && (
-                    <img 
-                      src={piece.imageData} 
-                      alt={`Piece ${piece.id}`}
-                      className="w-full h-full object-cover rounded"
-                    />
-                  )}
-                </button>
-              ))}
+            <div className="w-full max-w-full overflow-hidden">
+              <div 
+                className="grid gap-1 aspect-square w-full"
+                style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
+              >
+                {grid.map((piece, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handlePlacement(index)}
+                    disabled={! selectedPiece || piece !== null || ! isMyTurn}
+                    className={`aspect-square rounded border transition-all overflow-hidden ${
+                      piece 
+                        ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-white/40' 
+                        : selectedPiece && isMyTurn
+                          ? 'bg-white/10 border-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
+                          : 'bg-white/5 border-white/10'
+                    }`}
+                  >
+                    {piece && piece.imageData && (
+                      <img 
+                        src={piece.imageData} 
+                        alt={`Piece ${piece.id}`}
+                        className="w-full h-full object-cover rounded"
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -1260,21 +1265,23 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
               Your Pieces ({myRack.filter(p => p !== null).length})
             </h3>
             <div className="grid grid-cols-5 gap-2">
-              {myRack.map((piece, index) => (
-                piece && (
-                  <button
-                    key={index}
-                    onClick={() => handlePieceSelect(piece)}
-                    disabled={!isMyTurn}
-                    className={`aspect-square rounded-lg border-2 transition-all ${
-                      selectedPiece?.id === piece.id
-                        ? 'border-yellow-400 ring-2 ring-yellow-400 scale-110'
-                        : isMyTurn 
-                          ? 'border-white/20 hover:border-cyan-400 cursor-pointer'
-                          : 'border-white/10 opacity-50'
-                    }`}
-                  >
-                    {piece.imageData ? (
+              {myRack.slice(0, 10).map((piece, index) => (
+                <button
+                  key={index}
+                  onClick={() => piece && handlePieceSelect(piece)}
+                  disabled={!isMyTurn || !piece}
+                  className={`aspect-square rounded-lg border-2 transition-all ${
+                    piece && selectedPiece?.id === piece.id
+                      ? 'border-yellow-400 ring-2 ring-yellow-400 scale-110'
+                      : piece && isMyTurn 
+                        ? 'border-white/20 hover:border-cyan-400 cursor-pointer'
+                        : piece
+                          ? 'border-white/10 opacity-50'
+                          : 'border-white/10 bg-white/5 opacity-30'
+                  }`}
+                >
+                  {piece ? (
+                    piece.imageData ? (
                       <img 
                         src={piece.imageData} 
                         alt={`Piece ${piece.id}`}
@@ -1284,9 +1291,13 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
                       <div className="w-full h-full bg-gradient-to-br from-purple-500/50 to-pink-500/50 rounded flex items-center justify-center text-white text-xs">
                         {piece.id}
                       </div>
-                    )}
-                  </button>
-                )
+                    )
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-white/20"></div>
+                    </div>
+                  )}
+                </button>
               ))}
             </div>
             {selectedPiece && (
