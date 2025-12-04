@@ -39,12 +39,22 @@ export class ImageProcessor {
     let cols = this.gridSize;
     let rows = this.gridSize;
 
-    if (aspectRatio > 1) {
-      rows = Math.round(this.gridSize / aspectRatio);
-    } else if (aspectRatio < 1) {
-      cols = Math.round(this.gridSize * aspectRatio);
+    // For standard square grid sizes (5x5, 8x8, 10x10, 12x12, 15x15),
+    // maintain square grids to ensure check/pass functionality works correctly
+    const standardSquareSizes = [5, 8, 10, 12, 15];
+    const isStandardSquare = standardSquareSizes.includes(this.gridSize);
+    
+    if (!isStandardSquare) {
+      // For non-standard sizes, adjust based on aspect ratio
+      if (aspectRatio > 1) {
+        rows = Math.round(this.gridSize / aspectRatio);
+      } else if (aspectRatio < 1) {
+        cols = Math.round(this.gridSize * aspectRatio);
+      }
     }
+    // else: keep cols = rows = gridSize for standard square grids
 
+    console.log(`Grid dimensions calculated: ${cols}x${rows} = ${cols * rows} pieces (gridSize: ${this.gridSize}, aspectRatio: ${aspectRatio.toFixed(2)})`);
     return { cols, rows, totalPieces: cols * rows };
   }
 
@@ -187,18 +197,31 @@ export class GameLogic {
   returnPieceToRack(player, piece) {
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
     
+    // Ensure piece has complete data including imageData
+    // If piece only has metadata (id, correctPosition), look it up from this.pieces
+    let completePiece = piece;
+    if (piece && !piece.imageData && this.pieces && this.pieces.length > 0) {
+      const fullPiece = this.pieces.find(p => p.id === piece.id);
+      if (fullPiece) {
+        completePiece = fullPiece;
+        console.log(`Retrieved full piece data for piece ${piece.id} from pieces array`);
+      } else {
+        console.warn(`Warning: Could not find full piece data for piece ${piece.id}`);
+      }
+    }
+    
     // Find first null/undefined slot
     const firstEmptySlot = rack.findIndex(p => p === null || p === undefined);
     
     if (firstEmptySlot !== -1) {
       // Fill the first empty slot
-      rack[firstEmptySlot] = piece;
+      rack[firstEmptySlot] = completePiece;
     } else {
       // No empty slot, push to end
-      rack.push(piece);
+      rack.push(completePiece);
     }
     
-    console.log(`Returned piece ${piece.id} to ${player} rack`);
+    console.log(`Returned piece ${completePiece.id} to ${player} rack (hasImageData: ${!!completePiece.imageData})`);
   }
 
   isValidPlacement(pieceId, gridIndex) {
@@ -336,6 +359,8 @@ export class GameLogic {
         // Piece is CORRECT
         // PLACER gets +10 points
         this.updateScore(placer, 10, true);
+        // CHECKER gets -2 points penalty for failed check
+        this.updateScore(checker, -2, false);
         
         // Piece remains placed
         // Clear pending check and switch turn to CHECKER
@@ -346,9 +371,10 @@ export class GameLogic {
         return {
           success: true,
           result: 'failed_check',
-          message: 'Placer awarded 10 points for a correct piece.',
+          message: 'Placer awarded 10 points. Checker penalized -2 points.',
           correctPlacement: true,
-          placerGained: 10
+          placerGained: 10,
+          checkerLost: -2
         };
       }
     } else {
@@ -587,6 +613,12 @@ export class GameLogic {
     this.piecePool = Array.isArray(piecePoolData)
       ? piecePoolData.map(item => getPieceFromIdOrObject(item)).filter(Boolean)
       : [];
+    
+    console.log('Piece pool import:', {
+      piecePoolDataLength: piecePoolData.length,
+      reconstructedPoolLength: this.piecePool.length,
+      hasImageData: this.piecePool.length > 0 ? !!this.piecePool[0]?.imageData : false
+    });
 
     // Import other state
     this.currentTurn = data.current_turn || data.currentTurn || 'playerA';

@@ -940,6 +940,9 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
   const [lastAction, setLastAction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
+  
+  // Track previous pending check state to detect when opponent responds
+  const prevPendingCheckRef = useRef(null);
 
   // Get player identifier
   const myPlayer = isHost ? 'playerA' : 'playerB';
@@ -974,6 +977,57 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
         myPlayer,
         shouldShowCheckUI: newState.pendingCheck && newState.pendingCheck.player !== myPlayer
       });
+      
+      // Detect when pendingCheck is resolved (was set, now null)
+      const prevPendingCheck = prevPendingCheckRef.current;
+      const currentPendingCheck = newState.pendingCheck;
+      
+      if (prevPendingCheck && !currentPendingCheck && prevPendingCheck.player === myPlayer) {
+        // I was the placer, and the pending check has been resolved
+        // Update lastAction to show the result
+        const prevScores = gameState?.scores || {};
+        const currentScores = newState.scores || {};
+        const myScore = currentScores[myPlayer]?.score || 0;
+        const opponentScore = currentScores[opponentPlayer]?.score || 0;
+        const prevMyScore = prevScores[myPlayer]?.score || 0;
+        const prevOpponentScore = prevScores[opponentPlayer]?.score || 0;
+        const myDelta = myScore - prevMyScore;
+        const opponentDelta = opponentScore - prevOpponentScore;
+        
+        let message = '';
+        let resultType = '';
+        
+        if (myDelta > 0) {
+          // I gained points - opponent checked and was wrong (failed_check)
+          message = `Opponent checked - you gained ${myDelta} points! Piece was correct.`;
+          resultType = 'failed_check';
+        } else if (opponentDelta > 0 && myDelta === 0) {
+          // Opponent gained points - they checked and caught wrong piece (successful_check)
+          message = `Opponent checked - piece was wrong and removed!`;
+          resultType = 'successful_check';
+        } else if (myDelta === 0 && opponentDelta === 0) {
+          // No score changes - opponent passed
+          message = `Opponent passed - piece stays on board.`;
+          resultType = 'opponent_passed';
+        } else if (myDelta < 0) {
+          // Both penalized - opponent passed on wrong piece
+          message = `Opponent passed on wrong piece - both penalized ${myDelta} points.`;
+          resultType = 'opponent_passed_incorrect';
+        }
+        
+        if (message) {
+          console.log('📨 Updating placer message:', message);
+          setLastAction({ 
+            type: 'resolved', 
+            result: resultType,
+            message
+          });
+        }
+      }
+      
+      // Update ref for next comparison
+      prevPendingCheckRef.current = currentPendingCheck;
+      
       setGameState(newState);
       setLoading(false);
       
@@ -1009,7 +1063,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
     return () => {
       multiplayer.onStateUpdate = null;
     };
-  }, [multiplayerRef, myPlayer, opponentPlayer, onGameEnd]);
+  }, [multiplayerRef, myPlayer, opponentPlayer, onGameEnd, gameState?.scores]);
 
   // Timer countdown effect
   useEffect(() => {
