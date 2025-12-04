@@ -200,7 +200,7 @@ export class GameLogic {
     // Ensure piece has complete data including imageData
     // If piece only has metadata (id, correctPosition), look it up from this.pieces
     let completePiece = piece;
-    if (piece && !piece.imageData && this.pieces && this.pieces.length > 0) {
+    if (piece && !piece.imageData && Array.isArray(this.pieces) && this.pieces.length > 0) {
       const fullPiece = this.pieces.find(p => p.id === piece.id);
       if (fullPiece) {
         completePiece = fullPiece;
