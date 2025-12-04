@@ -523,16 +523,19 @@ export class MultiplayerGameGuest {
       const gameState = await realtimeService.getGameState(game.id);
 
       console.log('Step 4: Processing image into pieces...');
-      // Guest needs to process the image to get pieces with imageData
+      // Guest needs to process the puzzle image to get pieces with imageData
       // Calculate grid dimensions from piece metadata (which has row/col info)
       const piecesMetadata = gameState.pieces || [];
-      let gridSizeParam = 10; // Default fallback
+      let gridSizeParam;
+      
       if (piecesMetadata.length > 0) {
         // Find max col from piece metadata to determine the grid size parameter
         // Filter out any pieces with invalid col values
         const validPieces = piecesMetadata.filter(p => typeof p.col === 'number');
         if (validPieces.length > 0) {
-          gridSizeParam = Math.max(...validPieces.map(p => p.col)) + 1;
+          // Use reduce to avoid max call stack with large arrays
+          const maxCol = validPieces.reduce((max, p) => Math.max(max, p.col), 0);
+          gridSizeParam = maxCol + 1;
         } else {
           // Fallback if no valid col values
           gridSizeParam = Math.round(Math.sqrt(game.grid_size));

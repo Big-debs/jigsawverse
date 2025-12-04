@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Eye } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import { authService } from '../services/auth.service';
@@ -1137,13 +1137,20 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
   const myStreak = gameState?.scores?.[myPlayer]?.streak || 0;
   const myAccuracy = gameState?.scores?.[myPlayer]?.accuracy || 100;
   const isMyTurn = gameState?.currentTurn === myPlayer && !awaitingDecision;
-  const myRack = isHost ? (gameState?.playerARack || []) : (gameState?.playerBRack || []);
   
-  // Pad rack to exactly RACK_SIZE slots for consistent UI layout
-  const paddedRack = [...myRack.slice(0, RACK_SIZE)];
-  while (paddedRack.length < RACK_SIZE) {
-    paddedRack.push(null);
-  }
+  // Memoize rack selection to prevent unnecessary re-renders
+  const myRack = useMemo(() => {
+    return isHost ? (gameState?.playerARack || []) : (gameState?.playerBRack || []);
+  }, [isHost, gameState?.playerARack, gameState?.playerBRack]);
+  
+  // Pad rack to exactly RACK_SIZE slots for consistent UI layout (memoized for performance)
+  const paddedRack = useMemo(() => {
+    const padded = [...myRack.slice(0, RACK_SIZE)];
+    while (padded.length < RACK_SIZE) {
+      padded.push(null);
+    }
+    return padded;
+  }, [myRack]);
   
   const grid = gameState?.grid || [];
   
