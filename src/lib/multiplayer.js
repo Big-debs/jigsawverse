@@ -333,7 +333,9 @@ export class MultiplayerGameHost {
 
   handleGameStateUpdate(newState) {
     if (!this.gameLogic) return;
-    this.gameLogic.importGameState(newState, newState.pieces);
+    console.log('📥 Host received state with pendingCheck:', newState.pendingCheck);
+    // Use existing pieces array from gameLogic, not from newState (which doesn't include pieces)
+    this.gameLogic.importGameState(newState, this.gameLogic.pieces);
     if (this.onStateUpdate) {
       this.onStateUpdate(this.gameLogic.getGameState());
     }
@@ -420,6 +422,7 @@ export class MultiplayerGameHost {
     ]);
 
     // Broadcast state to opponent after DB updates complete
+    console.log('📤 Host broadcasting state with pendingCheck:', this.gameLogic.pendingCheck);
     await this.broadcastGameState();
 
     return result;
@@ -705,7 +708,9 @@ export class MultiplayerGameGuest {
 
   handleGameStateUpdate(newState) {
     if (!this.gameLogic) return;
-    this.gameLogic.importGameState(newState, newState.pieces);
+    console.log('📥 Guest received state with pendingCheck:', newState.pendingCheck);
+    // Use existing pieces array from gameLogic, not from newState (which doesn't include pieces)
+    this.gameLogic.importGameState(newState, this.gameLogic.pieces);
     if (this.onStateUpdate) {
       this.onStateUpdate(this.gameLogic.getGameState());
     }
@@ -758,6 +763,7 @@ export class MultiplayerGameGuest {
     ]);
 
     // Broadcast state to host after DB updates complete
+    console.log('📤 Guest broadcasting state with pendingCheck:', this.gameLogic.pendingCheck);
     await this.broadcastGameState();
 
     return result;
