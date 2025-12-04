@@ -526,6 +526,7 @@ export class MultiplayerGameGuest {
       // Guest needs to process the puzzle image to get pieces with imageData
       // Calculate grid dimensions from piece metadata (which has row/col info)
       const piecesMetadata = gameState.pieces || [];
+      const fallbackGridSize = Math.round(Math.sqrt(game.grid_size));
       let gridSizeParam;
       
       if (piecesMetadata.length > 0) {
@@ -538,11 +539,11 @@ export class MultiplayerGameGuest {
           gridSizeParam = maxCol + 1;
         } else {
           // Fallback if no valid col values
-          gridSizeParam = Math.round(Math.sqrt(game.grid_size));
+          gridSizeParam = fallbackGridSize;
         }
       } else {
         // Fallback: assume square grid
-        gridSizeParam = Math.round(Math.sqrt(game.grid_size));
+        gridSizeParam = fallbackGridSize;
       }
       
       // Use gridSizeParam for ImageProcessor (it will adjust based on aspect ratio)

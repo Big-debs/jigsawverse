@@ -1145,6 +1145,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
   
   // Pad rack to exactly RACK_SIZE slots for consistent UI layout (memoized for performance)
   const paddedRack = useMemo(() => {
+    // Slice to RACK_SIZE max (intentional - game logic maintains max 10 pieces per rack)
     const padded = [...myRack.slice(0, RACK_SIZE)];
     while (padded.length < RACK_SIZE) {
       padded.push(null);
