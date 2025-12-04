@@ -529,8 +529,14 @@ export class MultiplayerGameGuest {
       let gridSizeParam = 10; // Default fallback
       if (piecesMetadata.length > 0) {
         // Find max col from piece metadata to determine the grid size parameter
-        // The ImageProcessor will adjust based on aspect ratio
-        gridSizeParam = Math.max(...piecesMetadata.map(p => p.col)) + 1;
+        // Filter out any pieces with invalid col values
+        const validPieces = piecesMetadata.filter(p => typeof p.col === 'number');
+        if (validPieces.length > 0) {
+          gridSizeParam = Math.max(...validPieces.map(p => p.col)) + 1;
+        } else {
+          // Fallback if no valid col values
+          gridSizeParam = Math.round(Math.sqrt(game.grid_size));
+        }
       } else {
         // Fallback: assume square grid
         gridSizeParam = Math.round(Math.sqrt(game.grid_size));

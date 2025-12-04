@@ -1138,6 +1138,13 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
   const myAccuracy = gameState?.scores?.[myPlayer]?.accuracy || 100;
   const isMyTurn = gameState?.currentTurn === myPlayer && !awaitingDecision;
   const myRack = isHost ? (gameState?.playerARack || []) : (gameState?.playerBRack || []);
+  
+  // Pad rack to exactly RACK_SIZE slots for consistent UI layout
+  const paddedRack = [...myRack.slice(0, RACK_SIZE)];
+  while (paddedRack.length < RACK_SIZE) {
+    paddedRack.push(null);
+  }
+  
   const grid = gameState?.grid || [];
   
   // Calculate grid size with proper fallback
@@ -1269,7 +1276,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
               Your Pieces ({myRack.filter(p => p !== null).length})
             </h3>
             <div className="grid grid-cols-5 gap-2">
-              {myRack.slice(0, RACK_SIZE).map((piece, index) => (
+              {paddedRack.map((piece, index) => (
                 <button
                   key={index}
                   onClick={() => piece && handlePieceSelect(piece)}
