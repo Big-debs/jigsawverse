@@ -930,6 +930,9 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
 // GAMEPLAY SCREEN - INTEGRATED WITH GAME LOGIC
 // =====================================================
 
+// Game constants
+const RACK_SIZE = 10; // Maximum number of pieces in a player's rack
+
 const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, setError }) => {
   const [gameState, setGameState] = useState(null);
   const [selectedPiece, setSelectedPiece] = useState(null);
@@ -1062,7 +1065,8 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
       const result = await multiplayerRef.current.makeMove(pieceToPlace.id, gridIndex);
       
       if (result.awaitingCheck) {
-        setAwaitingDecision('opponent_check');
+        // We placed a piece, now waiting for opponent to check
+        // Don't set awaitingDecision for ourselves - the opponent will see it
         setLastAction({ 
           type: 'placed', 
           correct: result.correct,
@@ -1265,7 +1269,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
               Your Pieces ({myRack.filter(p => p !== null).length})
             </h3>
             <div className="grid grid-cols-5 gap-2">
-              {myRack.slice(0, 10).map((piece, index) => (
+              {myRack.slice(0, RACK_SIZE).map((piece, index) => (
                 <button
                   key={index}
                   onClick={() => piece && handlePieceSelect(piece)}

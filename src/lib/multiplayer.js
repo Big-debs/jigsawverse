@@ -524,9 +524,20 @@ export class MultiplayerGameGuest {
 
       console.log('Step 4: Processing image into pieces...');
       // Guest needs to process the image to get pieces with imageData
-      // Calculate grid size from total pieces
-      const gridSize = Math.round(Math.sqrt(game.grid_size));
-      const processor = new ImageProcessor(this.imageUrl, gridSize);
+      // Calculate grid dimensions from piece metadata (which has row/col info)
+      const piecesMetadata = gameState.pieces || [];
+      let gridSizeParam = 10; // Default fallback
+      if (piecesMetadata.length > 0) {
+        // Find max col from piece metadata to determine the grid size parameter
+        // The ImageProcessor will adjust based on aspect ratio
+        gridSizeParam = Math.max(...piecesMetadata.map(p => p.col)) + 1;
+      } else {
+        // Fallback: assume square grid
+        gridSizeParam = Math.round(Math.sqrt(game.grid_size));
+      }
+      
+      // Use gridSizeParam for ImageProcessor (it will adjust based on aspect ratio)
+      const processor = new ImageProcessor(this.imageUrl, gridSizeParam);
       await processor.loadImage();
       const { pieces } = await processor.sliceImage();
 
