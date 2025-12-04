@@ -1146,11 +1146,10 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
   // Pad rack to exactly RACK_SIZE slots for consistent UI layout (memoized for performance)
   const paddedRack = useMemo(() => {
     // Slice to RACK_SIZE max (intentional - game logic maintains max 10 pieces per rack)
-    const padded = [...myRack.slice(0, RACK_SIZE)];
-    while (padded.length < RACK_SIZE) {
-      padded.push(null);
-    }
-    return padded;
+    // Pad with nulls to reach exactly RACK_SIZE slots for consistent grid layout
+    const sliced = myRack.slice(0, RACK_SIZE);
+    const padding = Math.max(0, RACK_SIZE - sliced.length);
+    return [...sliced, ...Array(padding).fill(null)];
   }, [myRack]);
   
   const grid = gameState?.grid || [];
