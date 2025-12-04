@@ -1059,7 +1059,12 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
       const result = await multiplayerRef.current.makeMove(pieceToPlace.id, gridIndex);
       
       if (result.awaitingCheck) {
-        setLastAction({ type: 'placed', correct: result.correct });
+        setAwaitingDecision('opponent_check');
+        setLastAction({ 
+          type: 'placed', 
+          correct: result.correct,
+          message: 'Piece placed. Waiting for opponent to check or pass...'
+        });
       }
     } catch (err) {
       console.error('Move error:', err);
@@ -1074,11 +1079,43 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
     if (!multiplayerRef.current) return;
 
     try {
+      // Capture previous scores for delta calculation
+      const prevScores = gameState ? {
+        myScore: gameState.scores?.[myPlayer]?.score || 0,
+        opponentScore: gameState.scores?.[opponentPlayer]?.score || 0
+      } : null;
+
       const result = await multiplayerRef.current.respondToCheck(decision);
+      
+      // Calculate score deltas from the current game logic state (already updated)
+      let friendlyMessage = result.message;
+      if (prevScores && multiplayerRef.current.gameLogic) {
+        const currentScores = multiplayerRef.current.gameLogic.scores;
+        const myNewScore = currentScores[myPlayer]?.score || 0;
+        const opponentNewScore = currentScores[opponentPlayer]?.score || 0;
+        const myDelta = myNewScore - prevScores.myScore;
+        const opponentDelta = opponentNewScore - prevScores.opponentScore;
+        
+        // Create friendly messages based on the result
+        if (result.result === 'successful_check') {
+          // Checker caught incorrect piece
+          friendlyMessage = `You gained ${myDelta} points for catching an incorrect piece!`;
+        } else if (result.result === 'failed_check') {
+          // Placer's piece was correct
+          friendlyMessage = `Opponent gained ${opponentDelta} points for a correct piece.`;
+        } else if (result.result === 'opponent_passed_correct') {
+          // Opponent passed, piece was correct
+          friendlyMessage = 'Opponent passed — piece was correct. Turn moves to opponent.';
+        } else if (result.result === 'opponent_passed_incorrect') {
+          // Opponent passed, piece was incorrect, both penalized
+          friendlyMessage = `Both players penalized (${myDelta}). Piece removed and returned to placer.`;
+        }
+      }
+      
       setLastAction({ 
         type: decision, 
         result: result.result,
-        message: result.message 
+        message: friendlyMessage
       });
       setAwaitingDecision(null);
     } catch (err) {

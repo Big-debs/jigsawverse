@@ -184,6 +184,23 @@ export class GameLogic {
     console.log(`Refilled ${player} rack: now has ${newRack.length} pieces`);
   }
 
+  returnPieceToRack(player, piece) {
+    const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
+    
+    // Find first null/undefined slot
+    const firstEmptySlot = rack.findIndex(p => p === null || p === undefined);
+    
+    if (firstEmptySlot !== -1) {
+      // Fill the first empty slot
+      rack[firstEmptySlot] = piece;
+    } else {
+      // No empty slot, push to end
+      rack.push(piece);
+    }
+    
+    console.log(`Returned piece ${piece.id} to ${player} rack`);
+  }
+
   isValidPlacement(pieceId, gridIndex) {
     // Bounds check
     if (gridIndex < 0 || gridIndex >= this.totalPieces) {
@@ -279,104 +296,103 @@ export class GameLogic {
     };
   }
 
-  handleOpponentCheck(opponent, checkDecision) {
+  handleOpponentCheck(checker, checkDecision) {
     if (!this.pendingCheck) {
       return { success: false, message: 'No pending move to check' };
     }
 
     const move = this.pendingCheck;
+    const placer = move.player;
     
     if (checkDecision === 'check') {
-      if (move.correct) {
-        this.updateScore(opponent, -5, false);
-        this.pendingCheck = null;
-        this.switchTurn();
-        return {
-          success: true,
-          result: 'failed_check',
-          message: 'Piece was correct! Opponent loses 5 points.',
-          correctPlacement: true
-        };
-      } else {
-        this.updateScore(opponent, 5, false);
+      // CHECK outcome
+      if (!move.correct) {
+        // Piece is INCORRECT
+        // Checker gets +5 points
+        this.updateScore(checker, 5, false);
+        
+        // Remove piece from grid
+        const piece = this.grid[move.gridIndex];
         this.grid[move.gridIndex] = null;
+        
+        // Return piece to PLACER's rack
+        if (piece) {
+          this.returnPieceToRack(placer, piece);
+        }
+        
+        // Clear pending check and switch turn to CHECKER
         this.pendingCheck = null;
-        this.switchTurn();
+        this.currentTurn = checker;
+        this.isPlacementInProgress = false;
+        
         return {
           success: true,
           result: 'successful_check',
-          message: 'Piece was incorrect! Opponent gains 5 points.',
-          correctPlacement: false
+          message: 'Checker gained 5 points for catching an incorrect piece.',
+          correctPlacement: false,
+          checkerGained: 5
         };
-      }
-    } else {
-      return {
-        success: true,
-        result: 'opponent_passed',
-        message: 'Opponent passed. Your turn to check or pass.',
-        awaitingPlacerDecision: true
-      };
-    }
-  }
-
-  handlePlacerCheck(placer, checkDecision) {
-    if (!this.pendingCheck) {
-      return { success: false, message: 'No pending move to check' };
-    }
-
-    const move = this.pendingCheck;
-    
-    if (checkDecision === 'check') {
-      if (move.correct) {
-        // Placer checked their own correct placement - award points
+      } else {
+        // Piece is CORRECT
+        // PLACER gets +10 points
         this.updateScore(placer, 10, true);
+        
+        // Piece remains placed
+        // Clear pending check and switch turn to CHECKER
         this.pendingCheck = null;
-        this.switchTurn();
+        this.currentTurn = checker;
+        this.isPlacementInProgress = false;
+        
         return {
           success: true,
-          result: 'correct_placement',
-          message: 'Correct! +10 points.',
-          correctPlacement: true
-        };
-      } else {
-        // Placer checked their own incorrect placement - remove piece, no points
-        this.grid[move.gridIndex] = null;
-        this.pendingCheck = null;
-        this.switchTurn();
-        return {
-          success: true,
-          result: 'incorrect_placement',
-          message: 'Incorrect placement detected. Piece removed.',
-          correctPlacement: false
+          result: 'failed_check',
+          message: 'Placer awarded 10 points for a correct piece.',
+          correctPlacement: true,
+          placerGained: 10
         };
       }
     } else {
-      // Placer passed (both players passed)
-      const opponent = placer === 'playerA' ? 'playerB' : 'playerA';
-      
+      // PASS outcome
       if (move.correct) {
-        // Both passed, piece was correct - award placer points for correct placement
-        this.updateScore(placer, 5, true);  // Award 5 points for sneaking a correct piece
+        // Piece is CORRECT
+        // Piece remains placed
+        // TURN goes to CHECKER
         this.pendingCheck = null;
-        this.switchTurn();
+        this.currentTurn = checker;
+        this.isPlacementInProgress = false;
+        
         return {
           success: true,
-          result: 'both_passed_correct',
-          message: 'Both passed. Piece was correct! +5 points.',
+          result: 'opponent_passed_correct',
+          message: 'Opponent passed — piece was correct. Turn moves to opponent.',
           correctPlacement: true
         };
       } else {
-        // Both passed, piece was WRONG - remove piece and penalize opponent for missing it
-        this.grid[move.gridIndex] = null;  // REMOVE THE INCORRECT PIECE
-        this.updateScore(opponent, 3, false);  // Opponent gets 3 points for hidden mistake
+        // Piece is INCORRECT
+        // Remove piece from board
+        const piece = this.grid[move.gridIndex];
+        this.grid[move.gridIndex] = null;
+        
+        // Return piece to PLACER's rack
+        if (piece) {
+          this.returnPieceToRack(placer, piece);
+        }
+        
+        // BOTH players penalized -3 points
+        this.updateScore(placer, -3, false);
+        this.updateScore(checker, -3, false);
+        
+        // TURN goes to CHECKER
         this.pendingCheck = null;
-        this.switchTurn();
+        this.currentTurn = checker;
+        this.isPlacementInProgress = false;
+        
         return {
           success: true,
-          result: 'both_passed_incorrect',
-          message: 'Both passed. Piece was incorrect and removed. Opponent gains 3 points.',
-          hiddenPenalty: true,
-          correctPlacement: false
+          result: 'opponent_passed_incorrect',
+          message: 'Both penalized (-3). Piece removed and returned to placer.',
+          correctPlacement: false,
+          bothPenalized: -3
         };
       }
     }
@@ -385,18 +401,23 @@ export class GameLogic {
   updateScore(player, points, isCorrectPlacement) {
     const score = this.scores[player];
     score.score += points;
-    score.totalPlacements++;
+    
+    // Only update placement stats if this is an actual placement (not a penalty)
+    // Penalties (negative points without correct placement) shouldn't affect accuracy
+    if (points > 0 || isCorrectPlacement) {
+      score.totalPlacements++;
+      
+      if (isCorrectPlacement) {
+        score.correctPlacements++;
+        score.streak++;
+      } else {
+        score.streak = 0;
+      }
 
-    if (isCorrectPlacement) {
-      score.correctPlacements++;
-      score.streak++;
-    } else {
-      score.streak = 0;
+      score.accuracy = score.totalPlacements > 0
+        ? Math.round((score.correctPlacements / score.totalPlacements) * 100)
+        : 100;
     }
-
-    score.accuracy = score.totalPlacements > 0
-      ? Math.round((score.correctPlacements / score.totalPlacements) * 100)
-      : 100;
 
     if (score.streak >= 3) {
       const bonus = Math.floor(score.streak / 3) * 2;
