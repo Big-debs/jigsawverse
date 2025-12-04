@@ -401,18 +401,23 @@ export class GameLogic {
   updateScore(player, points, isCorrectPlacement) {
     const score = this.scores[player];
     score.score += points;
-    score.totalPlacements++;
+    
+    // Only update placement stats if this is an actual placement (not a penalty)
+    // Penalties (negative points without correct placement) shouldn't affect accuracy
+    if (points > 0 || isCorrectPlacement) {
+      score.totalPlacements++;
+      
+      if (isCorrectPlacement) {
+        score.correctPlacements++;
+        score.streak++;
+      } else {
+        score.streak = 0;
+      }
 
-    if (isCorrectPlacement) {
-      score.correctPlacements++;
-      score.streak++;
-    } else {
-      score.streak = 0;
+      score.accuracy = score.totalPlacements > 0
+        ? Math.round((score.correctPlacements / score.totalPlacements) * 100)
+        : 100;
     }
-
-    score.accuracy = score.totalPlacements > 0
-      ? Math.round((score.correctPlacements / score.totalPlacements) * 100)
-      : 100;
 
     if (score.streak >= 3) {
       const bonus = Math.floor(score.streak / 3) * 2;

@@ -1087,10 +1087,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
 
       const result = await multiplayerRef.current.respondToCheck(decision);
       
-      // Wait for state update
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Calculate score deltas if we have previous scores
+      // Calculate score deltas from the current game logic state (already updated)
       let friendlyMessage = result.message;
       if (prevScores && multiplayerRef.current.gameLogic) {
         const currentScores = multiplayerRef.current.gameLogic.scores;
