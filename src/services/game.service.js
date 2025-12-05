@@ -29,16 +29,21 @@ export const gameService = {
 
   // Join game by code
   async joinGame(gameCode, userId, playerName) {
-    // Get game
+    // Get game - use maybeSingle() to handle zero results gracefully
     const { data: game, error: fetchError } = await supabase
       .from('games')
       .select('*')
-      .eq('game_code', gameCode)
+      .eq('game_code', gameCode.toUpperCase())
       .eq('status', 'waiting')
-      .single();
+      .maybeSingle();
 
     if (fetchError) throw fetchError;
-    if (!game) throw new Error('Game not found');
+    if (!game) throw new Error('Game not found or no longer accepting players');
+
+    // Prevent host from joining their own game
+    if (game.host_id === userId) {
+      throw new Error('You cannot join your own game');
+    }
 
     // Update game with player B
     const { data, error } = await supabase
@@ -50,10 +55,13 @@ export const gameService = {
         started_at: new Date().toISOString()
       })
       .eq('id', game.id)
+      .eq('status', 'waiting') // Ensure game hasn't been joined by someone else
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data) throw new Error('Game was already joined by another player');
+    
     return data;
   },
 
@@ -74,8 +82,8 @@ export const gameService = {
     const { data, error } = await supabase
       .from('games')
       .select('*, images(*)')
-      .eq('game_code', gameCode)
-      .single();
+      .eq('game_code', gameCode.toUpperCase())
+      .maybeSingle();
 
     if (error) throw error;
     return data;
