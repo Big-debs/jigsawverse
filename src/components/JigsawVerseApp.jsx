@@ -9,6 +9,7 @@ import GameSettingsPanel from './GameSettingsPanel';
 import MoveHistoryPanel from './MoveHistoryPanel';
 import HintsPanel from './HintsPanel';
 import SinglePlayerGame from './SinglePlayerGame';
+import ZoomControls from './ZoomControls';
 import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
 import { isModeMultiplayer } from '../lib/gameModes';
 
@@ -1009,6 +1010,12 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   const [loading, setLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   
+  // Drag-and-drop state
+  const [draggedPiece, setDraggedPiece] = useState(null);
+  
+  // Zoom state
+  const [zoom, setZoom] = useState(1);
+  
   // Track previous pending check state and scores to detect when opponent responds
   const prevPendingCheckRef = useRef(null);
   const prevScoresRef = useRef(null);
@@ -1176,6 +1183,64 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     if (!isMyTurn || awaitingDecision) return;
     setSelectedPiece(piece);
   };
+
+  // Drag-and-drop handlers
+  const handleDragStart = useCallback((piece, e) => {
+    if (!isMyTurn || awaitingDecision) return;
+    e.preventDefault();
+    setDraggedPiece(piece);
+  }, [isMyTurn, awaitingDecision]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedPiece(null);
+  }, []);
+
+  const handlePieceDrop = useCallback(async (pieceId, gridIndex) => {
+    if (!isMyTurn || !multiplayerRef.current) return;
+
+    // UI-level check: ensure position is empty
+    const currentGrid = gameState?.grid || [];
+    if (currentGrid[gridIndex] !== null && currentGrid[gridIndex] !== undefined) {
+      console.warn('Position already occupied at UI level');
+      setError('This position is already occupied. Please choose an empty spot.');
+      handleDragEnd();
+      return;
+    }
+
+    try {
+      const result = await multiplayerRef.current.makeMove(pieceId, gridIndex);
+      
+      if (result.awaitingCheck) {
+        setLastAction({ 
+          type: 'placed', 
+          correct: result.correct,
+          message: 'Piece placed. Waiting for opponent to check or pass...'
+        });
+      }
+    } catch (err) {
+      console.error('Move error:', err);
+      setError('Failed to place piece: ' + err.message);
+    } finally {
+      handleDragEnd();
+    }
+  }, [isMyTurn, gameState, multiplayerRef, setError, handleDragEnd]);
+
+  // Zoom handlers
+  const handleZoomIn = useCallback(() => setZoom(prev => Math.min(prev + 0.25, 2.0)), []);
+  const handleZoomOut = useCallback(() => setZoom(prev => Math.max(prev - 0.25, 0.5)), []);
+  const handleZoomReset = useCallback(() => setZoom(1), []);
+
+  // Mouse up listener for drag
+  useEffect(() => {
+    if (!draggedPiece) return;
+
+    const handleMouseUp = () => handleDragEnd();
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [draggedPiece, handleDragEnd]);
 
   // Handle piece placement
   const handlePlacement = async (gridIndex) => {
@@ -1373,7 +1438,17 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         {/* Puzzle Grid */}
         <div className="lg:col-span-2">
           <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
-            <h3 className="text-white font-semibold mb-4">Puzzle Board</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-semibold">Puzzle Board</h3>
+              <ZoomControls
+                zoom={zoom}
+                onZoomIn={handleZoomIn}
+                onZoomOut={handleZoomOut}
+                onZoomReset={handleZoomReset}
+                minZoom={0.5}
+                maxZoom={2.0}
+              />
+            </div>
             <div className="w-full max-w-full overflow-hidden relative">
               {/* Ghost Image Background */}
               {gameSettings?.showGhostImage && (gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
@@ -1388,8 +1463,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
               )}
               
               <div 
-                className="grid gap-1 aspect-square w-full relative z-10"
-                style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
+                className="grid gap-1 aspect-square w-full relative z-10 transition-transform"
+                style={{ 
+                  gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
+                  transform: `scale(${zoom})`
+                }}
               >
                 {grid.map((piece, index) => {
                   const row = Math.floor(index / gridSize);
@@ -1402,6 +1480,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                     <button
                       key={index}
                       onClick={() => handlePlacement(index)}
+                      onMouseUp={() => draggedPiece && handlePieceDrop(draggedPiece.id, index)}
                       disabled={! selectedPiece || piece !== null || ! isMyTurn}
                       className={`aspect-square rounded border transition-all overflow-hidden relative ${
                         piece 
@@ -1458,20 +1537,22 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                   <button
                     key={index}
                     onClick={() => piece && handlePieceSelect(piece)}
+                    onMouseDown={(e) => piece && handleDragStart(piece, e)}
                     disabled={!isMyTurn || !piece}
-                    className={`aspect-square rounded-lg border-2 transition-all relative ${
+                    className={`aspect-square rounded-lg border-2 transition-all relative cursor-grab active:cursor-grabbing ${
                       piece && selectedPiece?.id === piece.id
                         ? 'border-yellow-400 ring-2 ring-yellow-400 scale-110'
                         : piece && isMyTurn 
                           ? showEdgeHighlight && isCorner
-                            ? 'border-red-400 hover:border-cyan-400 cursor-pointer shadow-lg shadow-red-400/50'
+                            ? 'border-red-400 hover:border-cyan-400 shadow-lg shadow-red-400/50'
                             : showEdgeHighlight
-                              ? 'border-amber-400 hover:border-cyan-400 cursor-pointer shadow-lg shadow-amber-400/50'
-                              : 'border-white/20 hover:border-cyan-400 cursor-pointer'
+                              ? 'border-amber-400 hover:border-cyan-400 shadow-lg shadow-amber-400/50'
+                              : 'border-white/20 hover:border-cyan-400'
                           : piece
                             ? 'border-white/10 opacity-50'
                             : 'border-white/10 bg-white/5 opacity-30'
                     }`}
+                    draggable={false}
                   >
                     {piece ? (
                       piece.imageData ? (
@@ -1479,6 +1560,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                           src={piece.imageData} 
                           alt={`Piece ${piece.id}`}
                           className="w-full h-full object-cover rounded"
+                          draggable={false}
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-purple-500/50 to-pink-500/50 rounded flex items-center justify-center text-white text-xs">
@@ -1496,7 +1578,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
             </div>
             {selectedPiece && (
               <p className="text-cyan-400 text-sm mt-3 text-center">
-                Click on the grid to place the selected piece
+                Click or drag to place the selected piece
               </p>
             )}
           </div>
