@@ -8,7 +8,9 @@ import ModeSelectScreen from './ModeSelectScreen';
 import GameSettingsPanel from './GameSettingsPanel';
 import MoveHistoryPanel from './MoveHistoryPanel';
 import HintsPanel from './HintsPanel';
+import SinglePlayerGame from './SinglePlayerGame';
 import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
+import { isModeMultiplayer } from '../lib/gameModes';
 
 // =====================================================
 // CONNECTION STATUS CONSTANTS
@@ -143,7 +145,8 @@ const ROUTES = {
   WAITING_ROOM: 'waiting',
   JOIN_GAME: 'join',
   GAMEPLAY: 'gameplay',
-  GAME_OVER: 'gameover'
+  GAME_OVER: 'gameover',
+  SINGLE_PLAYER_GAME: 'single_player_game'
 };
 
 // =====================================================
@@ -341,7 +344,7 @@ const JigsawVerseApp = () => {
               navigate(ROUTES.CREATE_GAME);
             }}
             onBack={() => navigate(ROUTES.HOME)}
-            multiplayerOnly={true}
+            multiplayerOnly={false}
           />
         )}
         
@@ -353,7 +356,12 @@ const JigsawVerseApp = () => {
             selectedMode={selectedMode}
             onGameCreated={(data) => {
               setGameData(data);
-              navigate(ROUTES.WAITING_ROOM, data);
+              // Route based on mode
+              if (data.isSinglePlayer) {
+                navigate(ROUTES.SINGLE_PLAYER_GAME, data);
+              } else {
+                navigate(ROUTES.WAITING_ROOM, data);
+              }
             }}
             onBack={() => navigate(ROUTES.HOME)}
             setError={setError}
@@ -435,6 +443,19 @@ const JigsawVerseApp = () => {
               navigate(ROUTES.HOME);
             }}
             setError={setError}
+          />
+        )}
+        
+        {currentRoute === ROUTES.SINGLE_PLAYER_GAME && gameData && (
+          <SinglePlayerGame
+            imageUrl={gameData.imagePreview}
+            gridSize={gameData.gridDimensions?.cols || 10}
+            pieces={gameData.pieces}
+            settings={gameSettings}
+            onExit={() => {
+              setGameData(null);
+              navigate(ROUTES.HOME);
+            }}
           />
         )}
         
@@ -575,43 +596,67 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
     setProgress('Initializing...');
     
     try {
-      // Create multiplayer host instance
-      const gameHost = new MultiplayerGameHost();
-      multiplayerRef.current = gameHost;
-
-      setProgress('Creating game...');
+      // Check if single player mode
+      const isSinglePlayer = !isModeMultiplayer(selectedMode);
       
-      // Create the game using the multiplayer host
-      const result = await gameHost.createGame(imageFile, {
-        gridSize,
-        timeLimit: 600,
-        mode: selectedMode || 'CLASSIC'
-      });
+      if (isSinglePlayer) {
+        // Single player: process image locally without multiplayer
+        setProgress('Processing image...');
+        
+        const { ImageProcessor } = await import('../lib/gameLogic');
+        const processor = new ImageProcessor(imageFile, gridSize);
+        await processor.loadImage();
+        const result = await processor.sliceImage();
+        
+        setProgress('Ready!');
+        
+        onGameCreated({
+          pieces: result.pieces,
+          gridDimensions: result.gridDimensions,
+          imagePreview,
+          isSinglePlayer: true,
+          mode: selectedMode
+        });
+      } else {
+        // Multiplayer: use existing flow
+        const gameHost = new MultiplayerGameHost();
+        multiplayerRef.current = gameHost;
 
-      // Setup connection manager for reconnection
-      connectionManager.setReconnectCallback(async () => {
-        if (gameHost.realtimeChannel) {
-          await gameHost.setupRealtimeChannel(result.gameId);
-        }
-      });
-      connectionManager.updateStatus(CONNECTION_STATUS.CONNECTED);
+        setProgress('Creating game...');
+        
+        // Create the game using the multiplayer host
+        const result = await gameHost.createGame(imageFile, {
+          gridSize,
+          timeLimit: 600,
+          mode: selectedMode || 'CLASSIC'
+        });
 
-      // Start lightweight heartbeat for connection monitoring
-      connectionManager.startHeartbeat(
-        createHeartbeatCheck(multiplayerRef),
-        HEARTBEAT_CONFIG.INTERVAL
-      );
+        // Setup connection manager for reconnection
+        connectionManager.setReconnectCallback(async () => {
+          if (gameHost.realtimeChannel) {
+            await gameHost.setupRealtimeChannel(result.gameId);
+          }
+        });
+        connectionManager.updateStatus(CONNECTION_STATUS.CONNECTED);
 
-      setProgress('Game created!');
-      
-      onGameCreated({
-        gameId: result.gameId,
-        gameCode: result.gameCode,
-        game: result.game,
-        pieces: result.pieces,
-        gridDimensions: result.gridDimensions,
-        imagePreview
-      });
+        // Start lightweight heartbeat for connection monitoring
+        connectionManager.startHeartbeat(
+          createHeartbeatCheck(multiplayerRef),
+          HEARTBEAT_CONFIG.INTERVAL
+        );
+
+        setProgress('Game created!');
+        
+        onGameCreated({
+          gameId: result.gameId,
+          gameCode: result.gameCode,
+          game: result.game,
+          pieces: result.pieces,
+          gridDimensions: result.gridDimensions,
+          imagePreview,
+          isSinglePlayer: false
+        });
+      }
     } catch (err) {
       console.error('Error creating game:', err);
       setError('Failed to create game: ' + (err.message || 'Unknown error'));
