@@ -139,7 +139,7 @@ export class MultiplayerGameHost {
       this.gameId = game.id;
 
       console.log('Step 4: Initializing game logic...');
-      this.gameLogic = new GameLogic(gridDimensions.totalPieces, pieces);
+      this.gameLogic = new GameLogic(gridDimensions.totalPieces, pieces, settings.mode || 'CLASSIC');
       this.gameLogic.initialize();
 
       console.log('Step 5: Setting up realtime state...');
@@ -536,7 +536,7 @@ export class MultiplayerGameGuest {
       const { pieces } = await processor.sliceImage();
 
       console.log('Step 5: Initializing game logic with full pieces...');
-      this.gameLogic = new GameLogic(game.grid_size, pieces);
+      this.gameLogic = new GameLogic(game.grid_size, pieces, game.mode || 'CLASSIC');
       this.gameLogic.importGameState(gameState, pieces);
 
       console.log('Step 6: Setting up realtime channel (broadcast)...');

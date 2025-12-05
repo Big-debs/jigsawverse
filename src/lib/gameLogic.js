@@ -2,6 +2,8 @@
 // IMAGE PROCESSOR - Slice images into puzzle pieces
 // =====================================================
 
+import { getModeConfig as importedGetModeConfig, getModeScoring as importedGetModeScoring } from './gameModes.js';
+
 export class ImageProcessor {
   constructor(imageSource, gridSize = 10) {
     this.imageSource = imageSource;
@@ -140,7 +142,7 @@ export class ImageProcessor {
 // =====================================================
 
 export class GameLogic {
-  constructor(totalPieces = 100, pieces = []) {
+  constructor(totalPieces = 100, pieces = [], mode = 'CLASSIC') {
     this.totalPieces = totalPieces;
     this.gridSize = Math.round(Math.sqrt(totalPieces));
     this.pieces = pieces;
@@ -150,14 +152,27 @@ export class GameLogic {
     this.playerBRack = [];
     this.currentTurn = 'playerA';
     this.scores = {
-      playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 },
-      playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 }
+      playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 },
+      playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 }
     };
     this.gameState = 'setup';
     this.moveHistory = [];
     this.pendingCheck = null;
     this.timerRemaining = 600; // Default 10 minutes
     this.isPlacementInProgress = false; // Add placement lock
+    
+    // Game mode support
+    this.mode = mode || 'CLASSIC';
+    this.modeConfig = importedGetModeConfig(mode);
+    this.modeScoring = importedGetModeScoring(mode);
+    this.turnsRemaining = {
+      playerA: this.modeConfig.features.turnsPerRound,
+      playerB: this.modeConfig.features.turnsPerRound
+    };
+    this.checksRemaining = {
+      playerA: this.modeConfig.features.checksPerTurn,
+      playerB: this.modeConfig.features.checksPerTurn
+    };
   }
 
   initialize() {
@@ -331,8 +346,9 @@ export class GameLogic {
       // CHECK outcome
       if (!move.correct) {
         // Piece is INCORRECT
-        // Checker gets +5 points
-        this.updateScore(checker, 5, false);
+        // Checker gets points based on mode
+        const checkerPoints = this.modeScoring.checkerSuccess || 5;
+        this.updateScore(checker, checkerPoints, false);
         
         // Remove piece from grid
         const piece = this.grid[move.gridIndex];
@@ -351,16 +367,18 @@ export class GameLogic {
         return {
           success: true,
           result: 'successful_check',
-          message: 'Checker gained 5 points for catching an incorrect piece.',
+          message: `Checker gained ${checkerPoints} points for catching an incorrect piece.`,
           correctPlacement: false,
-          checkerGained: 5
+          checkerGained: checkerPoints
         };
       } else {
         // Piece is CORRECT
-        // PLACER gets +10 points
-        this.updateScore(placer, 10, true);
-        // CHECKER gets -2 points penalty for failed check
-        this.updateScore(checker, -2, false);
+        // PLACER gets points based on mode
+        const placerPoints = this.modeScoring.checkCorrect || 10;
+        this.updateScore(placer, placerPoints, true);
+        // CHECKER gets penalty based on mode
+        const checkerPenalty = this.modeScoring.checkerFail || -2;
+        this.updateScore(checker, checkerPenalty, false);
         
         // Piece remains placed
         // Clear pending check and switch turn to CHECKER
@@ -371,10 +389,10 @@ export class GameLogic {
         return {
           success: true,
           result: 'failed_check',
-          message: 'Placer awarded 10 points. Checker penalized -2 points.',
+          message: `Placer awarded ${placerPoints} points. Checker penalized ${checkerPenalty} points.`,
           correctPlacement: true,
-          placerGained: 10,
-          checkerLost: -2
+          placerGained: placerPoints,
+          checkerLost: checkerPenalty
         };
       }
     } else {
@@ -404,9 +422,10 @@ export class GameLogic {
           this.returnPieceToRack(placer, piece);
         }
         
-        // BOTH players penalized -3 points
-        this.updateScore(placer, -3, false);
-        this.updateScore(checker, -3, false);
+        // BOTH players penalized based on mode
+        const penalty = this.modeScoring.passWrong || -3;
+        this.updateScore(placer, penalty, false);
+        this.updateScore(checker, penalty, false);
         
         // TURN goes to CHECKER
         this.pendingCheck = null;
@@ -416,9 +435,9 @@ export class GameLogic {
         return {
           success: true,
           result: 'opponent_passed_incorrect',
-          message: 'Both penalized (-3). Piece removed and returned to placer.',
+          message: `Both penalized (${penalty}). Piece removed and returned to placer.`,
           correctPlacement: false,
-          bothPenalized: -3
+          bothPenalized: penalty
         };
       }
     }
@@ -445,8 +464,12 @@ export class GameLogic {
         : 100;
     }
 
-    if (score.streak >= 3) {
-      const bonus = Math.floor(score.streak / 3) * 2;
+    // Apply mode-specific streak bonuses
+    const streakThreshold = this.modeScoring.streakBonusThreshold || 3;
+    const streakMultiplier = this.modeScoring.streakMultiplier || 1;
+    
+    if (score.streak >= streakThreshold) {
+      const bonus = Math.floor(score.streak / streakThreshold) * 2 * streakMultiplier;
       score.score += bonus;
     }
   }
@@ -490,6 +513,108 @@ export class GameLogic {
     return 'tie';
   }
 
+  resetTurnsForPlayer(player) {
+    if (this.turnsRemaining[player] !== undefined) {
+      this.turnsRemaining[player] = this.modeConfig.features.turnsPerRound;
+    }
+    if (this.checksRemaining[player] !== undefined) {
+      this.checksRemaining[player] = this.modeConfig.features.checksPerTurn;
+    }
+  }
+
+  useHint(player, hintType) {
+    const HINT_CONFIG = {
+      COSTS: {
+        position: -5,
+        edge: -2,
+        corner: -3,
+        region: -5
+      },
+      MAX_HINTS_PER_GAME: 5
+    };
+
+    const score = this.scores[player];
+    
+    // Check if player has exceeded hint limit
+    if (score.hintsUsed >= HINT_CONFIG.MAX_HINTS_PER_GAME) {
+      return { success: false, message: 'Maximum hints used for this game' };
+    }
+
+    // Get hint cost
+    const cost = HINT_CONFIG.COSTS[hintType] || -5;
+    
+    // Deduct points
+    this.updateScore(player, cost, false);
+    score.hintsUsed++;
+
+    // Get hint information based on type
+    const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
+    const availablePieces = rack.filter(p => p !== null);
+
+    if (availablePieces.length === 0) {
+      return { success: false, message: 'No pieces available for hint' };
+    }
+
+    let hintInfo = {};
+
+    switch (hintType) {
+      case 'position': {
+        const hintPiece = availablePieces[0];
+        hintInfo = {
+          type: 'position',
+          pieceId: hintPiece.id,
+          correctPosition: hintPiece.correctPosition
+        };
+        break;
+      }
+      case 'edge': {
+        const edgePieces = availablePieces.filter(p => p.isEdge && !p.edges.top && !p.edges.left && !p.edges.right && !p.edges.bottom);
+        hintInfo = {
+          type: 'edge',
+          edgePieceIds: edgePieces.map(p => p.id)
+        };
+        break;
+      }
+      case 'corner': {
+        const cornerPieces = availablePieces.filter(p => {
+          const edges = p.edges || {};
+          return (edges.top && edges.left) || (edges.top && edges.right) || 
+                 (edges.bottom && edges.left) || (edges.bottom && edges.right);
+        });
+        hintInfo = {
+          type: 'corner',
+          cornerPieceIds: cornerPieces.map(p => p.id)
+        };
+        break;
+      }
+      case 'region': {
+        const hintPiece = availablePieces[0];
+        const correctRow = Math.floor(hintPiece.correctPosition / this.gridSize);
+        const correctCol = hintPiece.correctPosition % this.gridSize;
+        hintInfo = {
+          type: 'region',
+          pieceId: hintPiece.id,
+          region: {
+            rowStart: Math.max(0, correctRow - 1),
+            rowEnd: Math.min(this.gridSize - 1, correctRow + 1),
+            colStart: Math.max(0, correctCol - 1),
+            colEnd: Math.min(this.gridSize - 1, correctCol + 1)
+          }
+        };
+        break;
+      }
+      default:
+        return { success: false, message: 'Unknown hint type' };
+    }
+
+    return {
+      success: true,
+      cost,
+      hintsUsed: score.hintsUsed,
+      hint: hintInfo
+    };
+  }
+
   getHint(player) {
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
     const availablePieces = rack.filter(p => p !== null);
@@ -521,7 +646,10 @@ export class GameLogic {
       winner: this.getWinner(),
       pendingCheck: this.pendingCheck,
       moveHistory: [...this.moveHistory],
-      timerRemaining: this.timerRemaining
+      timerRemaining: this.timerRemaining,
+      mode: this.mode,
+      turnsRemaining: { ...this.turnsRemaining },
+      checksRemaining: { ...this.checksRemaining }
     };
   }
 
@@ -534,7 +662,8 @@ export class GameLogic {
       current_turn: this.currentTurn,
       timer_remaining: this.timerRemaining,
       pending_check: this.pendingCheck,
-      move_history: this.moveHistory
+      move_history: this.moveHistory,
+      mode: this.mode
       // NOTE: 'scores' and 'game_state' columns DO NOT EXIST in database - removed
       // NOTE: 'pieces' exists but we don't update it after initialization
       // NOTE: 'awaiting_decision' exists and is set separately in makeMove/respondToCheck
@@ -624,12 +753,29 @@ export class GameLogic {
     this.currentTurn = data.current_turn || data.currentTurn || 'playerA';
     this.timerRemaining = data.timer_remaining || data.timerRemaining || 600;
     this.scores = data.scores || {
-      playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 },
-      playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0 }
+      playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 },
+      playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 }
     };
+    // Ensure hintsUsed is present in scores
+    if (!this.scores.playerA.hintsUsed) this.scores.playerA.hintsUsed = 0;
+    if (!this.scores.playerB.hintsUsed) this.scores.playerB.hintsUsed = 0;
+    
     this.gameState = data.game_state || data.gameState || 'active';
     this.pendingCheck = data.pending_check || data.pendingCheck || null;
     this.moveHistory = data.move_history || data.moveHistory || [];
+    
+    // Import mode data
+    if (data.mode) {
+      this.mode = data.mode;
+      this.modeConfig = importedGetModeConfig(data.mode);
+      this.modeScoring = importedGetModeScoring(data.mode);
+    }
+    if (data.turnsRemaining) {
+      this.turnsRemaining = data.turnsRemaining;
+    }
+    if (data.checksRemaining) {
+      this.checksRemaining = data.checksRemaining;
+    }
 
     console.log('importGameState complete:', {
       gridLength: this.grid.length,
@@ -638,7 +784,8 @@ export class GameLogic {
       playerBRackLength: this.playerBRack.filter(p => p !== null).length,
       piecePoolLength: this.piecePool.length,
       currentTurn: this.currentTurn,
-      pendingCheck: this.pendingCheck
+      pendingCheck: this.pendingCheck,
+      mode: this.mode
     });
   }
 }
