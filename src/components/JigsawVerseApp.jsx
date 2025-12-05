@@ -4,6 +4,11 @@ import { supabase } from '../config/supabase';
 import { authService } from '../services/auth.service';
 import { gameService } from '../services/game.service';
 import { MultiplayerGameHost, MultiplayerGameGuest } from '../lib/multiplayer';
+import ModeSelectScreen from './ModeSelectScreen';
+import GameSettingsPanel from './GameSettingsPanel';
+import MoveHistoryPanel from './MoveHistoryPanel';
+import HintsPanel from './HintsPanel';
+import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
 
 // =====================================================
 // CONNECTION STATUS CONSTANTS
@@ -133,6 +138,7 @@ function createHeartbeatCheck(multiplayerRef) {
 
 const ROUTES = {
   HOME: 'home',
+  MODE_SELECT: 'mode_select',
   CREATE_GAME: 'create',
   WAITING_ROOM: 'waiting',
   JOIN_GAME: 'join',
@@ -152,6 +158,8 @@ const JigsawVerseApp = () => {
   const [connectionStatus, setConnectionStatus] = useState(CONNECTION_STATUS.DISCONNECTED);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedMode, setSelectedMode] = useState('CLASSIC');
+  const [gameSettings, setGameSettings] = useState(ACCESSIBILITY_DEFAULTS);
 
   // Refs for multiplayer instances and connection manager
   const multiplayerRef = useRef(null);
@@ -326,11 +334,23 @@ const JigsawVerseApp = () => {
           />
         )}
         
+        {currentRoute === ROUTES.MODE_SELECT && (
+          <ModeSelectScreen
+            onModeSelect={(mode) => {
+              setSelectedMode(mode);
+              navigate(ROUTES.CREATE_GAME);
+            }}
+            onBack={() => navigate(ROUTES.HOME)}
+            multiplayerOnly={true}
+          />
+        )}
+        
         {currentRoute === ROUTES.CREATE_GAME && (
           <CreateGameScreen 
             user={user}
             multiplayerRef={multiplayerRef}
             connectionManager={connectionManagerRef.current}
+            selectedMode={selectedMode}
             onGameCreated={(data) => {
               setGameData(data);
               navigate(ROUTES.WAITING_ROOM, data);
@@ -374,6 +394,8 @@ const JigsawVerseApp = () => {
             isHost={isHost}
             multiplayerRef={multiplayerRef}
             gameData={gameData}
+            gameSettings={gameSettings}
+            onSettingsChange={setGameSettings}
             onGameEnd={async (winner) => {
               // Save final scores when game ends
               if (multiplayerRef.current?.gameLogic && multiplayerRef.current?.gameId) {
@@ -454,7 +476,7 @@ const HomeScreen = ({ onNavigate, setIsHost }) => {
         <button
           onClick={() => {
             setIsHost(true);
-            onNavigate(ROUTES.CREATE_GAME);
+            onNavigate(ROUTES.MODE_SELECT);
           }}
           className="group bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-2xl p-8 text-left transition-all transform hover:scale-105 shadow-2xl"
         >
@@ -531,7 +553,7 @@ const HomeScreen = ({ onNavigate, setIsHost }) => {
 // CREATE GAME SCREEN
 // =====================================================
 
-const CreateGameScreen = ({ user, multiplayerRef, connectionManager, onGameCreated, onBack, setError }) => {
+const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMode, onGameCreated, onBack, setError }) => {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [gridSize, setGridSize] = useState(10);
@@ -562,7 +584,8 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, onGameCreat
       // Create the game using the multiplayer host
       const result = await gameHost.createGame(imageFile, {
         gridSize,
-        timeLimit: 600
+        timeLimit: 600,
+        mode: selectedMode || 'CLASSIC'
       });
 
       // Setup connection manager for reconnection
@@ -933,7 +956,7 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
 // Game constants
 const RACK_SIZE = 10; // Maximum number of pieces in a player's rack
 
-const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, setError }) => {
+const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSettingsChange, onGameEnd, onExit, setError }) => {
   const [gameState, setGameState] = useState(null);
   const [selectedPiece, setSelectedPiece] = useState(null);
   const [awaitingDecision, setAwaitingDecision] = useState(null);
@@ -1306,33 +1329,62 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
         <div className="lg:col-span-2">
           <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
             <h3 className="text-white font-semibold mb-4">Puzzle Board</h3>
-            <div className="w-full max-w-full overflow-hidden">
+            <div className="w-full max-w-full overflow-hidden relative">
+              {/* Ghost Image Background */}
+              {gameSettings?.showGhostImage && (gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
+                <div className="absolute inset-0 z-0 pointer-events-none">
+                  <img 
+                    src={gameData?.imagePreview || multiplayerRef?.current?.imageUrl}
+                    alt="Ghost preview"
+                    className="w-full h-full object-cover rounded"
+                    style={{ opacity: 0.15 }}
+                  />
+                </div>
+              )}
+              
               <div 
-                className="grid gap-1 aspect-square w-full"
+                className="grid gap-1 aspect-square w-full relative z-10"
                 style={{ gridTemplateColumns: `repeat(${gridSize}, 1fr)` }}
               >
-                {grid.map((piece, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handlePlacement(index)}
-                    disabled={! selectedPiece || piece !== null || ! isMyTurn}
-                    className={`aspect-square rounded border transition-all overflow-hidden ${
-                      piece 
-                        ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-white/40' 
-                        : selectedPiece && isMyTurn
-                          ? 'bg-white/10 border-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
-                          : 'bg-white/5 border-white/10'
-                    }`}
-                  >
-                    {piece && piece.imageData && (
-                      <img 
-                        src={piece.imageData} 
-                        alt={`Piece ${piece.id}`}
-                        className="w-full h-full object-cover rounded"
-                      />
-                    )}
-                  </button>
-                ))}
+                {grid.map((piece, index) => {
+                  const row = Math.floor(index / gridSize);
+                  const col = index % gridSize;
+                  const gridLabel = gameSettings?.showGridLabels 
+                    ? `${String.fromCharCode(65 + col)}${row + 1}`
+                    : '';
+                  
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handlePlacement(index)}
+                      disabled={! selectedPiece || piece !== null || ! isMyTurn}
+                      className={`aspect-square rounded border transition-all overflow-hidden relative ${
+                        piece 
+                          ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-white/40' 
+                          : selectedPiece && isMyTurn
+                            ? 'bg-white/10 border-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
+                            : 'bg-white/5 border-white/10'
+                      }`}
+                    >
+                      {piece && piece.imageData && (
+                        <img 
+                          src={piece.imageData} 
+                          alt={`Piece ${piece.id}`}
+                          className="w-full h-full object-cover rounded"
+                        />
+                      )}
+                      {/* Grid Label Overlay */}
+                      {gridLabel && !piece && (
+                        <span 
+                          className="absolute inset-0 flex items-center justify-center text-white/60 text-xs font-mono pointer-events-none"
+                          style={{ opacity: 0.6 }}
+                        >
+                          {gridLabel}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1346,40 +1398,56 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
               Your Pieces ({myRack.filter(p => p !== null).length})
             </h3>
             <div className="grid grid-cols-5 gap-2">
-              {paddedRack.map((piece, index) => (
-                <button
-                  key={index}
-                  onClick={() => piece && handlePieceSelect(piece)}
-                  disabled={!isMyTurn || !piece}
-                  className={`aspect-square rounded-lg border-2 transition-all ${
-                    piece && selectedPiece?.id === piece.id
-                      ? 'border-yellow-400 ring-2 ring-yellow-400 scale-110'
-                      : piece && isMyTurn 
-                        ? 'border-white/20 hover:border-cyan-400 cursor-pointer'
-                        : piece
-                          ? 'border-white/10 opacity-50'
-                          : 'border-white/10 bg-white/5 opacity-30'
-                  }`}
-                >
-                  {piece ? (
-                    piece.imageData ? (
-                      <img 
-                        src={piece.imageData} 
-                        alt={`Piece ${piece.id}`}
-                        className="w-full h-full object-cover rounded"
-                      />
+              {paddedRack.map((piece, index) => {
+                // Determine if piece is edge or corner for highlighting
+                const isEdge = piece?.isEdge;
+                const isCorner = piece?.edges && (
+                  (piece.edges.top && piece.edges.left) ||
+                  (piece.edges.top && piece.edges.right) ||
+                  (piece.edges.bottom && piece.edges.left) ||
+                  (piece.edges.bottom && piece.edges.right)
+                );
+                const showEdgeHighlight = gameSettings?.highlightEdges && isEdge;
+                
+                return (
+                  <button
+                    key={index}
+                    onClick={() => piece && handlePieceSelect(piece)}
+                    disabled={!isMyTurn || !piece}
+                    className={`aspect-square rounded-lg border-2 transition-all relative ${
+                      piece && selectedPiece?.id === piece.id
+                        ? 'border-yellow-400 ring-2 ring-yellow-400 scale-110'
+                        : piece && isMyTurn 
+                          ? showEdgeHighlight && isCorner
+                            ? 'border-red-400 hover:border-cyan-400 cursor-pointer shadow-lg shadow-red-400/50'
+                            : showEdgeHighlight
+                              ? 'border-amber-400 hover:border-cyan-400 cursor-pointer shadow-lg shadow-amber-400/50'
+                              : 'border-white/20 hover:border-cyan-400 cursor-pointer'
+                          : piece
+                            ? 'border-white/10 opacity-50'
+                            : 'border-white/10 bg-white/5 opacity-30'
+                    }`}
+                  >
+                    {piece ? (
+                      piece.imageData ? (
+                        <img 
+                          src={piece.imageData} 
+                          alt={`Piece ${piece.id}`}
+                          className="w-full h-full object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-purple-500/50 to-pink-500/50 rounded flex items-center justify-center text-white text-xs">
+                          {piece.id}
+                        </div>
+                      )
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-500/50 to-pink-500/50 rounded flex items-center justify-center text-white text-xs">
-                        {piece.id}
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-2 h-2 rounded-full bg-white/20"></div>
                       </div>
-                    )
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <div className="w-2 h-2 rounded-full bg-white/20"></div>
-                    </div>
-                  )}
-                </button>
-              ))}
+                    )}
+                  </button>
+                );
+              })}
             </div>
             {selectedPiece && (
               <p className="text-cyan-400 text-sm mt-3 text-center">
@@ -1439,8 +1507,49 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, onGameEnd, onExit, s
           >
             Exit Game
           </button>
+          
+          {/* Game Settings Panel */}
+          <GameSettingsPanel 
+            settings={gameSettings || ACCESSIBILITY_DEFAULTS}
+            onSettingsChange={onSettingsChange}
+          />
+          
+          {/* Hints Panel */}
+          <HintsPanel
+            onUseHint={async (hintType) => {
+              if (!multiplayerRef.current?.gameLogic) return;
+              try {
+                const result = multiplayerRef.current.gameLogic.useHint(myPlayer, hintType);
+                if (result.success) {
+                  setLastAction({
+                    type: 'hint',
+                    message: `Hint used! ${result.cost} points deducted. ${result.hintsUsed}/${5} hints used.`
+                  });
+                  // Trigger state update to refresh UI
+                  const newState = multiplayerRef.current.gameLogic.getGameState();
+                  setGameState(newState);
+                } else {
+                  setError(result.message);
+                }
+              } catch (err) {
+                setError('Failed to use hint: ' + err.message);
+              }
+            }}
+            hintsUsed={gameState?.scores?.[myPlayer]?.hintsUsed || 0}
+            disabled={!isMyTurn}
+          />
         </div>
       </div>
+      
+      {/* Move History Panel - Shown when enabled */}
+      {gameSettings?.showMoveHistory && (
+        <div className="mt-6">
+          <MoveHistoryPanel 
+            moveHistory={gameState?.moveHistory || []}
+            isVisible={gameSettings?.showMoveHistory}
+          />
+        </div>
+      )}
 
       {/* Preview Modal */}
       {showPreview && (
