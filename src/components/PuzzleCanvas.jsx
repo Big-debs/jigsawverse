@@ -67,7 +67,8 @@ const PuzzleCanvas = ({
     };
 
     loadPieceImages();
-  }, [grid, pieceImages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grid]);
 
   // Load dragged piece image
   useEffect(() => {
@@ -79,7 +80,8 @@ const PuzzleCanvas = ({
       setPieceImages(prev => ({ ...prev, [draggedPiece.id]: img }));
     };
     img.src = draggedPiece.imageData;
-  }, [draggedPiece, pieceImages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draggedPiece]);
 
   // Calculate snap preview
   useEffect(() => {

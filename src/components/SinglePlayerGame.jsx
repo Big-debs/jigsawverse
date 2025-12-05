@@ -39,7 +39,7 @@ const SinglePlayerGame = ({
   const [draggedPiece, setDraggedPiece] = useState(null);
   const [dragPosition, setDragPosition] = useState(null);
   const [zoom, setZoom] = useState(1);
-  const offset = { x: 0, y: 0 }; // Static offset for now
+  const offset = { x: 0, y: 0 }; // No pan support for now (zoom only)
   const [gameSettings, setGameSettings] = useState(settings);
   const [activeHint, setActiveHint] = useState(null);
 
@@ -118,7 +118,8 @@ const SinglePlayerGame = ({
       // Calculate points with streak bonus
       let points = scoring.correctPiece;
       if (newStreak >= scoring.streakBonusThreshold) {
-        points = Math.floor(points * (1 + scoring.streakMultiplier * 0.2));
+        const multiplier = 1 + (scoring.streakMultiplier * 0.2);
+        points = Math.floor(points * multiplier);
       }
       setScore(prev => prev + points);
 

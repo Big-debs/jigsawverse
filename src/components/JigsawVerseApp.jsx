@@ -1185,9 +1185,8 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   };
 
   // Drag-and-drop handlers
-  const handleDragStart = useCallback((piece, e) => {
+  const handleDragStart = useCallback((piece) => {
     if (!isMyTurn || awaitingDecision) return;
-    e.preventDefault();
     setDraggedPiece(piece);
   }, [isMyTurn, awaitingDecision]);
 
@@ -1537,7 +1536,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                   <button
                     key={index}
                     onClick={() => piece && handlePieceSelect(piece)}
-                    onMouseDown={(e) => piece && handleDragStart(piece, e)}
+                    onMouseDown={() => piece && handleDragStart(piece)}
                     disabled={!isMyTurn || !piece}
                     className={`aspect-square rounded-lg border-2 transition-all relative cursor-grab active:cursor-grabbing ${
                       piece && selectedPiece?.id === piece.id
