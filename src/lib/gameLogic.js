@@ -2,6 +2,8 @@
 // IMAGE PROCESSOR - Slice images into puzzle pieces
 // =====================================================
 
+import { getModeConfig as importedGetModeConfig, getModeScoring as importedGetModeScoring } from './gameModes.js';
+
 export class ImageProcessor {
   constructor(imageSource, gridSize = 10) {
     this.imageSource = imageSource;
@@ -161,8 +163,8 @@ export class GameLogic {
     
     // Game mode support
     this.mode = mode || 'CLASSIC';
-    this.modeConfig = this.getModeConfig(mode);
-    this.modeScoring = this.getModeScoring(mode);
+    this.modeConfig = importedGetModeConfig(mode);
+    this.modeScoring = importedGetModeScoring(mode);
     this.turnsRemaining = {
       playerA: this.modeConfig.features.turnsPerRound,
       playerB: this.modeConfig.features.turnsPerRound
@@ -171,88 +173,6 @@ export class GameLogic {
       playerA: this.modeConfig.features.checksPerTurn,
       playerB: this.modeConfig.features.checksPerTurn
     };
-  }
-
-  getModeConfig(modeId) {
-    const GAME_MODES = {
-      CLASSIC: {
-        id: 'CLASSIC',
-        features: {
-          turnsPerRound: 1,
-          checksPerTurn: 1
-        }
-      },
-      SUPER: {
-        id: 'SUPER',
-        features: {
-          turnsPerRound: 2,
-          checksPerTurn: 1
-        }
-      },
-      SAGE: {
-        id: 'SAGE',
-        features: {
-          turnsPerRound: 5,
-          checksPerTurn: 2
-        }
-      },
-      SAVANT: {
-        id: 'SAVANT',
-        features: {
-          turnsPerRound: Infinity,
-          checksPerTurn: 0
-        }
-      },
-      SINGLE_PLAYER: {
-        id: 'SINGLE_PLAYER',
-        features: {
-          turnsPerRound: 1,
-          checksPerTurn: 0
-        }
-      }
-    };
-    return GAME_MODES[modeId] || GAME_MODES.CLASSIC;
-  }
-
-  getModeScoring(modeId) {
-    const MODE_SCORING = {
-      CLASSIC: {
-        checkCorrect: 10,
-        checkerSuccess: 5,
-        checkerFail: -2,
-        passWrong: -3,
-        streakMultiplier: 1,
-        streakBonusThreshold: 3
-      },
-      SUPER: {
-        checkCorrect: 15,
-        checkerSuccess: 8,
-        checkerFail: -3,
-        passWrong: -5,
-        streakMultiplier: 1.5,
-        streakBonusThreshold: 3
-      },
-      SAGE: {
-        checkCorrect: 20,
-        checkerSuccess: 10,
-        checkerFail: -5,
-        passWrong: -8,
-        streakMultiplier: 2,
-        streakBonusThreshold: 2
-      },
-      SAVANT: {
-        correctPiece: 25,
-        streakMultiplier: 2.5,
-        streakBonusThreshold: 5
-      },
-      SINGLE_PLAYER: {
-        correctPiece: 10,
-        wrongPiece: -2,
-        streakMultiplier: 1,
-        streakBonusThreshold: 3
-      }
-    };
-    return MODE_SCORING[modeId] || MODE_SCORING.CLASSIC;
   }
 
   initialize() {
@@ -847,8 +767,8 @@ export class GameLogic {
     // Import mode data
     if (data.mode) {
       this.mode = data.mode;
-      this.modeConfig = this.getModeConfig(data.mode);
-      this.modeScoring = this.getModeScoring(data.mode);
+      this.modeConfig = importedGetModeConfig(data.mode);
+      this.modeScoring = importedGetModeScoring(data.mode);
     }
     if (data.turnsRemaining) {
       this.turnsRemaining = data.turnsRemaining;

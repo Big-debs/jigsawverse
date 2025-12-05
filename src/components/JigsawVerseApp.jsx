@@ -1546,6 +1546,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         <div className="mt-6">
           <MoveHistoryPanel 
             moveHistory={gameState?.moveHistory || []}
+            gridSize={gridSize}
             isVisible={gameSettings?.showMoveHistory}
           />
         </div>

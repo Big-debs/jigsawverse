@@ -1,7 +1,7 @@
 import { History, CheckCircle, XCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 
-const MoveHistoryPanel = ({ moveHistory = [], isVisible = true }) => {
+const MoveHistoryPanel = ({ moveHistory = [], gridSize = 10, isVisible = true }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
   if (!isVisible) return null;
@@ -30,9 +30,9 @@ const MoveHistoryPanel = ({ moveHistory = [], isVisible = true }) => {
     });
   };
 
-  const getGridPosition = (gridIndex, gridSize = 10) => {
-    const col = gridIndex % gridSize;
-    const row = Math.floor(gridIndex / gridSize);
+  const getGridPosition = (gridIndex, size = gridSize) => {
+    const col = gridIndex % size;
+    const row = Math.floor(gridIndex / size);
     const colLetter = String.fromCharCode(65 + col); // A-Z
     const rowNumber = row + 1;
     return `${colLetter}${rowNumber}`;
