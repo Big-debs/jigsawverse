@@ -61,7 +61,7 @@ export const gameService = {
 
     if (error) throw error;
     if (!data) throw new Error('Game was already joined by another player');
-    
+
     return data;
   },
 
