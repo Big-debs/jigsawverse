@@ -18,8 +18,8 @@ const SinglePlayerGame = ({
   const [gameLogic] = useState(() => {
     const totalPieces = gridSize * gridSize;
     const logic = new GameLogic(totalPieces, pieces, 'SINGLE_PLAYER');
-    // Put all pieces in player rack for single player
-    logic.piecePool = [...pieces];
+    // Put all pieces in player rack for single player - SHUFFLED
+    logic.piecePool = logic.shufflePieces();
     logic.playerARack = [];
     logic.fillRack('playerA');
     logic.gameState = 'active';
