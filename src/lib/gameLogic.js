@@ -132,10 +132,25 @@ export class ImageProcessor {
   }
 
   getPiecesForRack(count = 10) {
+    // Instead of taking sequential pieces, distribute them across the grid
+    // to ensure rack pieces aren't clustered together
     const shuffled = this.shufflePieces();
-    return shuffled.slice(0, count);
+    const rackPieces = [];
+    const step = Math.max(1, Math.floor(shuffled.length / count));
+    
+    for (let i = 0; i < count && i < shuffled.length; i++) {
+      const index = (i * step) % shuffled.length;
+      rackPieces.push(shuffled[index]);
+    }
+    
+    // Do a final shuffle of the selected pieces
+    for (let i = rackPieces.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rackPieces[i], rackPieces[j]] = [rackPieces[j], rackPieces[i]];
+    }
+    
+    return rackPieces;
   }
-}
 
 // =====================================================
 // GAME LOGIC - Core puzzle game mechanics
@@ -176,6 +191,8 @@ export class GameLogic {
   }
 
   initialize() {
+    // Shuffle the piece pool to randomize distribution
+    this.piecePool = this.shufflePieces();
     this.fillRack('playerA');
     this.fillRack('playerB');
     this.gameState = 'active';
