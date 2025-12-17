@@ -151,6 +151,7 @@ export class ImageProcessor {
     
     return rackPieces;
   }
+}
 
 // =====================================================
 // GAME LOGIC - Core puzzle game mechanics
