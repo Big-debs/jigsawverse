@@ -18,8 +18,16 @@ const SinglePlayerGame = ({
   const [gameLogic] = useState(() => {
     const totalPieces = gridSize * gridSize;
     const logic = new GameLogic(totalPieces, pieces, 'SINGLE_PLAYER');
-    // Put all pieces in player rack for single player - SHUFFLED
-    logic.piecePool = logic.shufflePieces();
+    
+    // Shuffle pieces manually using Fisher-Yates algorithm
+    const shuffled = [...pieces];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    // Put all shuffled pieces in player rack for single player
+    logic.piecePool = shuffled;
     logic.playerARack = [];
     logic.fillRack('playerA');
     logic.gameState = 'active';
