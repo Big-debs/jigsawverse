@@ -191,7 +191,7 @@ export class GameLogic {
     };
   }
 
-  initialize() {
+ initialize() {
     // Shuffle the piece pool to randomize distribution
     this.piecePool = this.shufflePieces();
     this.fillRack('playerA');
@@ -199,8 +199,18 @@ export class GameLogic {
     this.gameState = 'active';
   }
 
+  shufflePieces() {
+    const shuffled = [...this.pieces];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
   fillRack(player) {
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
+    // ... rest of fillRack code
     
     // Filter out null AND undefined, then count actual pieces
     const actualPieces = rack.filter(p => p !== null && p !== undefined);
