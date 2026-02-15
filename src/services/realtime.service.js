@@ -6,7 +6,7 @@ import { supabase } from '../config/supabase';
 
 export const realtimeService = {
   // Initialize game state
-  async initializeGameState(gameId, pieces, gridSize) {
+  async initializeGameState(gameId, pieces, gridSize, gameplayMode = 'CLASSIC') {
     // Store only piece metadata, not the full imageData
     // imageData is NOT stored - it's reconstructed client-side
     const piecesMetadata = pieces.map(p => ({
@@ -34,7 +34,8 @@ export const realtimeService = {
         piece_pool: pieces.slice(20).map(p => p.id),
         pieces: piecesMetadata,  // Smaller payload without imageData
         current_turn: 'playerA',
-        timer_remaining: 600
+        timer_remaining: 600,
+        gameplay_mode: gameplayMode
       })
       .select()
       .single();
