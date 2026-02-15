@@ -696,7 +696,7 @@ export class GameLogic {
       timer_remaining: this.timerRemaining,
       pending_check: this.pendingCheck,
       move_history: this.moveHistory,
-      mode: this.mode
+      gameplay_mode: this.mode
       // NOTE: 'scores' and 'game_state' columns DO NOT EXIST in database - removed
       // NOTE: 'pieces' exists but we don't update it after initialization
       // NOTE: 'awaiting_decision' exists and is set separately in makeMove/respondToCheck
@@ -798,10 +798,11 @@ export class GameLogic {
     this.moveHistory = data.move_history || data.moveHistory || [];
     
     // Import mode data
-    if (data.mode) {
-      this.mode = data.mode;
-      this.modeConfig = importedGetModeConfig(data.mode);
-      this.modeScoring = importedGetModeScoring(data.mode);
+    const importedMode = data.gameplay_mode || data.mode;
+    if (importedMode) {
+      this.mode = importedMode;
+      this.modeConfig = importedGetModeConfig(importedMode);
+      this.modeScoring = importedGetModeScoring(importedMode);
     }
     if (data.turnsRemaining) {
       this.turnsRemaining = data.turnsRemaining;

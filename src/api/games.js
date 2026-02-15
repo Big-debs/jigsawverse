@@ -137,8 +137,8 @@ export const gameStateApi = {
    * @param {number} gridSize - Total number of grid positions
    * @returns {Promise<Object>} Initial game state
    */
-  async initializeGameState(gameId, pieces, gridSize) {
-    return realtimeService.initializeGameState(gameId, pieces, gridSize);
+  async initializeGameState(gameId, pieces, gridSize, gameplayMode = 'CLASSIC') {
+    return realtimeService.initializeGameState(gameId, pieces, gridSize, gameplayMode);
   },
 
   /**
