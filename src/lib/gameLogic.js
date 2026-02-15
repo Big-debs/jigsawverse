@@ -610,13 +610,6 @@ export class GameLogic {
       return { success: false, message: 'Maximum hints used for this game' };
     }
 
-    // Get hint cost
-    const cost = HINT_CONFIG.COSTS[hintType] || -5;
-    
-    // Deduct points
-    this.updateScore(player, cost, false);
-    score.hintsUsed++;
-
     // Get hint information based on type
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
     const availablePieces = rack.filter(p => p !== null);
@@ -624,6 +617,16 @@ export class GameLogic {
     if (availablePieces.length === 0) {
       return { success: false, message: 'No pieces available for hint' };
     }
+
+    const validHintTypes = Object.keys(HINT_CONFIG.COSTS);
+    if (!validHintTypes.includes(hintType)) {
+      return { success: false, message: 'Unknown hint type' };
+    }
+
+    // Get hint cost and deduct points only after validation passes
+    const cost = HINT_CONFIG.COSTS[hintType];
+    this.updateScore(player, cost, false);
+    score.hintsUsed++;
 
     let hintInfo = {};
 
