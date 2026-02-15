@@ -159,7 +159,8 @@ export class MultiplayerGameHost {
         gameCode: game.game_code,
         game: game,
         pieces: pieces,
-        gridDimensions: gridDimensions
+        gridDimensions: gridDimensions,
+        gameState: this.gameLogic.getGameState()
       };
 
     } catch (error) {

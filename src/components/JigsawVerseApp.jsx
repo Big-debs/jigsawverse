@@ -654,6 +654,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
           game: result.game,
           pieces: result.pieces,
           gridDimensions: result.gridDimensions,
+          gameState: result.gameState,
           imagePreview,
           isSinglePlayer: false
         });
@@ -1026,9 +1027,18 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
   // Initialize game state from multiplayer instance
   useEffect(() => {
-    if (!multiplayerRef.current) return;
-
     const multiplayer = multiplayerRef.current;
+
+    if (!multiplayer) {
+      if (gameData?.gameState) {
+        setGameState(gameData.gameState);
+        setLoading(false);
+      } else {
+        setLoading(false);
+        setError('Game session was created but no gameplay state was available. Please rejoin the room.');
+      }
+      return;
+    }
 
     // Get initial game state
     if (multiplayer.gameLogic) {
@@ -1040,6 +1050,14 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
       });
       setGameState(initialState);
       setLoading(false);
+    } else if (gameData?.gameState) {
+      console.warn('multiplayer gameLogic missing, using persisted gameState fallback.');
+      setGameState(gameData.gameState);
+      setLoading(false);
+    } else {
+      setLoading(false);
+      setError('Unable to initialize gameplay state. Please exit and rejoin the game.');
+      return;
     }
 
     // Setup state update callback
@@ -1053,11 +1071,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         myPlayer,
         shouldShowCheckUI: newState.pendingCheck && newState.pendingCheck.player !== myPlayer
       });
-      
+
       // Detect when pendingCheck is resolved (was set, now null)
       const prevPendingCheck = prevPendingCheckRef.current;
       const currentPendingCheck = newState.pendingCheck;
-      
+
       if (prevPendingCheck && !currentPendingCheck && prevPendingCheck.player === myPlayer) {
         // I was the placer, and the pending check has been resolved
         // Update lastAction to show the result
@@ -1069,48 +1087,45 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         const prevOpponentScore = prevScores[opponentPlayer]?.score || 0;
         const myDelta = myScore - prevMyScore;
         const opponentDelta = opponentScore - prevOpponentScore;
-        
+
         let message = '';
         let resultType = '';
-        
-        if (prevPendingCheck.revealCorrectness === false) {
-          message = 'Opponent made a decision. Correctness is hidden until the next 20% milestone.';
-          resultType = 'concealed_decision';
-        } else if (myDelta > 0) {
+
+        if (myDelta > 0) {
           // I gained points - opponent checked and was wrong (failed_check)
           message = `Opponent checked - you gained ${myDelta} points! Piece was correct.`;
           resultType = 'failed_check';
         } else if (opponentDelta > 0 && myDelta === 0) {
           // Opponent gained points - they checked and caught wrong piece (successful_check)
-          message = `Opponent checked - piece was wrong and removed!`;
+          message = 'Opponent checked - piece was wrong and removed!';
           resultType = 'successful_check';
         } else if (myDelta === 0 && opponentDelta === 0) {
           // No score changes - opponent passed
-          message = `Opponent passed - piece stays on board.`;
+          message = 'Opponent passed - piece stays on board.';
           resultType = 'opponent_passed';
         } else if (myDelta < 0) {
           // Both penalized - opponent passed on wrong piece
           message = `Opponent passed on wrong piece - both penalized ${Math.abs(myDelta)} points.`;
           resultType = 'opponent_passed_incorrect';
         }
-        
+
         if (message) {
           console.log('📨 Updating placer message:', message);
-          setLastAction({ 
-            type: 'resolved', 
+          setLastAction({
+            type: 'resolved',
             result: resultType,
             message
           });
         }
       }
-      
+
       // Update refs for next comparison
       prevPendingCheckRef.current = currentPendingCheck;
       prevScoresRef.current = newState.scores;
-      
+
       setGameState(newState);
       setLoading(false);
-      
+
       // Check for game completion
       if (newState.isComplete) {
         const winner = newState.winner;
@@ -1143,7 +1158,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     return () => {
       multiplayer.onStateUpdate = null;
     };
-  }, [multiplayerRef, myPlayer, opponentPlayer, onGameEnd]);
+  }, [multiplayerRef, gameData, myPlayer, opponentPlayer, onGameEnd, setError]);
 
   // Timer countdown effect
   useEffect(() => {
