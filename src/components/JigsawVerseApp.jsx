@@ -1073,7 +1073,10 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         let message = '';
         let resultType = '';
         
-        if (myDelta > 0) {
+        if (prevPendingCheck.revealCorrectness === false) {
+          message = 'Opponent made a decision. Correctness is hidden until the next 20% milestone.';
+          resultType = 'concealed_decision';
+        } else if (myDelta > 0) {
           // I gained points - opponent checked and was wrong (failed_check)
           message = `Opponent checked - you gained ${myDelta} points! Piece was correct.`;
           resultType = 'failed_check';
@@ -1305,6 +1308,10 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         } else if (result.result === 'failed_check') {
           // Placer's piece was correct
           friendlyMessage = `Opponent gained ${opponentDelta} points for a correct piece.`;
+        } else if (result.result === 'concealed_check') {
+          friendlyMessage = 'You checked. Correctness stays hidden until the next 20% milestone.';
+        } else if (result.result === 'concealed_pass') {
+          friendlyMessage = 'You passed. Correctness stays hidden until the next 20% milestone.';
         } else if (result.result === 'opponent_passed_correct') {
           // Opponent passed, piece was correct
           friendlyMessage = 'Opponent passed — piece was correct. Turn moves to opponent.';

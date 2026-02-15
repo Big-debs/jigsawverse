@@ -174,6 +174,7 @@ export class GameLogic {
     this.gameState = 'setup';
     this.moveHistory = [];
     this.pendingCheck = null;
+    this.nextCheckRevealProgress = 0.2;
     this.timerRemaining = 600; // Default 10 minutes
     this.isPlacementInProgress = false; // Add placement lock
     
@@ -344,7 +345,22 @@ export class GameLogic {
     };
     this.moveHistory.push(move);
 
-    this.pendingCheck = move;
+    const supportsCheckFlow = this.modeConfig?.features?.checksPerTurn > 0;
+    const shouldRevealCheck = supportsCheckFlow && this.shouldRevealCheckAtCurrentProgress();
+
+    if (supportsCheckFlow) {
+      this.pendingCheck = {
+        ...move,
+        revealCorrectness: shouldRevealCheck
+      };
+
+      if (shouldRevealCheck) {
+        this.nextCheckRevealProgress = Math.min(this.nextCheckRevealProgress + 0.2, 1);
+      }
+    } else {
+      this.pendingCheck = null;
+      this.switchTurn();
+    }
 
     // Check if rack needs refilling (when all pieces used)
     const activeRack = player === 'playerA' ? this.playerARack : this.playerBRack;
@@ -358,8 +374,21 @@ export class GameLogic {
       success: true,
       correct: validation.correct,
       piece: validation.piece,
-      awaitingCheck: true
+      awaitingCheck: supportsCheckFlow
     };
+  }
+
+  shouldRevealCheckAtCurrentProgress() {
+    const filledCells = this.grid.filter(cell => cell !== null && cell !== undefined).length;
+    const progress = this.totalPieces > 0 ? filledCells / this.totalPieces : 0;
+    return progress >= this.nextCheckRevealProgress;
+  }
+
+  calculateNextCheckRevealProgress() {
+    const filledCells = this.grid.filter(cell => cell !== null && cell !== undefined).length;
+    const progress = this.totalPieces > 0 ? filledCells / this.totalPieces : 0;
+    const bucket = Math.floor(progress / 0.2);
+    return Math.min((bucket + 1) * 0.2, 1);
   }
 
   handleOpponentCheck(checker, checkDecision) {
@@ -369,6 +398,19 @@ export class GameLogic {
 
     const move = this.pendingCheck;
     const placer = move.player;
+
+    if (!move.revealCorrectness) {
+      this.pendingCheck = null;
+      this.currentTurn = checker;
+      this.isPlacementInProgress = false;
+
+      return {
+        success: true,
+        result: checkDecision === 'check' ? 'concealed_check' : 'concealed_pass',
+        message: 'Decision recorded. Correctness remains hidden until the next 20% milestone.',
+        correctnessRevealed: false
+      };
+    }
     
     if (checkDecision === 'check') {
       // CHECK outcome
@@ -682,7 +724,8 @@ export class GameLogic {
       timerRemaining: this.timerRemaining,
       mode: this.mode,
       turnsRemaining: { ...this.turnsRemaining },
-      checksRemaining: { ...this.checksRemaining }
+      checksRemaining: { ...this.checksRemaining },
+      nextCheckRevealProgress: this.nextCheckRevealProgress
     };
   }
 
@@ -714,13 +757,13 @@ export class GameLogic {
     if (pieces && Array.isArray(pieces) && pieces.length > 0) {
       this.pieces = pieces;
     }
-    
+
     // Guard against undefined data
     if (!data) {
       console.error('importGameState: data is undefined');
       return;
     }
-    
+
     if (!this.pieces || !Array.isArray(this.pieces) || this.pieces.length === 0) {
       console.error('importGameState: no valid pieces array');
       return;
@@ -758,6 +801,10 @@ export class GameLogic {
     } else {
       this.grid = Array(this.totalPieces).fill(null);
     }
+
+    this.nextCheckRevealProgress = typeof data.nextCheckRevealProgress === 'number'
+      ? data.nextCheckRevealProgress
+      : this.calculateNextCheckRevealProgress();
 
     // Import racks using helper
     const playerARackData = data.player_a_rack || data.playerARack || [];
