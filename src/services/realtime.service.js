@@ -4,6 +4,22 @@
 
 import { supabase } from '../config/supabase';
 
+const GAMEPLAY_MODE_SCHEMA_CACHE_ERROR = "Could not find the 'gameplay_mode' column of 'game_state' in the schema cache";
+
+function isGameplayModeSchemaCacheError(error) {
+  return !!error?.message && error.message.includes(GAMEPLAY_MODE_SCHEMA_CACHE_ERROR);
+}
+
+function withoutGameplayMode(payload) {
+  if (!payload || typeof payload !== 'object' || !('gameplay_mode' in payload)) {
+    return payload;
+  }
+
+  const fallbackPayload = { ...payload };
+  delete fallbackPayload.gameplay_mode;
+  return fallbackPayload;
+}
+
 export const realtimeService = {
   // Initialize game state
   async initializeGameState(gameId, pieces, gridSize, gameplayMode = 'CLASSIC') {
@@ -24,21 +40,32 @@ export const realtimeService = {
       emptyGrid.push(null);
     }
     
-    const { data, error } = await supabase
+    const initialPayload = {
+      game_id: gameId,
+      grid: emptyGrid,  // Explicit null array
+      player_a_rack: pieces.slice(0, 10).map(p => p.id),
+      player_b_rack: pieces.slice(10, 20).map(p => p.id),
+      piece_pool: pieces.slice(20).map(p => p.id),
+      pieces: piecesMetadata,  // Smaller payload without imageData
+      current_turn: 'playerA',
+      timer_remaining: 600,
+      gameplay_mode: gameplayMode
+    };
+
+    let { data, error } = await supabase
       .from('game_state')
-      .insert({
-        game_id: gameId,
-        grid: emptyGrid,  // Explicit null array
-        player_a_rack: pieces.slice(0, 10).map(p => p.id),
-        player_b_rack: pieces.slice(10, 20).map(p => p.id),
-        piece_pool: pieces.slice(20).map(p => p.id),
-        pieces: piecesMetadata,  // Smaller payload without imageData
-        current_turn: 'playerA',
-        timer_remaining: 600,
-        gameplay_mode: gameplayMode
-      })
+      .insert(initialPayload)
       .select()
       .single();
+
+    if (isGameplayModeSchemaCacheError(error)) {
+      console.warn('[realtimeService] gameplay_mode missing from schema cache, retrying create game state without gameplay_mode column.');
+      ({ data, error } = await supabase
+        .from('game_state')
+        .insert(withoutGameplayMode(initialPayload))
+        .select()
+        .single());
+    }
 
     if (error) throw error;
     return data;
@@ -58,12 +85,22 @@ export const realtimeService = {
 
   // Update game state
   async updateGameState(gameId, updates) {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('game_state')
       .update(updates)
       .eq('game_id', gameId)
       .select()
       .single();
+
+    if (isGameplayModeSchemaCacheError(error) && updates && 'gameplay_mode' in updates) {
+      console.warn('[realtimeService] gameplay_mode missing from schema cache, retrying update without gameplay_mode column.');
+      ({ data, error } = await supabase
+        .from('game_state')
+        .update(withoutGameplayMode(updates))
+        .eq('game_id', gameId)
+        .select()
+        .single());
+    }
 
     if (error) throw error;
     return data;
