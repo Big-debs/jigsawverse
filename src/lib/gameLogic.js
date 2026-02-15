@@ -695,10 +695,10 @@ export class GameLogic {
       current_turn: this.currentTurn,
       timer_remaining: this.timerRemaining,
       pending_check: this.pendingCheck,
-      move_history: this.moveHistory,
-      mode: this.mode
+      move_history: this.moveHistory
       // NOTE: 'scores' and 'game_state' columns DO NOT EXIST in database - removed
       // NOTE: 'pieces' exists but we don't update it after initialization
+      // NOTE: 'mode' column does NOT exist in game_state; mode stays in in-memory logic/broadcast state
       // NOTE: 'awaiting_decision' exists and is set separately in makeMove/respondToCheck
     };
   }
