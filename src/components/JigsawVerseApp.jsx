@@ -632,12 +632,12 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
           mode: selectedMode || 'CLASSIC'
         });
 
-        // Setup connection manager for reconnection
-        connectionManager.setReconnectCallback(async () => {
-          if (gameHost.realtimeChannel) {
-            await gameHost.setupRealtimeChannel(result.gameId);
-          }
-        });
+      // Setup connection manager for reconnection
+      connectionManager.setReconnectCallback(async () => {
+        if (result.gameId) {
+          gameHost.realtimeChannel = await gameHost.setupBroadcastChannel(result.gameId);
+        }
+      });
         connectionManager.updateStatus(CONNECTION_STATUS.CONNECTED);
 
         // Start lightweight heartbeat for connection monitoring
@@ -912,8 +912,8 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
 
       // Setup connection manager for reconnection
       connectionManager.setReconnectCallback(async () => {
-        if (gameGuest.realtimeChannel) {
-          await gameGuest.setupRealtimeChannel(result.gameId);
+        if (result.gameId) {
+          gameGuest.realtimeChannel = await gameGuest.setupBroadcastChannel(result.gameId);
         }
       });
       connectionManager.updateStatus(CONNECTION_STATUS.CONNECTED);
@@ -1196,6 +1196,9 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+
+  const isMyTurn = gameState?.currentTurn === myPlayer && !awaitingDecision;
+
   // Handle piece selection
   const handlePieceSelect = (piece) => {
     if (!isMyTurn || awaitingDecision) return;
@@ -1353,7 +1356,6 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   const opponentScore = gameState?.scores?.[opponentPlayer]?.score || 0;
   const myStreak = gameState?.scores?.[myPlayer]?.streak || 0;
   const myAccuracy = gameState?.scores?.[myPlayer]?.accuracy || 100;
-  const isMyTurn = gameState?.currentTurn === myPlayer && !awaitingDecision;
   
   // Memoize rack selection to prevent unnecessary re-renders
   const myRack = useMemo(() => {
