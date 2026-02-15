@@ -596,7 +596,12 @@ export class GameLogic {
         break;
       }
       case 'edge': {
-        const edgePieces = availablePieces.filter(p => p.isEdge && !p.edges.top && !p.edges.left && !p.edges.right && !p.edges.bottom);
+        const edgePieces = availablePieces.filter((p) => {
+          const edges = p.edges || {};
+          const edgeCount = [edges.top, edges.right, edges.bottom, edges.left].filter(Boolean).length;
+          // Edge hints should exclude corner pieces (which have 2 edges).
+          return p.isEdge && edgeCount === 1;
+        });
         hintInfo = {
           type: 'edge',
           edgePieceIds: edgePieces.map(p => p.id)
