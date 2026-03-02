@@ -18,14 +18,14 @@ const SinglePlayerGame = ({
   const [gameLogic] = useState(() => {
     const totalPieces = gridSize * gridSize;
     const logic = new GameLogic(totalPieces, pieces, 'SINGLE_PLAYER');
-    
+
     // Shuffle pieces manually using Fisher-Yates algorithm
     const shuffled = [...pieces];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    
+
     // Put all shuffled pieces in player rack for single player
     logic.piecePool = shuffled;
     logic.playerARack = [];
@@ -110,7 +110,7 @@ const SinglePlayerGame = ({
     if (isCorrect) {
       // Correct placement
       gameLogic.grid[gridIndex] = validation.piece;
-      
+
       // Remove from rack
       const pieceIndex = gameLogic.playerARack.findIndex(p => p && p.id === pieceId);
       if (pieceIndex !== -1) {
@@ -230,46 +230,46 @@ const SinglePlayerGame = ({
   if (gameStatus !== 'playing') {
     return (
       <div className="max-w-4xl mx-auto">
-        <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur-md rounded-2xl p-8 border border-purple-500/30">
+        <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur-md rounded-2xl p-5 sm:p-8 border border-purple-500/30">
           <div className="text-center">
-            <div className="text-6xl mb-4">
+            <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">
               {gameStatus === 'completed' ? '🎉' : '⏰'}
             </div>
-            <h2 className="text-4xl font-bold text-white mb-6">
+            <h2 className="text-2xl sm:text-4xl font-bold text-white mb-4 sm:mb-6">
               {gameStatus === 'completed' ? 'Puzzle Complete!' : 'Time\'s Up!'}
             </h2>
 
-            <div className="grid grid-cols-2 gap-6 mb-8">
-              <div className="bg-slate-800/50 rounded-xl p-6">
-                <Trophy className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                <div className="text-3xl font-bold text-white mb-1">{score}</div>
-                <div className="text-slate-400">Final Score</div>
+            <div className="grid grid-cols-2 gap-3 sm:gap-6 mb-6 sm:mb-8">
+              <div className="bg-slate-800/50 rounded-xl p-3 sm:p-6">
+                <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 mx-auto mb-1 sm:mb-2" />
+                <div className="text-xl sm:text-3xl font-bold text-white mb-1">{score}</div>
+                <div className="text-slate-400 text-xs sm:text-base">Final Score</div>
               </div>
 
-              <div className="bg-slate-800/50 rounded-xl p-6">
-                <Target className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <div className="text-3xl font-bold text-white mb-1">{accuracy}%</div>
-                <div className="text-slate-400">Accuracy</div>
+              <div className="bg-slate-800/50 rounded-xl p-3 sm:p-6">
+                <Target className="w-6 h-6 sm:w-8 sm:h-8 text-green-400 mx-auto mb-1 sm:mb-2" />
+                <div className="text-xl sm:text-3xl font-bold text-white mb-1">{accuracy}%</div>
+                <div className="text-slate-400 text-xs sm:text-base">Accuracy</div>
               </div>
 
-              <div className="bg-slate-800/50 rounded-xl p-6">
-                <Zap className="w-8 h-8 text-orange-400 mx-auto mb-2" />
-                <div className="text-3xl font-bold text-white mb-1">{bestStreak}</div>
-                <div className="text-slate-400">Best Streak</div>
+              <div className="bg-slate-800/50 rounded-xl p-3 sm:p-6">
+                <Zap className="w-6 h-6 sm:w-8 sm:h-8 text-orange-400 mx-auto mb-1 sm:mb-2" />
+                <div className="text-xl sm:text-3xl font-bold text-white mb-1">{bestStreak}</div>
+                <div className="text-slate-400 text-xs sm:text-base">Best Streak</div>
               </div>
 
-              <div className="bg-slate-800/50 rounded-xl p-6">
-                <Clock className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                <div className="text-3xl font-bold text-white mb-1">
+              <div className="bg-slate-800/50 rounded-xl p-3 sm:p-6">
+                <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400 mx-auto mb-1 sm:mb-2" />
+                <div className="text-xl sm:text-3xl font-bold text-white mb-1">
                   {gameStatus === 'completed' ? `+${timeRemaining}` : '0'}
                 </div>
-                <div className="text-slate-400">Time Bonus</div>
+                <div className="text-slate-400 text-xs sm:text-base">Time Bonus</div>
               </div>
             </div>
 
             <button
               onClick={onExit}
-              className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-xl transition-all"
+              className="px-6 sm:px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-xl transition-all active:scale-95 touch-target"
             >
               Back to Menu
             </button>
@@ -296,47 +296,47 @@ const SinglePlayerGame = ({
         <div className="w-20"></div>
       </div>
 
-      {/* Stats Bar */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-4 border border-slate-700">
-          <div className="flex items-center gap-2 mb-1">
-            <Clock className="w-4 h-4 text-blue-400" />
-            <span className="text-slate-400 text-sm">Time</span>
+      {/* Stats Bar — scrollable row on mobile, 5-col on desktop */}
+      <div className="flex gap-2 sm:grid sm:grid-cols-5 sm:gap-4 mb-4 sm:mb-6 overflow-x-auto hide-scrollbar pb-1 sm:pb-0">
+        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-2.5 sm:p-4 border border-slate-700 min-w-[100px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400" />
+            <span className="text-slate-400 text-[10px] sm:text-sm">Time</span>
           </div>
-          <div className={`text-2xl font-bold ${timeRemaining < 60 ? 'text-red-400' : 'text-white'}`}>
+          <div className={`text-lg sm:text-2xl font-bold ${timeRemaining < 60 ? 'text-red-400' : 'text-white'}`}>
             {formatTime(timeRemaining)}
           </div>
         </div>
 
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-4 border border-slate-700">
-          <div className="flex items-center gap-2 mb-1">
-            <Trophy className="w-4 h-4 text-yellow-400" />
-            <span className="text-slate-400 text-sm">Score</span>
+        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-2.5 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400" />
+            <span className="text-slate-400 text-[10px] sm:text-sm">Score</span>
           </div>
-          <div className="text-2xl font-bold text-white">{score}</div>
+          <div className="text-lg sm:text-2xl font-bold text-white">{score}</div>
         </div>
 
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-4 border border-slate-700">
-          <div className="flex items-center gap-2 mb-1">
-            <Zap className="w-4 h-4 text-orange-400" />
-            <span className="text-slate-400 text-sm">Streak</span>
+        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-2.5 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-400" />
+            <span className="text-slate-400 text-[10px] sm:text-sm">Streak</span>
           </div>
-          <div className="text-2xl font-bold text-white">{streak}</div>
+          <div className="text-lg sm:text-2xl font-bold text-white">{streak}</div>
         </div>
 
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-4 border border-slate-700">
-          <div className="flex items-center gap-2 mb-1">
-            <Target className="w-4 h-4 text-green-400" />
-            <span className="text-slate-400 text-sm">Accuracy</span>
+        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-2.5 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-400" />
+            <span className="text-slate-400 text-[10px] sm:text-sm">Accuracy</span>
           </div>
-          <div className="text-2xl font-bold text-white">{accuracy}%</div>
+          <div className="text-lg sm:text-2xl font-bold text-white">{accuracy}%</div>
         </div>
 
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-4 border border-slate-700">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-slate-400 text-sm">Placed</span>
+        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-2.5 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            <span className="text-slate-400 text-[10px] sm:text-sm">Placed</span>
           </div>
-          <div className="text-2xl font-bold text-white">
+          <div className="text-lg sm:text-2xl font-bold text-white">
             {correctPlacements}/{gridSize * gridSize}
           </div>
         </div>
@@ -345,24 +345,23 @@ const SinglePlayerGame = ({
       {/* Feedback */}
       {lastResult && (
         <div
-          className={`mb-4 p-4 rounded-xl text-center font-semibold transition-all ${
-            lastResult.correct
+          className={`mb-4 p-4 rounded-xl text-center font-semibold transition-all ${lastResult.correct
               ? 'bg-green-500/20 text-green-300 border border-green-500/30'
               : 'bg-red-500/20 text-red-300 border border-red-500/30'
-          }`}
+            }`}
         >
           {lastResult.correct ? '✓' : '✗'} {lastResult.correct ? 'Correct' : 'Wrong'}! {lastResult.points > 0 ? '+' : ''}{lastResult.points} points
         </div>
       )}
 
-      <div className="grid grid-cols-12 gap-6">
-        {/* Left Panel - Settings & Hints */}
-        <div className="col-span-3 space-y-4">
+      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-3 sm:gap-6">
+        {/* Left Panel - Settings & Hints (hidden on mobile, shown at bottom) */}
+        <div className="hidden lg:block lg:col-span-3 space-y-4">
           <GameSettingsPanel
             settings={gameSettings}
             onSettingsChange={setGameSettings}
           />
-          
+
           <HintsPanel
             onUseHint={handleUseHint}
             hintsUsed={gameLogic.scores.playerA.hintsUsed}
@@ -370,9 +369,9 @@ const SinglePlayerGame = ({
           />
 
           {activeHint && (
-            <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-4">
-              <div className="text-yellow-300 font-semibold mb-2">Active Hint:</div>
-              <div className="text-white text-sm">
+            <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-3 sm:p-4">
+              <div className="text-yellow-300 font-semibold mb-1 sm:mb-2 text-sm">Active Hint:</div>
+              <div className="text-white text-xs sm:text-sm">
                 {activeHint.type === 'position' && `Piece ${activeHint.pieceId} goes to position ${activeHint.correctPosition}`}
                 {activeHint.type === 'edge' && 'Edge pieces highlighted'}
                 {activeHint.type === 'corner' && 'Corner pieces highlighted'}
@@ -383,8 +382,8 @@ const SinglePlayerGame = ({
         </div>
 
         {/* Center - Canvas */}
-        <div className="col-span-6">
-          <div className="mb-4 flex justify-center">
+        <div className="lg:col-span-6">
+          <div className="mb-2 sm:mb-4 flex justify-center">
             <ZoomControls
               zoom={zoom}
               onZoomIn={handleZoomIn}
@@ -393,7 +392,7 @@ const SinglePlayerGame = ({
             />
           </div>
 
-          <div className="flex justify-center">
+          <div className="flex justify-center game-board-container">
             <PuzzleCanvas
               grid={gameState.grid}
               gridSize={gridSize}
@@ -410,20 +409,19 @@ const SinglePlayerGame = ({
         </div>
 
         {/* Right Panel - Piece Rack */}
-        <div className="col-span-3">
-          <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-4 border border-slate-700">
-            <h3 className="text-white font-semibold mb-4">Your Pieces</h3>
-            <div className="grid grid-cols-2 gap-2 max-h-[600px] overflow-y-auto">
+        <div className="lg:col-span-3">
+          <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-slate-700">
+            <h3 className="text-white font-semibold mb-2 sm:mb-4 text-sm sm:text-base">Your Pieces</h3>
+            <div className="grid grid-cols-5 lg:grid-cols-2 gap-1.5 sm:gap-2 max-h-[200px] lg:max-h-[600px] overflow-y-auto hide-scrollbar">
               {gameState.playerARack.filter(p => p !== null).map((piece) => (
                 <button
                   key={piece.id}
                   onClick={() => handlePieceSelect(piece)}
                   onMouseDown={(e) => handleDragStart(piece, e)}
-                  className={`relative rounded-lg border-2 transition-all cursor-grab active:cursor-grabbing ${
-                    selectedPiece?.id === piece.id
+                  className={`relative rounded-lg border-2 transition-all cursor-grab active:cursor-grabbing touch-target ${selectedPiece?.id === piece.id
                       ? 'border-purple-500 shadow-lg shadow-purple-500/50'
                       : 'border-slate-600 hover:border-slate-500'
-                  }`}
+                    }`}
                   draggable={false}
                 >
                   <img
@@ -436,6 +434,19 @@ const SinglePlayerGame = ({
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Mobile-only Settings & Hints */}
+        <div className="lg:hidden space-y-3">
+          <GameSettingsPanel
+            settings={gameSettings}
+            onSettingsChange={setGameSettings}
+          />
+          <HintsPanel
+            onUseHint={handleUseHint}
+            hintsUsed={gameLogic.scores.playerA.hintsUsed}
+            disabled={gameStatus !== 'playing'}
+          />
         </div>
       </div>
     </div>

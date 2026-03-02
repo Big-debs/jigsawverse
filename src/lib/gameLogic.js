@@ -357,6 +357,7 @@ export class GameLogic {
     const shouldRevealCheck = supportsCheckFlow && this.shouldRevealCheckAtCurrentProgress();
 
     if (supportsCheckFlow) {
+      // Modes with check/pass flow (CLASSIC, SUPER, SAGE)
       this.pendingCheck = {
         ...move,
         revealCorrectness: shouldRevealCheck
@@ -366,15 +367,25 @@ export class GameLogic {
         this.nextCheckRevealProgress = Math.min(this.nextCheckRevealProgress + 0.2, 1);
       }
     } else {
+      // No-check modes (SAVANT, SINGLE_PLAYER) — score immediately
       this.pendingCheck = null;
-      this.switchTurn();
+      const correctPts = this.modeScoring.correctPiece || 10;
+      const wrongPts = this.modeScoring.wrongPiece || 0;
+
+      if (validation.correct) {
+        this.updateScore(player, correctPts, true);
+      } else {
+        this.updateScore(player, wrongPts, false);
+      }
+
+      // Decrement turns and switch if exhausted
+      this.consumeTurn(player);
     }
 
     // Check if rack needs refilling (when all pieces used)
     const activeRack = player === 'playerA' ? this.playerARack : this.playerBRack;
     const remainingPieces = activeRack.filter(p => p !== null).length;
     if (remainingPieces === 0 && this.piecePool.length > 0) {
-      console.log('Rack empty, refilling...');
       this.fillRack(player);
     }
 
@@ -382,7 +393,8 @@ export class GameLogic {
       success: true,
       correct: validation.correct,
       piece: validation.piece,
-      awaitingCheck: supportsCheckFlow
+      awaitingCheck: supportsCheckFlow,
+      scored: !supportsCheckFlow
     };
   }
 
@@ -437,9 +449,10 @@ export class GameLogic {
           this.returnPieceToRack(placer, piece);
         }
 
-        // Clear pending check and switch turn to CHECKER
+        // Clear pending check, decrement checker's checks, switch turn
         this.pendingCheck = null;
-        this.currentTurn = checker;
+        this.consumeCheck(checker);
+        this.consumeTurn(placer); // Placer's turn is consumed by the resolution
         this.isPlacementInProgress = false;
 
         return {
@@ -459,9 +472,10 @@ export class GameLogic {
         this.updateScore(checker, checkerPenalty, false);
 
         // Piece remains placed
-        // Clear pending check and switch turn to CHECKER
+        // Clear pending check, decrement checker's checks, handle turn logic
         this.pendingCheck = null;
-        this.currentTurn = checker;
+        this.consumeCheck(checker);
+        this.consumeTurn(placer); // Placer's turn is consumed by the resolution
         this.isPlacementInProgress = false;
 
         return {
@@ -476,11 +490,9 @@ export class GameLogic {
     } else {
       // PASS outcome
       if (move.correct) {
-        // Piece is CORRECT
-        // Piece remains placed
-        // TURN goes to CHECKER
+        // Piece is CORRECT — piece remains placed
         this.pendingCheck = null;
-        this.currentTurn = checker;
+        this.consumeTurn(placer); // Placer's turn is consumed
         this.isPlacementInProgress = false;
 
         return {
@@ -505,9 +517,9 @@ export class GameLogic {
         this.updateScore(placer, penalty, false);
         this.updateScore(checker, penalty, false);
 
-        // TURN goes to CHECKER
+        // Clear pending check, consume turn, release lock
         this.pendingCheck = null;
-        this.currentTurn = checker;
+        this.consumeTurn(placer); // Placer's turn is consumed
         this.isPlacementInProgress = false;
 
         return {
@@ -552,21 +564,54 @@ export class GameLogic {
     }
   }
 
+  /**
+   * Consume one turn for the player. If they have turns remaining in
+   * a multi-turn mode, they keep playing. Otherwise, switch to the
+   * other player and reset both players' per-round counters.
+   */
+  consumeTurn(player) {
+    const turnsPerRound = this.modeConfig?.features?.turnsPerRound ?? 1;
+
+    if (turnsPerRound !== Infinity && this.turnsRemaining[player] > 0) {
+      this.turnsRemaining[player]--;
+    }
+
+    // If the player has remaining turns, they keep playing (no switch)
+    if (turnsPerRound !== Infinity && this.turnsRemaining[player] > 0) {
+      this.isPlacementInProgress = false;
+      return;
+    }
+
+    // Turns exhausted — switch to the other player and reset for next round
+    this.switchTurn();
+    this.resetTurnsForPlayer(player); // Reset the outgoing player for their next round
+  }
+
+  /**
+   * Consume one check for the checker. Tracked per-turn for modes
+   * like SAGE that allow multiple checks (checksPerTurn: 2).
+   */
+  consumeCheck(checker) {
+    const checksPerTurn = this.modeConfig?.features?.checksPerTurn ?? 1;
+    if (checksPerTurn > 0 && this.checksRemaining[checker] > 0) {
+      this.checksRemaining[checker]--;
+    }
+  }
+
   switchTurn() {
     this.currentTurn = this.currentTurn === 'playerA' ? 'playerB' : 'playerA';
 
     // Release placement lock
     this.isPlacementInProgress = false;
 
+    // Reset checks for the new current player's round
+    const checksPerTurn = this.modeConfig?.features?.checksPerTurn ?? 1;
+    this.checksRemaining[this.currentTurn] = checksPerTurn;
+
     const rack = this.currentTurn === 'playerA' ? this.playerARack : this.playerBRack;
-    // Check for empty or all null/undefined
-    let hasNoPieces = !rack || rack.length === 0;
-    if (rack && !hasNoPieces) {
-      hasNoPieces = rack.every(p => p === null || p === undefined);
-    }
+    const hasNoPieces = !rack || rack.length === 0 || rack.every(p => p == null);
 
     if (hasNoPieces && this.piecePool.length > 0) {
-      console.log(`${this.currentTurn} rack is empty, refilling...`);
       this.fillRack(this.currentTurn);
     }
   }
@@ -632,7 +677,7 @@ export class GameLogic {
 
     switch (hintType) {
       case 'position': {
-        const hintPiece = availablePieces[0];
+        const hintPiece = availablePieces[Math.floor(Math.random() * availablePieces.length)];
         hintInfo = {
           type: 'position',
           pieceId: hintPiece.id,
@@ -666,7 +711,7 @@ export class GameLogic {
         break;
       }
       case 'region': {
-        const hintPiece = availablePieces[0];
+        const hintPiece = availablePieces[Math.floor(Math.random() * availablePieces.length)];
         const correctRow = Math.floor(hintPiece.correctPosition / this.gridSize);
         const correctCol = hintPiece.correctPosition % this.gridSize;
         hintInfo = {
@@ -742,8 +787,10 @@ export class GameLogic {
       timer_remaining: this.timerRemaining,
       pending_check: this.pendingCheck,
       move_history: this.moveHistory,
-      gameplay_mode: this.mode
-      // NOTE: 'scores' and 'game_state' columns DO NOT EXIST in database - removed
+      gameplay_mode: this.mode,
+      scores: this.scores,
+      turns_remaining: this.turnsRemaining,
+      checks_remaining: this.checksRemaining
       // NOTE: 'pieces' exists but we don't update it after initialization
       // NOTE: 'awaiting_decision' exists and is set separately in makeMove/respondToCheck
     };
@@ -854,11 +901,11 @@ export class GameLogic {
       this.modeConfig = importedGetModeConfig(importedMode);
       this.modeScoring = importedGetModeScoring(importedMode);
     }
-    if (data.turnsRemaining) {
-      this.turnsRemaining = data.turnsRemaining;
+    if (data.turns_remaining || data.turnsRemaining) {
+      this.turnsRemaining = data.turns_remaining || data.turnsRemaining;
     }
-    if (data.checksRemaining) {
-      this.checksRemaining = data.checksRemaining;
+    if (data.checks_remaining || data.checksRemaining) {
+      this.checksRemaining = data.checks_remaining || data.checksRemaining;
     }
 
     console.log('importGameState complete:', {

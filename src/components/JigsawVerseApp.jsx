@@ -173,7 +173,7 @@ const JigsawVerseApp = () => {
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (session?.user) {
           setUser(session.user);
         } else {
@@ -214,7 +214,7 @@ const JigsawVerseApp = () => {
   useEffect(() => {
     const connectionManager = connectionManagerRef.current;
     connectionManager.setStatusCallback(setConnectionStatus);
-    
+
     return () => {
       connectionManager.reset();
     };
@@ -244,7 +244,7 @@ const JigsawVerseApp = () => {
         multiplayerRef.current = null;
       }
       connectionManagerRef.current.reset();
-      
+
       await authService.signOut();
       setUser(null);
       setGameData(null);
@@ -271,19 +271,19 @@ const JigsawVerseApp = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Header */}
       <header className="bg-black/20 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-              <Gamepad2 className="w-6 h-6 text-white" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+              <Gamepad2 className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white">JigsawVerse</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-white">JigsawVerse</h1>
           </div>
-          
+
           {user && (
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               {/* Connection Status Indicator */}
               {currentRoute === ROUTES.GAMEPLAY && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   {connectionStatus === CONNECTION_STATUS.CONNECTED && (
                     <Wifi className="w-4 h-4 text-green-400" />
                   )}
@@ -298,14 +298,14 @@ const JigsawVerseApp = () => {
                   )}
                 </div>
               )}
-              <span className="text-purple-200">
+              <span className="text-purple-200 text-sm sm:text-base truncate max-w-[100px] sm:max-w-none">
                 {user.user_metadata?.username || 'Player'}
               </span>
               <button
                 onClick={handleLogout}
-                className="text-purple-400 hover:text-purple-300 transition-colors"
+                className="text-purple-400 hover:text-purple-300 transition-colors p-1"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           )}
@@ -320,7 +320,7 @@ const JigsawVerseApp = () => {
               <AlertCircle className="w-5 h-5 text-red-400" />
               <span className="text-red-200">{error}</span>
             </div>
-            <button 
+            <button
               onClick={() => setError(null)}
               className="text-red-400 hover:text-red-300"
             >
@@ -330,14 +330,14 @@ const JigsawVerseApp = () => {
         </div>
       )}
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 safe-bottom">
         {currentRoute === ROUTES.HOME && (
-          <HomeScreen 
+          <HomeScreen
             onNavigate={navigate}
             setIsHost={setIsHost}
           />
         )}
-        
+
         {currentRoute === ROUTES.MODE_SELECT && (
           <ModeSelectScreen
             onModeSelect={(mode) => {
@@ -348,9 +348,9 @@ const JigsawVerseApp = () => {
             multiplayerOnly={false}
           />
         )}
-        
+
         {currentRoute === ROUTES.CREATE_GAME && (
-          <CreateGameScreen 
+          <CreateGameScreen
             user={user}
             multiplayerRef={multiplayerRef}
             connectionManager={connectionManagerRef.current}
@@ -368,9 +368,9 @@ const JigsawVerseApp = () => {
             setError={setError}
           />
         )}
-        
+
         {currentRoute === ROUTES.WAITING_ROOM && (
-          <WaitingRoom 
+          <WaitingRoom
             gameCode={gameData?.gameCode}
             multiplayerRef={multiplayerRef}
             onCancel={async () => {
@@ -383,9 +383,9 @@ const JigsawVerseApp = () => {
             onGameStart={() => navigate(ROUTES.GAMEPLAY)}
           />
         )}
-        
+
         {currentRoute === ROUTES.JOIN_GAME && (
-          <JoinGameScreen 
+          <JoinGameScreen
             user={user}
             multiplayerRef={multiplayerRef}
             connectionManager={connectionManagerRef.current}
@@ -397,9 +397,9 @@ const JigsawVerseApp = () => {
             setError={setError}
           />
         )}
-        
+
         {currentRoute === ROUTES.GAMEPLAY && (
-          <GameplayScreen 
+          <GameplayScreen
             isHost={isHost}
             multiplayerRef={multiplayerRef}
             gameData={gameData}
@@ -418,7 +418,7 @@ const JigsawVerseApp = () => {
                     player_b_accuracy: finalState.scores.playerB.accuracy
                   });
                   // Update gameData with final scores
-                  navigate(ROUTES.GAME_OVER, { 
+                  navigate(ROUTES.GAME_OVER, {
                     winner,
                     game: updatedGame,
                     finalScores: finalState.scores
@@ -426,7 +426,7 @@ const JigsawVerseApp = () => {
                 } catch (err) {
                   console.error('Failed to save final scores:', err);
                   // Still navigate to game over screen even if save fails
-                  navigate(ROUTES.GAME_OVER, { 
+                  navigate(ROUTES.GAME_OVER, {
                     winner,
                     finalScores: finalState.scores
                   });
@@ -446,7 +446,7 @@ const JigsawVerseApp = () => {
             setError={setError}
           />
         )}
-        
+
         {currentRoute === ROUTES.SINGLE_PLAYER_GAME && gameData && (
           <SinglePlayerGame
             imageUrl={gameData.imagePreview}
@@ -459,9 +459,9 @@ const JigsawVerseApp = () => {
             }}
           />
         )}
-        
+
         {currentRoute === ROUTES.GAME_OVER && (
-          <GameOverScreen 
+          <GameOverScreen
             winner={gameData?.winner}
             gameData={gameData}
             onPlayAgain={() => {
@@ -483,35 +483,35 @@ const HomeScreen = ({ onNavigate, setIsHost }) => {
   return (
     <div className="max-w-4xl mx-auto">
       {/* Hero Section */}
-      <div className="text-center mb-12">
-        <h2 className="text-5xl font-bold text-white mb-4">
+      <div className="text-center mb-8 sm:mb-12">
+        <h2 className="text-3xl sm:text-5xl font-bold text-white mb-3 sm:mb-4">
           Welcome to JigsawVerse
         </h2>
-        <p className="text-xl text-purple-200">
+        <p className="text-base sm:text-xl text-purple-200">
           Challenge friends in real-time puzzle battles
         </p>
       </div>
 
       {/* Action Cards */}
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {/* Create Game Card */}
         <button
           onClick={() => {
             setIsHost(true);
             onNavigate(ROUTES.MODE_SELECT);
           }}
-          className="group bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-2xl p-8 text-left transition-all transform hover:scale-105 shadow-2xl"
+          className="group bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-2xl p-6 sm:p-8 text-left transition-all transform hover:scale-[1.02] sm:hover:scale-105 shadow-2xl active:scale-[0.98]"
         >
-          <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
-            <Play className="w-8 h-8 text-white" />
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-white/30 transition-colors">
+            <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
           </div>
-          <h3 className="text-2xl font-bold text-white mb-2">Create Game</h3>
-          <p className="text-purple-100">
+          <h3 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">Create Game</h3>
+          <p className="text-purple-100 text-sm sm:text-base">
             Upload an image and start a new multiplayer puzzle challenge
           </p>
-          <div className="mt-4 flex items-center text-white font-medium">
+          <div className="mt-3 sm:mt-4 flex items-center text-white font-medium text-sm sm:text-base">
             <span>Get Started</span>
-            <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </div>
@@ -523,18 +523,18 @@ const HomeScreen = ({ onNavigate, setIsHost }) => {
             setIsHost(false);
             onNavigate(ROUTES.JOIN_GAME);
           }}
-          className="group bg-gradient-to-br from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-2xl p-8 text-left transition-all transform hover:scale-105 shadow-2xl"
+          className="group bg-gradient-to-br from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-2xl p-6 sm:p-8 text-left transition-all transform hover:scale-[1.02] sm:hover:scale-105 shadow-2xl active:scale-[0.98]"
         >
-          <div className="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
-            <UserPlus className="w-8 h-8 text-white" />
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-white/30 transition-colors">
+            <UserPlus className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
           </div>
-          <h3 className="text-2xl font-bold text-white mb-2">Join Game</h3>
-          <p className="text-cyan-100">
+          <h3 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">Join Game</h3>
+          <p className="text-cyan-100 text-sm sm:text-base">
             Enter a game code to join your friend&apos;s puzzle challenge
           </p>
-          <div className="mt-4 flex items-center text-white font-medium">
+          <div className="mt-3 sm:mt-4 flex items-center text-white font-medium text-sm sm:text-base">
             <span>Enter Code</span>
-            <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </div>
@@ -542,27 +542,27 @@ const HomeScreen = ({ onNavigate, setIsHost }) => {
       </div>
 
       {/* Features Section */}
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-white/5 backdrop-blur-md rounded-xl p-6 border border-white/10">
-          <Users className="w-8 h-8 text-purple-400 mb-3" />
-          <h4 className="text-white font-semibold mb-2">Real-Time Multiplayer</h4>
-          <p className="text-purple-200 text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6">
+        <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 sm:p-6 border border-white/10">
+          <Users className="w-6 h-6 sm:w-8 sm:h-8 text-purple-400 mb-2 sm:mb-3" />
+          <h4 className="text-white font-semibold mb-1 sm:mb-2 text-sm sm:text-base">Real-Time Multiplayer</h4>
+          <p className="text-purple-200 text-xs sm:text-sm">
             Play with friends in synchronized real-time gameplay
           </p>
         </div>
-        
-        <div className="bg-white/5 backdrop-blur-md rounded-xl p-6 border border-white/10">
-          <Trophy className="w-8 h-8 text-yellow-400 mb-3" />
-          <h4 className="text-white font-semibold mb-2">Competitive Scoring</h4>
-          <p className="text-purple-200 text-sm">
+
+        <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 sm:p-6 border border-white/10">
+          <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 mb-2 sm:mb-3" />
+          <h4 className="text-white font-semibold mb-1 sm:mb-2 text-sm sm:text-base">Competitive Scoring</h4>
+          <p className="text-purple-200 text-xs sm:text-sm">
             Strategic check/pass system with streak bonuses
           </p>
         </div>
-        
-        <div className="bg-white/5 backdrop-blur-md rounded-xl p-6 border border-white/10">
-          <Gamepad2 className="w-8 h-8 text-cyan-400 mb-3" />
-          <h4 className="text-white font-semibold mb-2">Custom Puzzles</h4>
-          <p className="text-purple-200 text-sm">
+
+        <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 sm:p-6 border border-white/10">
+          <Gamepad2 className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400 mb-2 sm:mb-3" />
+          <h4 className="text-white font-semibold mb-1 sm:mb-2 text-sm sm:text-base">Custom Puzzles</h4>
+          <p className="text-purple-200 text-xs sm:text-sm">
             Upload any image and choose difficulty level
           </p>
         </div>
@@ -592,25 +592,25 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
 
   const handleCreate = async () => {
     if (!imageFile || !user) return;
-    
+
     setCreating(true);
     setProgress('Initializing...');
-    
+
     try {
       // Check if single player mode
       const isSinglePlayer = !isModeMultiplayer(selectedMode);
-      
+
       if (isSinglePlayer) {
         // Single player: process image locally without multiplayer
         setProgress('Processing image...');
-        
+
         const { ImageProcessor } = await import('../lib/gameLogic');
         const processor = new ImageProcessor(imageFile, gridSize);
         await processor.loadImage();
         const result = await processor.sliceImage();
-        
+
         setProgress('Ready!');
-        
+
         onGameCreated({
           pieces: result.pieces,
           gridDimensions: result.gridDimensions,
@@ -624,7 +624,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
         multiplayerRef.current = gameHost;
 
         setProgress('Creating game...');
-        
+
         // Create the game using the multiplayer host
         const result = await gameHost.createGame(imageFile, {
           gridSize,
@@ -632,12 +632,12 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
           mode: selectedMode || 'CLASSIC'
         });
 
-      // Setup connection manager for reconnection
-      connectionManager.setReconnectCallback(async () => {
-        if (result.gameId) {
-          gameHost.realtimeChannel = await gameHost.setupBroadcastChannel(result.gameId);
-        }
-      });
+        // Setup connection manager for reconnection
+        connectionManager.setReconnectCallback(async () => {
+          if (result.gameId) {
+            gameHost.realtimeChannel = await gameHost.setupBroadcastChannel(result.gameId);
+          }
+        });
         connectionManager.updateStatus(CONNECTION_STATUS.CONNECTED);
 
         // Start lightweight heartbeat for connection monitoring
@@ -647,7 +647,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
         );
 
         setProgress('Game created!');
-        
+
         onGameCreated({
           gameId: result.gameId,
           gameCode: result.gameCode,
@@ -663,7 +663,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
       console.error('Error creating game:', err);
       setError('Failed to create game: ' + (err.message || 'Unknown error'));
       connectionManager.updateStatus(CONNECTION_STATUS.ERROR);
-      
+
       // Cleanup on error
       if (multiplayerRef.current) {
         await multiplayerRef.current.disconnect();
@@ -693,7 +693,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
         <label className="block text-white font-semibold mb-3">
           Choose Puzzle Image
         </label>
-        
+
         <input
           type="file"
           accept="image/*"
@@ -702,7 +702,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
           className="hidden"
           id="image-upload"
         />
-        
+
         <label htmlFor="image-upload" className="block cursor-pointer">
           {imagePreview ? (
             <img
@@ -746,11 +746,10 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
       <button
         onClick={handleCreate}
         disabled={!imageFile || creating}
-        className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-          imageFile && !creating
-            ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white'
-            : 'bg-white/10 text-white/40 cursor-not-allowed'
-        }`}
+        className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${imageFile && !creating
+          ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white'
+          : 'bg-white/10 text-white/40 cursor-not-allowed'
+          }`}
       >
         {creating ? (
           <span className="flex items-center justify-center gap-2">
@@ -850,13 +849,13 @@ const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
             <div className="w-16 h-16 bg-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Users className="w-8 h-8 text-cyan-400 animate-pulse" />
             </div>
-            
+
             <h2 className="text-2xl font-bold text-white mb-2">Waiting for Opponent...</h2>
             <p className="text-purple-200 mb-6">Share this code to start playing</p>
 
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 mb-6">
-              <p className="text-white/80 text-sm mb-2">Game Code</p>
-              <p className="text-5xl font-bold text-white tracking-wider font-mono">
+            <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+              <p className="text-white/80 text-xs sm:text-sm mb-1 sm:mb-2">Game Code</p>
+              <p className="text-3xl sm:text-5xl font-bold text-white tracking-wider font-mono">
                 {gameCode || '------'}
               </p>
             </div>
@@ -896,17 +895,17 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
 
   const handleJoin = async () => {
     if (gameCode.length !== 6 || !user) return;
-    
+
     setJoining(true);
     setProgress('Finding game...');
-    
+
     try {
       // Create multiplayer guest instance
       const gameGuest = new MultiplayerGameGuest();
       multiplayerRef.current = gameGuest;
 
       setProgress('Joining game...');
-      
+
       // Join the game using the multiplayer guest
       const result = await gameGuest.joinGame(gameCode);
 
@@ -925,7 +924,7 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
       );
 
       setProgress('Game joined!');
-      
+
       onGameJoined({
         gameId: result.gameId,
         game: result.game,
@@ -935,7 +934,7 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
       console.error('Error joining game:', err);
       setError('Failed to join game: ' + (err.message || 'Game not found'));
       connectionManager.updateStatus(CONNECTION_STATUS.ERROR);
-      
+
       // Cleanup on error
       if (multiplayerRef.current) {
         await multiplayerRef.current.disconnect();
@@ -972,17 +971,16 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
           placeholder="ABC123"
           maxLength={6}
           disabled={joining}
-          className="w-full bg-white/5 border-2 border-white/20 focus:border-cyan-400 rounded-xl px-6 py-4 text-white text-center text-3xl font-mono font-bold uppercase tracking-wider focus:outline-none mb-4"
+          className="w-full bg-white/5 border-2 border-white/20 focus:border-cyan-400 rounded-xl px-4 sm:px-6 py-3 sm:py-4 text-white text-center text-2xl sm:text-3xl font-mono font-bold uppercase tracking-wider focus:outline-none mb-4"
         />
 
         <button
           onClick={handleJoin}
           disabled={gameCode.length !== 6 || joining}
-          className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-            gameCode.length === 6 && !joining
-              ? 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white'
-              : 'bg-white/10 text-white/40 cursor-not-allowed'
-          }`}
+          className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${gameCode.length === 6 && !joining
+            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white'
+            : 'bg-white/10 text-white/40 cursor-not-allowed'
+            }`}
         >
           {joining ? (
             <span className="flex items-center justify-center gap-2">
@@ -1010,13 +1008,13 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   const [lastAction, setLastAction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
-  
+
   // Drag-and-drop state
   const [draggedPiece, setDraggedPiece] = useState(null);
-  
+
   // Zoom state
   const [zoom, setZoom] = useState(1);
-  
+
   // Track previous pending check state and scores to detect when opponent responds
   const prevPendingCheckRef = useRef(null);
   const prevScoresRef = useRef(null);
@@ -1163,22 +1161,22 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   // Timer countdown effect
   useEffect(() => {
     if (!multiplayerRef.current?.gameLogic) return;
-    
+
     const interval = setInterval(() => {
       const gameLogic = multiplayerRef.current?.gameLogic;
       if (!gameLogic) {
         clearInterval(interval);
         return;
       }
-      
+
       gameLogic.timerRemaining -= 1;
-      
+
       if (gameLogic.timerRemaining <= 0) {
         clearInterval(interval);
         onGameEnd('timeout');
         return;
       }
-      
+
       // Update state with new timer value
       setGameState(prev => ({
         ...prev,
@@ -1229,10 +1227,10 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
     try {
       const result = await multiplayerRef.current.makeMove(pieceId, gridIndex);
-      
+
       if (result.awaitingCheck) {
-        setLastAction({ 
-          type: 'placed', 
+        setLastAction({
+          type: 'placed',
           correct: result.correct,
           message: 'Piece placed. Waiting for opponent to check or pass...'
         });
@@ -1279,12 +1277,12 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
     try {
       const result = await multiplayerRef.current.makeMove(pieceToPlace.id, gridIndex);
-      
+
       if (result.awaitingCheck) {
         // We placed a piece, now waiting for opponent to check
         // Don't set awaitingDecision for ourselves - the opponent will see it
-        setLastAction({ 
-          type: 'placed', 
+        setLastAction({
+          type: 'placed',
           correct: result.correct,
           message: 'Piece placed. Waiting for opponent to check or pass...'
         });
@@ -1309,7 +1307,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
       } : null;
 
       const result = await multiplayerRef.current.respondToCheck(decision);
-      
+
       // Calculate score deltas from the current game logic state (already updated)
       let friendlyMessage = result.message;
       if (prevScores && multiplayerRef.current.gameLogic) {
@@ -1318,7 +1316,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         const opponentNewScore = currentScores[opponentPlayer]?.score || 0;
         const myDelta = myNewScore - prevScores.myScore;
         const opponentDelta = opponentNewScore - prevScores.opponentScore;
-        
+
         // Create friendly messages based on the result
         if (result.result === 'successful_check') {
           // Checker caught incorrect piece
@@ -1338,9 +1336,9 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
           friendlyMessage = `Both players penalized (${myDelta}). Piece removed and returned to placer.`;
         }
       }
-      
-      setLastAction({ 
-        type: decision, 
+
+      setLastAction({
+        type: decision,
         result: result.result,
         message: friendlyMessage
       });
@@ -1356,12 +1354,12 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   const opponentScore = gameState?.scores?.[opponentPlayer]?.score || 0;
   const myStreak = gameState?.scores?.[myPlayer]?.streak || 0;
   const myAccuracy = gameState?.scores?.[myPlayer]?.accuracy || 100;
-  
+
   // Memoize rack selection to prevent unnecessary re-renders
   const myRack = useMemo(() => {
     return isHost ? (gameState?.playerARack || []) : (gameState?.playerBRack || []);
   }, [isHost, gameState?.playerARack, gameState?.playerBRack]);
-  
+
   // Pad rack to exactly RACK_SIZE slots for consistent UI layout (memoized for performance)
   const paddedRack = useMemo(() => {
     // Slice to RACK_SIZE max (intentional - game logic maintains max 10 pieces per rack)
@@ -1370,9 +1368,9 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     const padding = Math.max(0, RACK_SIZE - sliced.length);
     return [...sliced, ...Array(padding).fill(null)];
   }, [myRack]);
-  
+
   const grid = gameState?.grid || [];
-  
+
   // Calculate grid size with proper fallback
   const calculateGridSize = () => {
     if (!grid || grid.length === 0) return 10;
@@ -1380,7 +1378,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     return Number.isInteger(size) && size > 0 ? size : 10;
   };
   const gridSize = calculateGridSize();
-  
+
   // Get timer from game state (synced from database)
   const timer = gameState?.timerRemaining || 600;
 
@@ -1398,71 +1396,77 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* Game Header */}
-      <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 mb-6 flex items-center justify-between">
-        <div className={`flex-1 ${isMyTurn ? 'ring-2 ring-yellow-400 rounded-lg p-2' : 'opacity-70 p-2'}`}>
-          <p className="text-white font-bold">You {isHost ? '(Host)' : '(Guest)'}</p>
-          <p className="text-purple-300">Score: {myScore}</p>
-          <p className="text-purple-400 text-sm">Streak: {myStreak} | Accuracy: {myAccuracy}%</p>
+      {/* Game Header — compact on mobile */}
+      <div className="bg-white/5 backdrop-blur-md rounded-xl p-2.5 sm:p-4 mb-3 sm:mb-6">
+        <div className="flex items-center justify-between">
+          <div className={`flex-1 min-w-0 ${isMyTurn ? 'ring-2 ring-yellow-400 rounded-lg p-1.5 sm:p-2' : 'opacity-70 p-1.5 sm:p-2'}`}>
+            <p className="text-white font-bold text-xs sm:text-base truncate">You {isHost ? '(Host)' : '(Guest)'}</p>
+            <p className="text-purple-300 text-xs sm:text-base">Score: {myScore}</p>
+            <p className="text-purple-400 text-[10px] sm:text-sm hidden sm:block">Streak: {myStreak} | Accuracy: {myAccuracy}%</p>
+          </div>
+
+          <div className="text-center px-2 sm:px-4 flex-shrink-0">
+            <p className="text-lg sm:text-2xl font-mono font-bold text-white">{formatTime(timer)}</p>
+            {isMyTurn ? (
+              <p className="text-yellow-400 font-bold animate-pulse text-xs sm:text-base">Your Turn</p>
+            ) : (
+              <p className="text-cyan-400 text-xs sm:text-base">Opponent&apos;s Turn</p>
+            )}
+          </div>
+
+          <div className={`flex-1 min-w-0 text-right ${!isMyTurn && !awaitingDecision ? 'ring-2 ring-cyan-400 rounded-lg p-1.5 sm:p-2' : 'opacity-70 p-1.5 sm:p-2'}`}>
+            <p className="text-white font-bold text-xs sm:text-base">Opponent</p>
+            <p className="text-purple-300 text-xs sm:text-base">Score: {opponentScore}</p>
+          </div>
         </div>
-        
-        <div className="text-center px-4">
-          <p className="text-2xl font-mono font-bold text-white">{formatTime(timer)}</p>
-          {isMyTurn ? (
-            <p className="text-yellow-400 font-bold animate-pulse">Your Turn</p>
-          ) : (
-            <p className="text-cyan-400">Opponent&apos;s Turn</p>
-          )}
-        </div>
-        
-        <div className={`flex-1 text-right ${!isMyTurn && !awaitingDecision ? 'ring-2 ring-cyan-400 rounded-lg p-2' : 'opacity-70 p-2'}`}>
-          <p className="text-white font-bold">Opponent</p>
-          <p className="text-purple-300">Score: {opponentScore}</p>
+        {/* Mobile-only compact stats row */}
+        <div className="flex justify-between mt-1.5 sm:hidden text-[10px] text-purple-400 px-1">
+          <span>🔥 {myStreak} streak</span>
+          <span>🎯 {myAccuracy}% accuracy</span>
         </div>
       </div>
 
       {/* Last Action Feedback */}
       {lastAction && (
-        <div className={`mb-4 p-3 rounded-xl text-center ${
-          lastAction.result === 'correct_placement' || lastAction.result === 'successful_check' 
-            ? 'bg-green-500/20 text-green-300' 
-            : lastAction.result === 'failed_check' 
-              ? 'bg-red-500/20 text-red-300'
-              : 'bg-purple-500/20 text-purple-300'
-        }`}>
+        <div className={`mb-4 p-3 rounded-xl text-center ${lastAction.result === 'correct_placement' || lastAction.result === 'successful_check'
+          ? 'bg-green-500/20 text-green-300'
+          : lastAction.result === 'failed_check'
+            ? 'bg-red-500/20 text-red-300'
+            : 'bg-purple-500/20 text-purple-300'
+          }`}>
           {lastAction.message}
         </div>
       )}
 
       {/* Check/Pass Decision UI */}
       {awaitingDecision && (
-        <div className="mb-6 bg-yellow-500/20 rounded-xl p-6 border border-yellow-500/30">
-          <h3 className="text-xl font-bold text-white mb-4 text-center">
+        <div className="mb-3 sm:mb-6 bg-yellow-500/20 rounded-xl p-4 sm:p-6 border border-yellow-500/30">
+          <h3 className="text-base sm:text-xl font-bold text-white mb-3 sm:mb-4 text-center">
             Opponent placed a piece! What do you want to do?
           </h3>
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center">
             <button
               onClick={() => handleCheckDecision('check')}
-              className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold rounded-xl transition-all"
+              className="px-6 sm:px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-bold rounded-xl transition-all active:scale-95 touch-target"
             >
-              Check (+5 if wrong)
+              ✓ Check (+5 if wrong)
             </button>
             <button
               onClick={() => handleCheckDecision('pass')}
-              className="px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white font-bold rounded-xl transition-all"
+              className="px-6 sm:px-8 py-3 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 text-white font-bold rounded-xl transition-all active:scale-95 touch-target"
             >
-              Pass (Skip)
+              ✗ Pass (Skip)
             </button>
           </div>
         </div>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3 sm:gap-6">
         {/* Puzzle Grid */}
         <div className="lg:col-span-2">
-          <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-semibold">Puzzle Board</h3>
+          <div className="bg-white/5 backdrop-blur-md rounded-xl p-2 sm:p-4 border border-white/10">
+            <div className="flex items-center justify-between mb-2 sm:mb-4">
+              <h3 className="text-white font-semibold text-sm sm:text-base">Puzzle Board</h3>
               <ZoomControls
                 zoom={zoom}
                 onZoomIn={handleZoomIn}
@@ -1472,11 +1476,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                 maxZoom={2.0}
               />
             </div>
-            <div className="w-full max-w-full overflow-hidden relative">
+            <div className="w-full max-w-full overflow-auto relative game-board-container hide-scrollbar">
               {/* Ghost Image Background */}
               {gameSettings?.showGhostImage && (gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
                 <div className="absolute inset-0 z-0 pointer-events-none">
-                  <img 
+                  <img
                     src={gameData?.imagePreview || multiplayerRef?.current?.imageUrl}
                     alt="Ghost preview"
                     className="w-full h-full object-cover rounded"
@@ -1484,10 +1488,10 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                   />
                 </div>
               )}
-              
-              <div 
-                className="grid gap-1 aspect-square w-full relative z-10 transition-transform"
-                style={{ 
+
+              <div
+                className="grid gap-0.5 sm:gap-1 aspect-square w-full relative z-10 transition-transform"
+                style={{
                   gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
                   transform: `scale(${zoom})`
                 }}
@@ -1495,35 +1499,34 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                 {grid.map((piece, index) => {
                   const row = Math.floor(index / gridSize);
                   const col = index % gridSize;
-                  const gridLabel = gameSettings?.showGridLabels 
+                  const gridLabel = gameSettings?.showGridLabels
                     ? `${String.fromCharCode(65 + col)}${row + 1}`
                     : '';
-                  
+
                   return (
                     <button
                       key={index}
                       onClick={() => handlePlacement(index)}
                       onMouseUp={() => draggedPiece && handlePieceDrop(draggedPiece.id, index)}
-                      disabled={! selectedPiece || piece !== null || ! isMyTurn}
-                      className={`aspect-square rounded border transition-all overflow-hidden relative ${
-                        piece 
-                          ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-white/40' 
-                          : selectedPiece && isMyTurn
-                            ? 'bg-white/10 border-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
-                            : 'bg-white/5 border-white/10'
-                      }`}
+                      disabled={!selectedPiece || piece !== null || !isMyTurn}
+                      className={`aspect-square rounded border transition-all overflow-hidden relative ${piece
+                        ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-white/40'
+                        : selectedPiece && isMyTurn
+                          ? 'bg-white/10 border-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
+                          : 'bg-white/5 border-white/10'
+                        }`}
                     >
                       {piece && piece.imageData && (
-                        <img 
-                          src={piece.imageData} 
+                        <img
+                          src={piece.imageData}
                           alt={`Piece ${piece.id}`}
                           className="w-full h-full object-cover rounded"
                         />
                       )}
                       {/* Grid Label Overlay */}
                       {gridLabel && !piece && (
-                        <span 
-                          className="absolute inset-0 flex items-center justify-center text-white/60 text-xs font-mono pointer-events-none"
+                        <span
+                          className="absolute inset-0 flex items-center justify-center text-white/60 text-[8px] sm:text-xs font-mono pointer-events-none"
                           style={{ opacity: 0.6 }}
                         >
                           {gridLabel}
@@ -1540,11 +1543,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         {/* Player Rack and Actions */}
         <div className="space-y-4">
           {/* Your Rack */}
-          <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
-            <h3 className="text-white font-semibold mb-4">
+          <div className="bg-white/5 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-white/10">
+            <h3 className="text-white font-semibold mb-2 sm:mb-4 text-sm sm:text-base">
               Your Pieces ({myRack.filter(p => p !== null).length})
             </h3>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
               {paddedRack.map((piece, index) => {
                 // Determine if piece is edge or corner for highlighting
                 const isEdge = piece?.isEdge;
@@ -1555,44 +1558,43 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                   (piece.edges.bottom && piece.edges.right)
                 );
                 const showEdgeHighlight = gameSettings?.highlightEdges && isEdge;
-                
+
                 return (
                   <button
                     key={index}
                     onClick={() => piece && handlePieceSelect(piece)}
                     onMouseDown={() => piece && handleDragStart(piece)}
                     disabled={!isMyTurn || !piece}
-                    className={`aspect-square rounded-lg border-2 transition-all relative cursor-grab active:cursor-grabbing ${
-                      piece && selectedPiece?.id === piece.id
-                        ? 'border-yellow-400 ring-2 ring-yellow-400 scale-110'
-                        : piece && isMyTurn 
-                          ? showEdgeHighlight && isCorner
-                            ? 'border-red-400 hover:border-cyan-400 shadow-lg shadow-red-400/50'
-                            : showEdgeHighlight
-                              ? 'border-amber-400 hover:border-cyan-400 shadow-lg shadow-amber-400/50'
-                              : 'border-white/20 hover:border-cyan-400'
-                          : piece
-                            ? 'border-white/10 opacity-50'
-                            : 'border-white/10 bg-white/5 opacity-30'
-                    }`}
+                    className={`aspect-square rounded-lg border-2 transition-all relative cursor-grab active:cursor-grabbing touch-target ${piece && selectedPiece?.id === piece.id
+                      ? 'border-yellow-400 ring-2 ring-yellow-400 scale-105 sm:scale-110'
+                      : piece && isMyTurn
+                        ? showEdgeHighlight && isCorner
+                          ? 'border-red-400 hover:border-cyan-400 shadow-lg shadow-red-400/50'
+                          : showEdgeHighlight
+                            ? 'border-amber-400 hover:border-cyan-400 shadow-lg shadow-amber-400/50'
+                            : 'border-white/20 hover:border-cyan-400'
+                        : piece
+                          ? 'border-white/10 opacity-50'
+                          : 'border-white/10 bg-white/5 opacity-30'
+                      }`}
                     draggable={false}
                   >
                     {piece ? (
                       piece.imageData ? (
-                        <img 
-                          src={piece.imageData} 
+                        <img
+                          src={piece.imageData}
                           alt={`Piece ${piece.id}`}
                           className="w-full h-full object-cover rounded"
                           draggable={false}
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-purple-500/50 to-pink-500/50 rounded flex items-center justify-center text-white text-xs">
+                        <div className="w-full h-full bg-gradient-to-br from-purple-500/50 to-pink-500/50 rounded flex items-center justify-center text-white text-[10px] sm:text-xs">
                           {piece.id}
                         </div>
                       )
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-2 h-2 rounded-full bg-white/20"></div>
+                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white/20"></div>
                       </div>
                     )}
                   </button>
@@ -1600,36 +1602,36 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
               })}
             </div>
             {selectedPiece && (
-              <p className="text-cyan-400 text-sm mt-3 text-center">
-                Click or drag to place the selected piece
+              <p className="text-cyan-400 text-xs sm:text-sm mt-2 sm:mt-3 text-center">
+                Tap an empty cell to place the selected piece
               </p>
             )}
           </div>
 
           {/* Game Stats */}
-          <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
-            <h3 className="text-white font-semibold mb-4">Game Stats</h3>
-            <div className="space-y-2 text-sm">
+          <div className="bg-white/5 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-white/10">
+            <h3 className="text-white font-semibold mb-2 sm:mb-4 text-sm sm:text-base">Game Stats</h3>
+            <div className="grid grid-cols-3 lg:grid-cols-1 gap-1 sm:gap-2 text-xs sm:text-sm">
               <div className="flex justify-between">
-                <span className="text-purple-300">Pieces Placed</span>
+                <span className="text-purple-300">Placed</span>
                 <span className="text-white">{grid.filter(p => p !== null).length}/{grid.length}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-purple-300">Pieces Remaining</span>
+                <span className="text-purple-300">Remaining</span>
                 <span className="text-white">{gameState?.piecePoolCount || 0}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-purple-300">Your Streak</span>
+                <span className="text-purple-300">Streak</span>
                 <span className="text-white">{myStreak}</span>
               </div>
             </div>
           </div>
 
-          {/* Puzzle Thumbnail */}
+          {/* Puzzle Thumbnail — hidden on mobile to save space */}
           {(gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
-            <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
+            <div className="hidden sm:block bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
               <h3 className="text-white font-semibold mb-3">Reference</h3>
-              <img 
+              <img
                 src={gameData?.imagePreview || multiplayerRef?.current?.imageUrl}
                 alt="Puzzle"
                 className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
@@ -1639,31 +1641,31 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
             </div>
           )}
 
-          {/* Preview Button */}
-          {(gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
+          {/* Preview + Exit Buttons — compact row on mobile */}
+          <div className="flex gap-2 sm:flex-col sm:gap-4">
+            {(gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
+              <button
+                onClick={() => setShowPreview(true)}
+                className="flex-1 sm:w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded-xl py-2.5 sm:py-3 font-medium transition-colors flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base touch-target"
+              >
+                <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                Preview
+              </button>
+            )}
             <button
-              onClick={() => setShowPreview(true)}
-              className="w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded-xl py-3 font-medium transition-colors flex items-center justify-center gap-2"
+              onClick={onExit}
+              className="flex-1 sm:w-full bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl py-2.5 sm:py-3 font-medium transition-colors text-sm sm:text-base touch-target"
             >
-              <Eye className="w-5 h-5" />
-              Preview Image
+              Exit Game
             </button>
-          )}
+          </div>
 
-          {/* Exit Button */}
-          <button
-            onClick={onExit}
-            className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl py-3 font-medium transition-colors"
-          >
-            Exit Game
-          </button>
-          
           {/* Game Settings Panel */}
-          <GameSettingsPanel 
+          <GameSettingsPanel
             settings={gameSettings || ACCESSIBILITY_DEFAULTS}
             onSettingsChange={onSettingsChange}
           />
-          
+
           {/* Hints Panel */}
           <HintsPanel
             onUseHint={async (hintType) => {
@@ -1690,11 +1692,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
           />
         </div>
       </div>
-      
+
       {/* Move History Panel - Shown when enabled */}
       {gameSettings?.showMoveHistory && (
         <div className="mt-6">
-          <MoveHistoryPanel 
+          <MoveHistoryPanel
             moveHistory={gameState?.moveHistory || []}
             gridSize={gridSize}
             isVisible={gameSettings?.showMoveHistory}
@@ -1704,11 +1706,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
       {/* Preview Modal */}
       {showPreview && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowPreview(false)}
         >
-          <div 
+          <div
             className="relative max-w-4xl max-h-[90vh] bg-slate-800 rounded-2xl p-4 border border-white/20"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1719,7 +1721,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
               ×
             </button>
             <h3 className="text-white font-semibold mb-3 text-center">Puzzle Preview</h3>
-            <img 
+            <img
               src={gameData?.imagePreview || multiplayerRef?.current?.imageUrl}
               alt="Puzzle Preview"
               className="max-w-full max-h-[70vh] object-contain rounded-lg"
@@ -1742,41 +1744,39 @@ const GameOverScreen = ({ winner, gameData, onPlayAgain }) => {
 
   return (
     <div className="max-w-2xl mx-auto text-center">
-      <div className="bg-white/5 backdrop-blur-md rounded-xl p-8 border border-white/10">
-        <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ${
-          isWinner ? 'bg-yellow-500/20' : isTie ? 'bg-purple-500/20' : 'bg-gray-500/20'
-        }`}>
-          <Trophy className={`w-12 h-12 ${
-            isWinner ? 'text-yellow-400' : isTie ? 'text-purple-400' : 'text-gray-400'
-          }`} />
+      <div className="bg-white/5 backdrop-blur-md rounded-xl p-6 sm:p-8 border border-white/10">
+        <div className={`w-16 h-16 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6 ${isWinner ? 'bg-yellow-500/20' : isTie ? 'bg-purple-500/20' : 'bg-gray-500/20'
+          }`}>
+          <Trophy className={`w-8 h-8 sm:w-12 sm:h-12 ${isWinner ? 'text-yellow-400' : isTie ? 'text-purple-400' : 'text-gray-400'
+            }`} />
         </div>
 
-        <h2 className="text-4xl font-bold text-white mb-4">
+        <h2 className="text-2xl sm:text-4xl font-bold text-white mb-3 sm:mb-4">
           {isTimeout ? '⏰ Time Up!' : isWinner ? '🎉 You Win!' : isTie ? '🤝 It\'s a Tie!' : 'Game Over'}
         </h2>
-        
-        <p className="text-purple-200 mb-8">
-          {isTimeout 
-            ? 'The game has ended due to time limit.' 
-            : isWinner 
-              ? 'Congratulations on your victory!' 
-              : isTie 
-                ? 'Great game! You both played equally well.' 
+
+        <p className="text-purple-200 mb-6 sm:mb-8 text-sm sm:text-base">
+          {isTimeout
+            ? 'The game has ended due to time limit.'
+            : isWinner
+              ? 'Congratulations on your victory!'
+              : isTie
+                ? 'Great game! You both played equally well.'
                 : 'Better luck next time!'}
         </p>
 
         {gameData?.game && (
           <div className="bg-white/5 rounded-xl p-4 mb-6">
-            <h3 className="text-white font-semibold mb-3">Final Scores</h3>
+            <h3 className="text-white font-semibold mb-3 text-sm sm:text-base">Final Scores</h3>
             <div className="flex justify-around">
               <div>
-                <p className="text-purple-300 text-sm">{gameData.game.player_a_name || 'Player A'}</p>
-                <p className="text-2xl font-bold text-white">{gameData.game.player_a_score || 0}</p>
+                <p className="text-purple-300 text-xs sm:text-sm">{gameData.game.player_a_name || 'Player A'}</p>
+                <p className="text-xl sm:text-2xl font-bold text-white">{gameData.game.player_a_score || 0}</p>
               </div>
-              <div className="text-purple-400 self-center">VS</div>
+              <div className="text-purple-400 self-center text-sm sm:text-base">VS</div>
               <div>
-                <p className="text-purple-300 text-sm">{gameData.game.player_b_name || 'Player B'}</p>
-                <p className="text-2xl font-bold text-white">{gameData.game.player_b_score || 0}</p>
+                <p className="text-purple-300 text-xs sm:text-sm">{gameData.game.player_b_name || 'Player B'}</p>
+                <p className="text-xl sm:text-2xl font-bold text-white">{gameData.game.player_b_score || 0}</p>
               </div>
             </div>
           </div>
@@ -1784,7 +1784,7 @@ const GameOverScreen = ({ winner, gameData, onPlayAgain }) => {
 
         <button
           onClick={onPlayAgain}
-          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white py-4 rounded-xl font-bold text-lg transition-all"
+          className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all active:scale-95 touch-target"
         >
           Play Again
         </button>
