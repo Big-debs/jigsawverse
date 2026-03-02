@@ -8,13 +8,13 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables!');
+  throw new Error(
+    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY environment variables. ' +
+    'Copy .env.example to .env.local and fill in your Supabase credentials.'
+  );
 }
 
-const url = supabaseUrl || 'https://placeholder.supabase.co';
-const key = supabaseAnonKey || 'placeholder-key';
-
-export const supabase = createClient(url, key, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
@@ -37,10 +37,7 @@ export const supabase = createClient(url, key, {
   }
 });
 
-// Make supabase available globally for debugging
-if (typeof window !== 'undefined') {
-  window.supabase = supabase;
-}
+
 
 /**
  * Set up the realtime client to use the current access token
@@ -60,34 +57,19 @@ export const setupRealtimeAuth = async () => {
 
 // Listen for auth changes and update realtime token
 supabase.auth.onAuthStateChange(async (event, session) => {
-  console.log('=== AUTH STATE CHANGE ===');
-  console.log('Event:', event);
-  console.log('Session exists:', !!session);
-  console.log('Access token exists:', !!session?.access_token);
-  
   if (session?.access_token) {
     supabase.realtime.setAuth(session.access_token);
-    console.log('Realtime auth token updated');
-    console.log('Realtime accessToken set:', !!supabase.realtime.accessToken);
   } else if (event === 'SIGNED_OUT') {
     supabase.realtime.setAuth(null);
-    console.log('Realtime auth cleared');
   }
 });
 
-// Debug: Check session on load
+// Set realtime auth from existing session on load
 (async () => {
   if (typeof window !== 'undefined') {
     const { data } = await supabase.auth.getSession();
-    console.log('=== INITIAL SESSION CHECK ===');
-    console.log('Session exists:', !!data.session);
-    console.log('Access token exists:', !!data.session?.access_token);
-    console.log('Realtime accessToken:', !!supabase.realtime.accessToken);
-    
     if (data.session?.access_token && !supabase.realtime.accessToken) {
-      console.log('Setting realtime auth from existing session...');
       supabase.realtime.setAuth(data.session.access_token);
-      console.log('Realtime accessToken now:', !!supabase.realtime.accessToken);
     }
   }
 })();

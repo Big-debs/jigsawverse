@@ -148,8 +148,25 @@ export const gameService = {
     return data;
   },
 
-  // Update user stats after game
+  // Update user stats after game (atomic — avoids race conditions)
   async updateUserStatsAfterGame(userId, result, score) {
+    // First try RPC for atomic increment (requires the DB function to exist)
+    try {
+      const { error: rpcError } = await supabase.rpc('increment_user_stats', {
+        p_user_id: userId,
+        p_result: result,
+        p_score: score
+      });
+
+      if (!rpcError) return;
+
+      // If RPC doesn't exist, fall back to read-then-write
+      console.warn('increment_user_stats RPC not found, falling back to read-then-write:', rpcError.message);
+    } catch {
+      // RPC not available, continue with fallback
+    }
+
+    // Fallback: read-then-write (not perfectly atomic, but functional)
     const { data: stats } = await supabase
       .from('user_stats')
       .select('*')

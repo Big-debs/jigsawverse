@@ -3,6 +3,7 @@
 // =====================================================
 
 import { getModeConfig as importedGetModeConfig, getModeScoring as importedGetModeScoring } from './gameModes.js';
+import { HINT_CONFIG } from './gameConfig.js';
 
 export class ImageProcessor {
   constructor(imageSource, gridSize = 10) {
@@ -18,14 +19,14 @@ export class ImageProcessor {
     return new Promise((resolve, reject) => {
       const img = new window.Image();
       img.crossOrigin = 'anonymous';
-      
+
       img.onload = () => {
         this.image = img;
         resolve(img);
       };
-      
+
       img.onerror = reject;
-      
+
       if (typeof this.imageSource === 'string') {
         img.src = this.imageSource;
       } else {
@@ -45,7 +46,7 @@ export class ImageProcessor {
     // maintain square grids to ensure check/pass functionality works correctly
     const standardSquareSizes = [5, 8, 10, 12, 15];
     const isStandardSquare = standardSquareSizes.includes(this.gridSize);
-    
+
     if (!isStandardSquare) {
       // For non-standard sizes, adjust based on aspect ratio
       if (aspectRatio > 1) {
@@ -72,7 +73,7 @@ export class ImageProcessor {
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const index = row * cols + col;
-        
+
         this.canvas.width = pieceWidth;
         this.canvas.height = pieceHeight;
 
@@ -132,23 +133,30 @@ export class ImageProcessor {
   }
 
   getPiecesForRack(count = 10) {
-    // Instead of taking sequential pieces, distribute them across the grid
-    // to ensure rack pieces aren't clustered together
+    // Distribute pieces across the grid to avoid clustering
     const shuffled = this.shufflePieces();
     const rackPieces = [];
+    const selectedIndices = new Set();
     const step = Math.max(1, Math.floor(shuffled.length / count));
-    
-    for (let i = 0; i < count && i < shuffled.length; i++) {
-      const index = (i * step) % shuffled.length;
-      rackPieces.push(shuffled[index]);
+
+    for (let i = 0; i < count && rackPieces.length < count && i < shuffled.length; i++) {
+      let index = (i * step) % shuffled.length;
+      // If already selected, find the next available index
+      while (selectedIndices.has(index) && selectedIndices.size < shuffled.length) {
+        index = (index + 1) % shuffled.length;
+      }
+      if (!selectedIndices.has(index)) {
+        selectedIndices.add(index);
+        rackPieces.push(shuffled[index]);
+      }
     }
-    
-    // Do a final shuffle of the selected pieces
+
+    // Final shuffle of the selected pieces
     for (let i = rackPieces.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [rackPieces[i], rackPieces[j]] = [rackPieces[j], rackPieces[i]];
     }
-    
+
     return rackPieces;
   }
 }
@@ -177,7 +185,7 @@ export class GameLogic {
     this.nextCheckRevealProgress = 0.2;
     this.timerRemaining = 600; // Default 10 minutes
     this.isPlacementInProgress = false; // Add placement lock
-    
+
     // Game mode support
     this.mode = mode || 'CLASSIC';
     this.modeConfig = importedGetModeConfig(mode);
@@ -192,7 +200,7 @@ export class GameLogic {
     };
   }
 
- initialize() {
+  initialize() {
     // Shuffle the piece pool to randomize distribution
     this.piecePool = this.shufflePieces();
     this.fillRack('playerA');
@@ -212,14 +220,14 @@ export class GameLogic {
   fillRack(player) {
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
     // ... rest of fillRack code
-    
+
     // Filter out null AND undefined, then count actual pieces
     const actualPieces = rack.filter(p => p !== null && p !== undefined);
     const needed = 10 - actualPieces.length;
 
     // Create new rack with actual pieces first
     const newRack = [...actualPieces];
-    
+
     // Add pieces from pool
     for (let i = 0; i < needed && this.piecePool.length > 0; i++) {
       const piece = this.piecePool.shift();
@@ -234,13 +242,13 @@ export class GameLogic {
     } else {
       this.playerBRack = newRack;
     }
-    
+
     console.log(`Refilled ${player} rack: now has ${newRack.length} pieces`);
   }
 
   returnPieceToRack(player, piece) {
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
-    
+
     // Ensure piece has complete data including imageData
     // If piece only has metadata (id, correctPosition), look it up from this.pieces
     let completePiece = piece;
@@ -253,10 +261,10 @@ export class GameLogic {
         console.warn(`Warning: Could not find full piece data for piece ${piece.id}`);
       }
     }
-    
+
     // Find first null/undefined slot
     const firstEmptySlot = rack.findIndex(p => p === null || p === undefined);
-    
+
     if (firstEmptySlot !== -1) {
       // Fill the first empty slot
       rack[firstEmptySlot] = completePiece;
@@ -264,7 +272,7 @@ export class GameLogic {
       // No empty slot, push to end
       rack.push(completePiece);
     }
-    
+
     console.log(`Returned piece ${completePiece.id} to ${player} rack (hasImageData: ${!!completePiece.imageData})`);
   }
 
@@ -291,10 +299,10 @@ export class GameLogic {
 
     const isCorrect = piece.correctPosition === gridIndex;
 
-    return { 
-      valid: true, 
+    return {
+      valid: true,
       correct: isCorrect,
-      piece 
+      piece
     };
   }
 
@@ -303,23 +311,23 @@ export class GameLogic {
     if (this.currentTurn !== player) {
       return { success: false, message: "Not your turn" };
     }
-    
+
     // Check placement lock
     if (this.isPlacementInProgress) {
       return { success: false, message: "Placement in progress, please wait" };
     }
-    
+
     // Set lock
     this.isPlacementInProgress = true;
-    
+
     // Bounds check
     if (gridIndex < 0 || gridIndex >= this.totalPieces) {
       this.isPlacementInProgress = false; // Release lock on error
       return { success: false, message: 'Invalid grid position' };
     }
-    
+
     const validation = this.isValidPlacement(pieceId, gridIndex);
-    
+
     if (!validation.valid) {
       this.isPlacementInProgress = false; // Release lock on error
       return { success: false, message: validation.reason };
@@ -411,7 +419,7 @@ export class GameLogic {
         correctnessRevealed: false
       };
     }
-    
+
     if (checkDecision === 'check') {
       // CHECK outcome
       if (!move.correct) {
@@ -419,21 +427,21 @@ export class GameLogic {
         // Checker gets points based on mode
         const checkerPoints = this.modeScoring.checkerSuccess || 5;
         this.updateScore(checker, checkerPoints, false);
-        
+
         // Remove piece from grid
         const piece = this.grid[move.gridIndex];
         this.grid[move.gridIndex] = null;
-        
+
         // Return piece to PLACER's rack
         if (piece) {
           this.returnPieceToRack(placer, piece);
         }
-        
+
         // Clear pending check and switch turn to CHECKER
         this.pendingCheck = null;
         this.currentTurn = checker;
         this.isPlacementInProgress = false;
-        
+
         return {
           success: true,
           result: 'successful_check',
@@ -449,13 +457,13 @@ export class GameLogic {
         // CHECKER gets penalty based on mode
         const checkerPenalty = this.modeScoring.checkerFail || -2;
         this.updateScore(checker, checkerPenalty, false);
-        
+
         // Piece remains placed
         // Clear pending check and switch turn to CHECKER
         this.pendingCheck = null;
         this.currentTurn = checker;
         this.isPlacementInProgress = false;
-        
+
         return {
           success: true,
           result: 'failed_check',
@@ -474,7 +482,7 @@ export class GameLogic {
         this.pendingCheck = null;
         this.currentTurn = checker;
         this.isPlacementInProgress = false;
-        
+
         return {
           success: true,
           result: 'opponent_passed_correct',
@@ -486,22 +494,22 @@ export class GameLogic {
         // Remove piece from board
         const piece = this.grid[move.gridIndex];
         this.grid[move.gridIndex] = null;
-        
+
         // Return piece to PLACER's rack
         if (piece) {
           this.returnPieceToRack(placer, piece);
         }
-        
+
         // BOTH players penalized based on mode
         const penalty = this.modeScoring.passWrong || -3;
         this.updateScore(placer, penalty, false);
         this.updateScore(checker, penalty, false);
-        
+
         // TURN goes to CHECKER
         this.pendingCheck = null;
         this.currentTurn = checker;
         this.isPlacementInProgress = false;
-        
+
         return {
           success: true,
           result: 'opponent_passed_incorrect',
@@ -516,12 +524,12 @@ export class GameLogic {
   updateScore(player, points, isCorrectPlacement) {
     const score = this.scores[player];
     score.score += points;
-    
+
     // Only update placement stats if this is an actual placement (not a penalty)
     // Penalties (negative points without correct placement) shouldn't affect accuracy
     if (points > 0 || isCorrectPlacement) {
       score.totalPlacements++;
-      
+
       if (isCorrectPlacement) {
         score.correctPlacements++;
         score.streak++;
@@ -537,7 +545,7 @@ export class GameLogic {
     // Apply mode-specific streak bonuses
     const streakThreshold = this.modeScoring.streakBonusThreshold || 3;
     const streakMultiplier = this.modeScoring.streakMultiplier || 1;
-    
+
     if (score.streak >= streakThreshold) {
       const bonus = Math.floor(score.streak / streakThreshold) * 2 * streakMultiplier;
       score.score += bonus;
@@ -546,17 +554,17 @@ export class GameLogic {
 
   switchTurn() {
     this.currentTurn = this.currentTurn === 'playerA' ? 'playerB' : 'playerA';
-    
+
     // Release placement lock
     this.isPlacementInProgress = false;
-    
+
     const rack = this.currentTurn === 'playerA' ? this.playerARack : this.playerBRack;
     // Check for empty or all null/undefined
     let hasNoPieces = !rack || rack.length === 0;
     if (rack && !hasNoPieces) {
       hasNoPieces = rack.every(p => p === null || p === undefined);
     }
-    
+
     if (hasNoPieces && this.piecePool.length > 0) {
       console.log(`${this.currentTurn} rack is empty, refilling...`);
       this.fillRack(this.currentTurn);
@@ -564,11 +572,12 @@ export class GameLogic {
   }
 
   isGameComplete() {
-    const allPlaced = this.grid.every(cell => cell !== null);
-    const noMorePieces = this.piecePool.length === 0 && 
-                         this.playerARack.every(p => p === null) &&
-                         this.playerBRack.every(p => p === null);
-    
+    // Use loose equality (!=) to catch both null and undefined
+    const allPlaced = this.grid.every(cell => cell != null);
+    const noMorePieces = this.piecePool.length === 0 &&
+      this.playerARack.every(p => p == null) &&
+      this.playerBRack.every(p => p == null);
+
     return allPlaced || noMorePieces;
   }
 
@@ -593,18 +602,9 @@ export class GameLogic {
   }
 
   useHint(player, hintType) {
-    const HINT_CONFIG = {
-      COSTS: {
-        position: -5,
-        edge: -2,
-        corner: -3,
-        region: -5
-      },
-      MAX_HINTS_PER_GAME: 5
-    };
 
     const score = this.scores[player];
-    
+
     // Check if player has exceeded hint limit
     if (score.hintsUsed >= HINT_CONFIG.MAX_HINTS_PER_GAME) {
       return { success: false, message: 'Maximum hints used for this game' };
@@ -656,8 +656,8 @@ export class GameLogic {
       case 'corner': {
         const cornerPieces = availablePieces.filter(p => {
           const edges = p.edges || {};
-          return (edges.top && edges.left) || (edges.top && edges.right) || 
-                 (edges.bottom && edges.left) || (edges.bottom && edges.right);
+          return (edges.top && edges.left) || (edges.top && edges.right) ||
+            (edges.bottom && edges.left) || (edges.bottom && edges.right);
         });
         hintInfo = {
           type: 'corner',
@@ -696,7 +696,7 @@ export class GameLogic {
   getHint(player) {
     const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
     const availablePieces = rack.filter(p => p !== null);
-    
+
     if (availablePieces.length === 0) return null;
 
     const hintPiece = availablePieces[0];
@@ -778,22 +778,22 @@ export class GameLogic {
     // Helper function to get piece from ID or object
     const getPieceFromIdOrObject = (item) => {
       if (item === null || item === undefined) return null;
-      
+
       // Already a full piece with imageData - use it directly
       if (typeof item === 'object' && item.imageData) {
         return item;
       }
-      
+
       // Object with just id (from DB) - find full piece with imageData
       if (typeof item === 'object' && typeof item.id === 'number') {
         return piecesArray.find(p => p.id === item.id) || null;
       }
-      
+
       // Just a number (piece ID) - find full piece
       if (typeof item === 'number') {
         return piecesArray.find(p => p.id === item) || null;
       }
-      
+
       return null;
     };
 
@@ -811,10 +811,10 @@ export class GameLogic {
 
     // Import racks using helper
     const playerARackData = data.player_a_rack || data.playerARack || [];
-    this.playerARack = Array.isArray(playerARackData) 
+    this.playerARack = Array.isArray(playerARackData)
       ? playerARackData.map(item => getPieceFromIdOrObject(item))
       : [];
-      
+
     const playerBRackData = data.player_b_rack || data.playerBRack || [];
     this.playerBRack = Array.isArray(playerBRackData)
       ? playerBRackData.map(item => getPieceFromIdOrObject(item))
@@ -825,7 +825,7 @@ export class GameLogic {
     this.piecePool = Array.isArray(piecePoolData)
       ? piecePoolData.map(item => getPieceFromIdOrObject(item)).filter(Boolean)
       : [];
-    
+
     console.log('Piece pool import:', {
       piecePoolDataLength: piecePoolData.length,
       reconstructedPoolLength: this.piecePool.length,
@@ -842,11 +842,11 @@ export class GameLogic {
     // Ensure hintsUsed is present in scores
     if (!this.scores.playerA.hintsUsed) this.scores.playerA.hintsUsed = 0;
     if (!this.scores.playerB.hintsUsed) this.scores.playerB.hintsUsed = 0;
-    
+
     this.gameState = data.game_state || data.gameState || 'active';
     this.pendingCheck = data.pending_check || data.pendingCheck || null;
     this.moveHistory = data.move_history || data.moveHistory || [];
-    
+
     // Import mode data
     const importedMode = data.gameplay_mode || data.mode;
     if (importedMode) {

@@ -151,10 +151,12 @@ export const profilesApi = {
    * @returns {Promise<Array>} List of matching profiles
    */
   async searchUsers(query, limit = 10) {
+    // Escape SQL LIKE wildcards in user input
+    const escapedQuery = query.replace(/[%_]/g, '\\$&');
     const { data, error } = await supabase
       .from('profiles')
       .select('id, username, display_name, avatar_url')
-      .ilike('username', `%${query}%`)
+      .ilike('username', `%${escapedQuery}%`)
       .limit(limit);
 
     if (error) throw error;
@@ -228,15 +230,24 @@ export const userStatsApi = {
    * @returns {Promise<number>} User's rank
    */
   async getUserRank(userId) {
-    const { data, error } = await supabase
+    // Get user's score first
+    const { data: userStats, error: userError } = await supabase
       .from('user_stats')
-      .select('user_id, total_score')
-      .order('total_score', { ascending: false });
+      .select('total_score')
+      .eq('user_id', userId)
+      .single();
 
-    if (error) throw error;
+    if (userError && userError.code !== 'PGRST116') throw userError;
+    if (!userStats) return null;
 
-    const rank = data.findIndex(s => s.user_id === userId) + 1;
-    return rank || data.length + 1;
+    // Count users with higher scores (efficient — no full table scan)
+    const { count, error: countError } = await supabase
+      .from('user_stats')
+      .select('*', { count: 'exact', head: true })
+      .gt('total_score', userStats.total_score);
+
+    if (countError) throw countError;
+    return (count || 0) + 1;
   }
 };
 

@@ -39,7 +39,7 @@ export const realtimeService = {
     for (let i = 0; i < gridSize; i++) {
       emptyGrid.push(null);
     }
-    
+
     const initialPayload = {
       game_id: gameId,
       grid: emptyGrid,  // Explicit null array
@@ -228,7 +228,13 @@ export const realtimeService = {
   async broadcastEvent(gameId, eventType, payload) {
     return new Promise((resolve, reject) => {
       const channel = supabase.channel(`broadcast:${gameId}`);
-      
+      const BROADCAST_TIMEOUT = 10000; // 10 seconds
+
+      const timeoutId = setTimeout(() => {
+        supabase.removeChannel(channel).catch(() => { });
+        reject(new Error('Broadcast event timed out'));
+      }, BROADCAST_TIMEOUT);
+
       channel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           channel.send({
@@ -236,15 +242,21 @@ export const realtimeService = {
             event: eventType,
             payload
           }).then(() => {
+            clearTimeout(timeoutId);
             // Cleanup after successful send with a small delay
             setTimeout(async () => {
-              await supabase.removeChannel(channel);
+              await supabase.removeChannel(channel).catch(() => { });
               resolve();
             }, 500);
           }).catch((err) => {
-            supabase.removeChannel(channel);
+            clearTimeout(timeoutId);
+            supabase.removeChannel(channel).catch(() => { });
             reject(err);
           });
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          clearTimeout(timeoutId);
+          supabase.removeChannel(channel).catch(() => { });
+          reject(new Error(`Broadcast channel failed: ${status}`));
         }
       });
     });
