@@ -757,10 +757,15 @@ export class GameLogic {
   }
 
   getGameState() {
+    // Deep-copy scores to prevent external mutation
+    const scoresCopy = {
+      playerA: { ...this.scores.playerA },
+      playerB: { ...this.scores.playerB }
+    };
     return {
       grid: [...this.grid],
       currentTurn: this.currentTurn,
-      scores: { ...this.scores },
+      scores: scoresCopy,
       playerARack: [...this.playerARack],
       playerBRack: [...this.playerBRack],
       piecePoolCount: this.piecePool.length,
@@ -882,13 +887,13 @@ export class GameLogic {
     // Import other state
     this.currentTurn = data.current_turn || data.currentTurn || 'playerA';
     this.timerRemaining = data.timer_remaining || data.timerRemaining || 600;
-    this.scores = data.scores || {
-      playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 },
-      playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 }
+    // Safely merge imported scores with defaults
+    const defaultScore = { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 };
+    const imported = data.scores || {};
+    this.scores = {
+      playerA: { ...defaultScore, ...(imported.playerA || {}) },
+      playerB: { ...defaultScore, ...(imported.playerB || {}) }
     };
-    // Ensure hintsUsed is present in scores
-    if (!this.scores.playerA.hintsUsed) this.scores.playerA.hintsUsed = 0;
-    if (!this.scores.playerB.hintsUsed) this.scores.playerB.hintsUsed = 0;
 
     this.gameState = data.game_state || data.gameState || 'active';
     this.pendingCheck = data.pending_check || data.pendingCheck || null;

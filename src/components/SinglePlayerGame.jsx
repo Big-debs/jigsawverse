@@ -35,7 +35,7 @@ const SinglePlayerGame = ({
   });
 
   const [gameState, setGameState] = useState(gameLogic.getGameState());
-  const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes
+  const [timeRemaining, setTimeRemaining] = useState(gridSize * 60); // gridSize minutes (5×5 = 5min)
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
@@ -346,8 +346,8 @@ const SinglePlayerGame = ({
       {lastResult && (
         <div
           className={`mb-4 p-4 rounded-xl text-center font-semibold transition-all ${lastResult.correct
-              ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-              : 'bg-red-500/20 text-red-300 border border-red-500/30'
+            ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+            : 'bg-red-500/20 text-red-300 border border-red-500/30'
             }`}
         >
           {lastResult.correct ? '✓' : '✗'} {lastResult.correct ? 'Correct' : 'Wrong'}! {lastResult.points > 0 ? '+' : ''}{lastResult.points} points
@@ -419,8 +419,8 @@ const SinglePlayerGame = ({
                   onClick={() => handlePieceSelect(piece)}
                   onMouseDown={(e) => handleDragStart(piece, e)}
                   className={`relative rounded-lg border-2 transition-all cursor-grab active:cursor-grabbing touch-target ${selectedPiece?.id === piece.id
-                      ? 'border-purple-500 shadow-lg shadow-purple-500/50'
-                      : 'border-slate-600 hover:border-slate-500'
+                    ? 'border-purple-500 shadow-lg shadow-purple-500/50'
+                    : 'border-slate-600 hover:border-slate-500'
                     }`}
                   draggable={false}
                 >

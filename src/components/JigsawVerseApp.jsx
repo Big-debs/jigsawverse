@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Eye } from 'lucide-react';
+import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Eye, Upload, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import { authService } from '../services/auth.service';
 import { gameService } from '../services/game.service';
@@ -10,6 +10,7 @@ import MoveHistoryPanel from './MoveHistoryPanel';
 import HintsPanel from './HintsPanel';
 import SinglePlayerGame from './SinglePlayerGame';
 import ZoomControls from './ZoomControls';
+import ImageLibrary from './ImageLibrary';
 import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
 import { isModeMultiplayer } from '../lib/gameModes';
 
@@ -581,12 +582,34 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
   const [gridSize, setGridSize] = useState(10);
   const [creating, setCreating] = useState(false);
   const [progress, setProgress] = useState('');
+  const [imageSource, setImageSource] = useState('upload'); // 'upload' | 'library'
 
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (file && file.type.startsWith('image/')) {
       setImageFile(file);
       setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleLibrarySelect = (imageData) => {
+    if (imageData.file) {
+      // Built-in image — already fetched as File
+      setImageFile(imageData.file);
+      setImagePreview(imageData.url);
+    } else if (imageData.url) {
+      // User upload — fetch as File
+      fetch(imageData.url)
+        .then(res => res.blob())
+        .then(blob => {
+          const file = new File([blob], imageData.name || 'library-image.jpg', { type: 'image/jpeg' });
+          setImageFile(file);
+          setImagePreview(imageData.url);
+        })
+        .catch(err => {
+          console.error('Failed to fetch library image:', err);
+          setError('Failed to load selected image');
+        });
     }
   };
 
@@ -628,7 +651,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
         // Create the game using the multiplayer host
         const result = await gameHost.createGame(imageFile, {
           gridSize,
-          timeLimit: 600,
+          timeLimit: (gridSize + 2) * 60, // (gridSize + 2) minutes for multiplayer
           mode: selectedMode || 'CLASSIC'
         });
 
@@ -689,38 +712,84 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
 
       <h2 className="text-3xl font-bold text-white mb-6">Create New Game</h2>
 
-      <div className="bg-white/5 backdrop-blur-md rounded-xl p-6 mb-6 border border-white/10">
+      <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 sm:p-6 mb-4 sm:mb-6 border border-white/10">
         <label className="block text-white font-semibold mb-3">
           Choose Puzzle Image
         </label>
 
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleImageSelect}
-          disabled={creating}
-          className="hidden"
-          id="image-upload"
-        />
+        {/* Source Toggle */}
+        <div className="flex rounded-lg overflow-hidden border border-white/10 mb-4">
+          <button
+            onClick={() => setImageSource('upload')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-medium transition-colors ${imageSource === 'upload'
+              ? 'bg-purple-500/30 text-white'
+              : 'bg-white/5 text-purple-300 hover:bg-white/10'
+              }`}
+          >
+            <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            Upload
+          </button>
+          <button
+            onClick={() => setImageSource('library')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs sm:text-sm font-medium transition-colors ${imageSource === 'library'
+              ? 'bg-cyan-500/30 text-white'
+              : 'bg-white/5 text-purple-300 hover:bg-white/10'
+              }`}
+          >
+            <ImageIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            Image Library
+          </button>
+        </div>
 
-        <label htmlFor="image-upload" className="block cursor-pointer">
-          {imagePreview ? (
+        {imageSource === 'upload' ? (
+          <>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              disabled={creating}
+              className="hidden"
+              id="image-upload"
+            />
+            <label htmlFor="image-upload" className="block cursor-pointer">
+              {imagePreview ? (
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-full h-48 sm:h-64 object-cover rounded-lg border-2 border-white/20 hover:border-cyan-400 transition-colors"
+                />
+              ) : (
+                <div className="w-full h-48 sm:h-64 border-2 border-dashed border-white/20 rounded-lg flex items-center justify-center hover:border-cyan-400 transition-colors">
+                  <div className="text-center text-purple-300">
+                    <svg className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-sm sm:text-base">Click to upload image</p>
+                    <p className="text-[10px] sm:text-xs text-purple-400 mt-1">JPG, PNG up to 5MB</p>
+                  </div>
+                </div>
+              )}
+            </label>
+          </>
+        ) : (
+          <ImageLibrary
+            userId={user?.id}
+            onSelectImage={handleLibrarySelect}
+            disabled={creating}
+          />
+        )}
+
+        {/* Selected preview (when using library) */}
+        {imageSource === 'library' && imagePreview && (
+          <div className="mt-3 relative">
+            <p className="text-green-400 text-xs sm:text-sm mb-1.5">✓ Image selected</p>
             <img
               src={imagePreview}
-              alt="Preview"
-              className="w-full h-64 object-cover rounded-lg border-2 border-white/20 hover:border-cyan-400 transition-colors"
+              alt="Selected"
+              className="w-full h-24 sm:h-32 object-cover rounded-lg border border-green-500/30"
             />
-          ) : (
-            <div className="w-full h-64 border-2 border-dashed border-white/20 rounded-lg flex items-center justify-center hover:border-cyan-400 transition-colors">
-              <div className="text-center text-purple-300">
-                <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p>Click to upload image</p>
-              </div>
-            </div>
-          )}
-        </label>
+          </div>
+        )}
       </div>
 
       <div className="bg-white/5 backdrop-blur-md rounded-xl p-6 mb-6 border border-white/10">
@@ -1493,7 +1562,8 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                 className="grid gap-0.5 sm:gap-1 aspect-square w-full relative z-10 transition-transform"
                 style={{
                   gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
-                  transform: `scale(${zoom})`
+                  transform: `scale(${zoom})`,
+                  transformOrigin: 'top left'
                 }}
               >
                 {grid.map((piece, index) => {
