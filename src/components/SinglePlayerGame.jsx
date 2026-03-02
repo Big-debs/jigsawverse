@@ -40,6 +40,8 @@ const SinglePlayerGame = ({
   const [streak, setStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
   const [correctPlacements, setCorrectPlacements] = useState(0);
+  const [totalPlacements, setTotalPlacements] = useState(0);
+  const [accuracy, setAccuracy] = useState(100);
   const [totalAttempts, setTotalAttempts] = useState(0);
   const [gameStatus, setGameStatus] = useState('playing'); // 'playing' | 'completed' | 'timeout'
   const [lastResult, setLastResult] = useState(null);
@@ -104,63 +106,97 @@ const SinglePlayerGame = ({
     const validation = gameLogic.isValidPlacement(pieceId, gridIndex);
     if (!validation.valid) return;
 
-    const isCorrect = validation.correct;
     setTotalAttempts(prev => prev + 1);
 
-    if (isCorrect) {
-      // Correct placement
-      gameLogic.grid[gridIndex] = validation.piece;
+    // Place piece on grid regardless of correctness
+    gameLogic.grid[gridIndex] = validation.piece;
 
-      // Remove from rack
-      const pieceIndex = gameLogic.playerARack.findIndex(p => p && p.id === pieceId);
-      if (pieceIndex !== -1) {
-        gameLogic.playerARack[pieceIndex] = null;
-      }
+    // Remove from rack
+    const pieceIndex = gameLogic.playerARack.findIndex(p => p && p.id === pieceId);
+    if (pieceIndex !== -1) {
+      gameLogic.playerARack[pieceIndex] = null;
+    }
 
-      // Update stats
-      const newStreak = streak + 1;
-      setStreak(newStreak);
-      setBestStreak(prev => Math.max(prev, newStreak));
-      setCorrectPlacements(prev => prev + 1);
+    // Refill rack if empty
+    const rackIsEmpty = gameLogic.playerARack.filter(p => p !== null).length === 0;
+    if (rackIsEmpty && gameLogic.piecePool.length > 0) {
+      gameLogic.fillRack('playerA');
+    }
 
-      // Calculate points with streak bonus
+    // Update actual scores (hidden)
+    if (validation.correct) {
+      const newStreak = gameLogic.scores.playerA.streak + 1;
       let points = scoring.correctPiece;
       if (newStreak >= scoring.streakBonusThreshold) {
         const multiplier = 1 + (scoring.streakMultiplier * 0.2);
         points = Math.floor(points * multiplier);
       }
-      setScore(prev => prev + points);
-
-      // Show feedback
-      setLastResult({ correct: true, points });
-      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
-      feedbackTimeoutRef.current = setTimeout(() => setLastResult(null), 2000);
-
-      // Refill rack if needed
-      if (gameLogic.playerARack.filter(p => p !== null).length === 0 && gameLogic.piecePool.length > 0) {
-        gameLogic.fillRack('playerA');
-      }
+      gameLogic.scores.playerA.score += points;
+      gameLogic.scores.playerA.streak = newStreak;
+      gameLogic.scores.playerA.correctPlacements++;
     } else {
-      // Wrong placement
-      setStreak(0);
+      gameLogic.scores.playerA.streak = 0;
+      gameLogic.scores.playerA.score += scoring.wrongPiece; // negative points
+    }
+    gameLogic.scores.playerA.totalPlacements++;
+    gameLogic.scores.playerA.accuracy = Math.round(
+      (gameLogic.scores.playerA.correctPlacements / gameLogic.scores.playerA.totalPlacements) * 100
+    );
 
-      const points = scoring.wrongPiece;
-      setScore(prev => prev + points); // points is negative
+    // Check if milestone reached
+    const filledCells = gameLogic.grid.filter(cell => cell !== null && cell !== undefined).length;
+    const progress = gameLogic.totalPieces > 0 ? filledCells / gameLogic.totalPieces : 0;
+    const isMilestone = progress >= gameLogic.nextCheckRevealProgress;
 
-      // Show feedback
-      setLastResult({ correct: false, points });
+    // Always update total placements for the UI
+    setTotalPlacements(gameLogic.scores.playerA.totalPlacements);
+
+    if (isMilestone) {
+      // 1. Sync revealed scores
+      setScore(gameLogic.scores.playerA.score);
+      setStreak(gameLogic.scores.playerA.streak);
+      setBestStreak(prev => Math.max(prev, gameLogic.scores.playerA.streak));
+      setCorrectPlacements(gameLogic.scores.playerA.correctPlacements);
+      setAccuracy(gameLogic.scores.playerA.accuracy);
+
+      // 2. Remove incorrect pieces and return to rack
+      let removedCount = 0;
+      for (let i = 0; i < gameLogic.grid.length; i++) {
+        const piece = gameLogic.grid[i];
+        if (piece && piece.correctPosition !== i) {
+          gameLogic.grid[i] = null;
+          gameLogic.returnPieceToRack('playerA', piece);
+          removedCount++;
+        }
+      }
+
+      // 3. Update next milestone
+      const bucket = Math.floor(progress / 0.2);
+      gameLogic.nextCheckRevealProgress = Math.min((bucket + 1) * 0.2, 1);
+
+      // 4. Show milestone feedback
+      setLastResult({
+        correct: true,
+        message: `Milestone Reached! Scores updated. ${removedCount > 0 ? `${removedCount} incorrect piece(s) returned to rack.` : 'All placements correct!'}`
+      });
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
-      feedbackTimeoutRef.current = setTimeout(() => setLastResult(null), 2000);
-
-      // Piece stays in rack (don't remove)
+      feedbackTimeoutRef.current = setTimeout(() => setLastResult(null), 4000);
+    } else {
+      // Generic "Piece Placed" feedback
+      setLastResult({
+        correct: true,
+        message: 'Piece placed'
+      });
+      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = setTimeout(() => setLastResult(null), 1000);
     }
 
-    // Update game state
+    // Update game state to re-render
     setGameState(gameLogic.getGameState());
     setSelectedPiece(null);
     setDraggedPiece(null);
     setDragPosition(null);
-  }, [gameLogic, gameStatus, streak, scoring]);
+  }, [gameLogic, gameStatus, scoring]);
 
   const handleCellClick = useCallback((gridIndex) => {
     if (!selectedPiece || gameStatus !== 'playing') return;
@@ -211,8 +247,6 @@ const SinglePlayerGame = ({
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
-
-  const accuracy = totalAttempts > 0 ? Math.round((correctPlacements / totalAttempts) * 100) : 100;
 
   // Mouse move listener
   useEffect(() => {
@@ -337,7 +371,7 @@ const SinglePlayerGame = ({
             <span className="text-slate-400 text-[10px] sm:text-sm">Placed</span>
           </div>
           <div className="text-lg sm:text-2xl font-bold text-white">
-            {correctPlacements}/{gridSize * gridSize}
+            {totalPlacements}/{gridSize * gridSize}
           </div>
         </div>
       </div>

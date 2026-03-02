@@ -336,6 +336,7 @@ const JigsawVerseApp = () => {
           <HomeScreen
             onNavigate={navigate}
             setIsHost={setIsHost}
+            setSelectedMode={setSelectedMode}
           />
         )}
 
@@ -480,7 +481,7 @@ const JigsawVerseApp = () => {
 // HOME SCREEN
 // =====================================================
 
-const HomeScreen = ({ onNavigate, setIsHost }) => {
+const HomeScreen = ({ onNavigate, setIsHost, setSelectedMode }) => {
   return (
     <div className="max-w-4xl mx-auto">
       {/* Hero Section */}
@@ -489,12 +490,12 @@ const HomeScreen = ({ onNavigate, setIsHost }) => {
           Welcome to JigsawVerse
         </h2>
         <p className="text-base sm:text-xl text-purple-200">
-          Challenge friends in real-time puzzle battles
+          Challenge friends or practice matching tiles in single player mode
         </p>
       </div>
 
       {/* Action Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {/* Create Game Card */}
         <button
           onClick={() => {
@@ -508,7 +509,7 @@ const HomeScreen = ({ onNavigate, setIsHost }) => {
           </div>
           <h3 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">Create Game</h3>
           <p className="text-purple-100 text-sm sm:text-base">
-            Upload an image and start a new multiplayer puzzle challenge
+            Upload an image and start a multiplayer puzzle challenge
           </p>
           <div className="mt-3 sm:mt-4 flex items-center text-white font-medium text-sm sm:text-base">
             <span>Get Started</span>
@@ -535,6 +536,29 @@ const HomeScreen = ({ onNavigate, setIsHost }) => {
           </p>
           <div className="mt-3 sm:mt-4 flex items-center text-white font-medium text-sm sm:text-base">
             <span>Enter Code</span>
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </button>
+
+        {/* Single Player Card */}
+        <button
+          onClick={() => {
+            setSelectedMode('SINGLE_PLAYER');
+            onNavigate(ROUTES.CREATE_GAME);
+          }}
+          className="group bg-gradient-to-br from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-2xl p-6 sm:p-8 text-left transition-all transform hover:scale-[1.02] sm:hover:scale-105 shadow-2xl active:scale-[0.98]"
+        >
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-white/30 transition-colors">
+            <Gamepad2 className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+          </div>
+          <h3 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">Single Player</h3>
+          <p className="text-green-100 text-sm sm:text-base">
+            Practice solo and assemble puzzles at your own pace
+          </p>
+          <div className="mt-3 sm:mt-4 flex items-center text-white font-medium text-sm sm:text-base">
+            <span>Play Solo</span>
             <svg className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
