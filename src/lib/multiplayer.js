@@ -310,6 +310,7 @@ export class MultiplayerGameHost {
       piecePool: gl.piecePool.map(p => p.id),
       currentTurn: gl.currentTurn,
       scores: gl.scores,
+      revealedScores: gl.revealedScores,
       pendingCheck: gl.pendingCheck,
       gameState: gl.gameState,
       timerRemaining: gl.timerRemaining,
@@ -317,7 +318,10 @@ export class MultiplayerGameHost {
       mode: gl.mode,
       turnsRemaining: gl.turnsRemaining,
       checksRemaining: gl.checksRemaining,
-      nextCheckRevealProgress: gl.nextCheckRevealProgress
+      nextCheckRevealProgress: gl.nextCheckRevealProgress,
+      piecePlacedBy: gl.piecePlacedBy,
+      pieceMarks: gl.pieceMarks,
+      nexusResolved: gl.nexusResolved
     };
 
     try {
@@ -471,6 +475,37 @@ export class MultiplayerGameHost {
       })
     ]).catch(err => console.error('Background DB write failed:', err));
 
+    return result;
+  }
+
+  // --- NEXUS MODE METHODS ---
+
+  async markPiece(gridIndex, markType) {
+    if (!this.gameLogic) throw new Error('Game not initialized');
+    const result = this.gameLogic.markPiece('playerA', gridIndex, markType);
+    if (result.success) {
+      await this.broadcastGameState();
+    }
+    return result;
+  }
+
+  async resolveEndGame() {
+    if (!this.gameLogic) throw new Error('Game not initialized');
+    const result = this.gameLogic.resolveNexusEndGame();
+    if (result.success) {
+      await this.broadcastGameState();
+      // Persist final scores
+      Promise.all([
+        realtimeService.updateGameState(this.gameId, this.gameLogic.exportForDatabase()),
+        gameService.updateGame(this.gameId, {
+          player_a_score: this.gameLogic.scores.playerA.score,
+          player_b_score: this.gameLogic.scores.playerB.score,
+          player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
+          player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
+          status: 'finished'
+        })
+      ]).catch(err => console.error('Failed to persist end-game:', err));
+    }
     return result;
   }
 
@@ -720,6 +755,7 @@ export class MultiplayerGameGuest {
       piecePool: gl.piecePool.map(p => p.id),
       currentTurn: gl.currentTurn,
       scores: gl.scores,
+      revealedScores: gl.revealedScores,
       pendingCheck: gl.pendingCheck,
       gameState: gl.gameState,
       timerRemaining: gl.timerRemaining,
@@ -727,7 +763,10 @@ export class MultiplayerGameGuest {
       mode: gl.mode,
       turnsRemaining: gl.turnsRemaining,
       checksRemaining: gl.checksRemaining,
-      nextCheckRevealProgress: gl.nextCheckRevealProgress
+      nextCheckRevealProgress: gl.nextCheckRevealProgress,
+      piecePlacedBy: gl.piecePlacedBy,
+      pieceMarks: gl.pieceMarks,
+      nexusResolved: gl.nexusResolved
     };
 
     try {
@@ -829,6 +868,36 @@ export class MultiplayerGameGuest {
       })
     ]).catch(err => console.error('Background DB write failed:', err));
 
+    return result;
+  }
+
+  // --- NEXUS MODE METHODS ---
+
+  async markPiece(gridIndex, markType) {
+    if (!this.gameLogic) throw new Error('Game not initialized');
+    const result = this.gameLogic.markPiece('playerB', gridIndex, markType);
+    if (result.success) {
+      await this.broadcastGameState();
+    }
+    return result;
+  }
+
+  async resolveEndGame() {
+    if (!this.gameLogic) throw new Error('Game not initialized');
+    const result = this.gameLogic.resolveNexusEndGame();
+    if (result.success) {
+      await this.broadcastGameState();
+      Promise.all([
+        realtimeService.updateGameState(this.gameId, this.gameLogic.exportForDatabase()),
+        gameService.updateGame(this.gameId, {
+          player_a_score: this.gameLogic.scores.playerA.score,
+          player_b_score: this.gameLogic.scores.playerB.score,
+          player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
+          player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
+          status: 'finished'
+        })
+      ]).catch(err => console.error('Failed to persist end-game:', err));
+    }
     return result;
   }
 

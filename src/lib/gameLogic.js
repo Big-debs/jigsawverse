@@ -179,6 +179,11 @@ export class GameLogic {
       playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 },
       playerB: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 }
     };
+    // Scores visible in the UI — only updated at 20% board-fill milestones
+    this.revealedScores = {
+      playerA: { score: 0, accuracy: 100, streak: 0 },
+      playerB: { score: 0, accuracy: 100, streak: 0 }
+    };
     this.gameState = 'setup';
     this.moveHistory = [];
     this.pendingCheck = null;
@@ -198,6 +203,11 @@ export class GameLogic {
       playerA: this.modeConfig.features.checksPerTurn,
       playerB: this.modeConfig.features.checksPerTurn
     };
+
+    // Nexus mode state
+    this.piecePlacedBy = {};  // gridIndex -> 'playerA'|'playerB'
+    this.pieceMarks = {};     // gridIndex -> { marker, type: 'suspect'|'confident' }
+    this.nexusResolved = false;
   }
 
   initialize() {
@@ -307,8 +317,10 @@ export class GameLogic {
   }
 
   placePiece(player, pieceId, gridIndex) {
-    // Check if it's this player's turn
-    if (this.currentTurn !== player) {
+    const isNexus = this.mode === 'NEXUS';
+
+    // In non-NEXUS modes, check if it's this player's turn
+    if (!isNexus && this.currentTurn !== player) {
       return { success: false, message: "Not your turn" };
     }
 
@@ -356,7 +368,28 @@ export class GameLogic {
     const supportsCheckFlow = this.modeConfig?.features?.checksPerTurn > 0;
     const shouldRevealCheck = supportsCheckFlow && this.shouldRevealCheckAtCurrentProgress();
 
-    if (supportsCheckFlow) {
+    if (isNexus) {
+      // NEXUS mode: no check/pass, no scoring now. Track who placed what.
+      this.piecePlacedBy[gridIndex] = player;
+      this.pendingCheck = null;
+
+      // Refill rack for this player
+      const activeRack = player === 'playerA' ? this.playerARack : this.playerBRack;
+      const remainingPieces = activeRack.filter(p => p !== null).length;
+      if (remainingPieces === 0 && this.piecePool.length > 0) {
+        this.fillRack(player);
+      }
+
+      this.isPlacementInProgress = false;
+      return {
+        success: true,
+        correct: validation.correct,
+        piece: validation.piece,
+        awaitingCheck: false,
+        scored: false,
+        nexus: true
+      };
+    } else if (supportsCheckFlow) {
       // Modes with check/pass flow (CLASSIC, SUPER, SAGE)
       this.pendingCheck = {
         ...move,
@@ -411,6 +444,24 @@ export class GameLogic {
     return Math.min((bucket + 1) * 0.2, 1);
   }
 
+  /**
+   * Sync revealedScores to actual scores when a milestone is hit.
+   */
+  syncRevealedScores() {
+    this.revealedScores = {
+      playerA: {
+        score: this.scores.playerA.score,
+        accuracy: this.scores.playerA.accuracy,
+        streak: this.scores.playerA.streak
+      },
+      playerB: {
+        score: this.scores.playerB.score,
+        accuracy: this.scores.playerB.accuracy,
+        streak: this.scores.playerB.streak
+      }
+    };
+  }
+
   handleOpponentCheck(checker, checkDecision) {
     if (!this.pendingCheck) {
       return { success: false, message: 'No pending move to check' };
@@ -418,25 +469,12 @@ export class GameLogic {
 
     const move = this.pendingCheck;
     const placer = move.player;
-
-    if (!move.revealCorrectness) {
-      this.pendingCheck = null;
-      this.currentTurn = checker;
-      this.isPlacementInProgress = false;
-
-      return {
-        success: true,
-        result: checkDecision === 'check' ? 'concealed_check' : 'concealed_pass',
-        message: 'Decision recorded. Correctness remains hidden until the next 20% milestone.',
-        correctnessRevealed: false
-      };
-    }
+    const isRevealed = move.revealCorrectness;
 
     if (checkDecision === 'check') {
       // CHECK outcome
       if (!move.correct) {
-        // Piece is INCORRECT
-        // Checker gets points based on mode
+        // Piece is INCORRECT — checker catches it
         const checkerPoints = this.modeScoring.checkerSuccess || 5;
         this.updateScore(checker, checkerPoints, false);
 
@@ -449,34 +487,37 @@ export class GameLogic {
           this.returnPieceToRack(placer, piece);
         }
 
-        // Clear pending check, decrement checker's checks, switch turn
         this.pendingCheck = null;
         this.consumeCheck(checker);
-        this.consumeTurn(placer); // Placer's turn is consumed by the resolution
+        this.consumeTurn(placer);
         this.isPlacementInProgress = false;
+
+        // Sync revealed scores at milestone
+        if (isRevealed) this.syncRevealedScores();
 
         return {
           success: true,
           result: 'successful_check',
           message: `Checker gained ${checkerPoints} points for catching an incorrect piece.`,
           correctPlacement: false,
-          checkerGained: checkerPoints
+          checkerGained: checkerPoints,
+          correctnessRevealed: isRevealed,
+          scoresRevealed: isRevealed
         };
       } else {
-        // Piece is CORRECT
-        // PLACER gets points based on mode
+        // Piece is CORRECT — placer rewarded, checker penalized
         const placerPoints = this.modeScoring.checkCorrect || 10;
         this.updateScore(placer, placerPoints, true);
-        // CHECKER gets penalty based on mode
         const checkerPenalty = this.modeScoring.checkerFail || -2;
         this.updateScore(checker, checkerPenalty, false);
 
-        // Piece remains placed
-        // Clear pending check, decrement checker's checks, handle turn logic
         this.pendingCheck = null;
         this.consumeCheck(checker);
-        this.consumeTurn(placer); // Placer's turn is consumed by the resolution
+        this.consumeTurn(placer);
         this.isPlacementInProgress = false;
+
+        // Sync revealed scores at milestone
+        if (isRevealed) this.syncRevealedScores();
 
         return {
           success: true,
@@ -484,53 +525,189 @@ export class GameLogic {
           message: `Placer awarded ${placerPoints} points. Checker penalized ${checkerPenalty} points.`,
           correctPlacement: true,
           placerGained: placerPoints,
-          checkerLost: checkerPenalty
+          checkerLost: checkerPenalty,
+          correctnessRevealed: isRevealed,
+          scoresRevealed: isRevealed
         };
       }
     } else {
       // PASS outcome
       if (move.correct) {
-        // Piece is CORRECT — piece remains placed
+        // Piece is CORRECT — placer gets bonus for surviving pass
+        const passBonus = this.modeScoring.passCorrect || 5;
+        if (passBonus > 0) {
+          this.updateScore(placer, passBonus, true);
+        }
+
         this.pendingCheck = null;
-        this.consumeTurn(placer); // Placer's turn is consumed
+        this.consumeTurn(placer);
         this.isPlacementInProgress = false;
+
+        // Sync revealed scores at milestone
+        if (isRevealed) this.syncRevealedScores();
 
         return {
           success: true,
           result: 'opponent_passed_correct',
-          message: 'Opponent passed — piece was correct. Turn moves to opponent.',
-          correctPlacement: true
+          message: passBonus > 0
+            ? `Opponent passed — piece was correct! Placer earned ${passBonus} points.`
+            : 'Opponent passed — piece was correct. Turn moves to opponent.',
+          correctPlacement: true,
+          placerGained: passBonus,
+          correctnessRevealed: isRevealed,
+          scoresRevealed: isRevealed
         };
       } else {
-        // Piece is INCORRECT
-        // Remove piece from board
+        // Piece is INCORRECT — both penalized
         const piece = this.grid[move.gridIndex];
         this.grid[move.gridIndex] = null;
 
-        // Return piece to PLACER's rack
         if (piece) {
           this.returnPieceToRack(placer, piece);
         }
 
-        // BOTH players penalized based on mode
         const penalty = this.modeScoring.passWrong || -3;
         this.updateScore(placer, penalty, false);
         this.updateScore(checker, penalty, false);
 
-        // Clear pending check, consume turn, release lock
         this.pendingCheck = null;
-        this.consumeTurn(placer); // Placer's turn is consumed
+        this.consumeTurn(placer);
         this.isPlacementInProgress = false;
+
+        // Sync revealed scores at milestone
+        if (isRevealed) this.syncRevealedScores();
 
         return {
           success: true,
           result: 'opponent_passed_incorrect',
           message: `Both penalized (${penalty}). Piece removed and returned to placer.`,
           correctPlacement: false,
-          bothPenalized: penalty
+          bothPenalized: penalty,
+          correctnessRevealed: isRevealed,
+          scoresRevealed: isRevealed
         };
       }
     }
+  }
+
+  // =====================================================
+  // NEXUS MODE — Suspect/Confident Marking & End-Game
+  // =====================================================
+
+  /**
+   * Mark a placed piece as 'suspect' (opponent's piece you think is wrong)
+   * or 'confident' (your own piece you're sure is right).
+   */
+  markPiece(player, gridIndex, markType) {
+    if (this.mode !== 'NEXUS') {
+      return { success: false, message: 'Marking is only available in Nexus mode' };
+    }
+
+    const piece = this.grid[gridIndex];
+    if (!piece) {
+      return { success: false, message: 'No piece at this position' };
+    }
+
+    const placedBy = this.piecePlacedBy[gridIndex];
+
+    if (markType === 'suspect') {
+      // Can only suspect opponent's pieces
+      if (placedBy === player) {
+        return { success: false, message: "You can't suspect your own piece" };
+      }
+    } else if (markType === 'confident') {
+      // Can only be confident about your own pieces
+      if (placedBy !== player) {
+        return { success: false, message: "You can only mark confidence on your own pieces" };
+      }
+    } else {
+      return { success: false, message: 'Invalid mark type' };
+    }
+
+    // Toggle: if same mark exists, remove it
+    const existing = this.pieceMarks[gridIndex];
+    if (existing && existing.marker === player && existing.type === markType) {
+      delete this.pieceMarks[gridIndex];
+      return { success: true, action: 'removed', gridIndex, markType };
+    }
+
+    this.pieceMarks[gridIndex] = { marker: player, type: markType };
+    return { success: true, action: 'added', gridIndex, markType };
+  }
+
+  /**
+   * Resolve the end-game for Nexus mode.
+   * Validates all pieces against their correct positions and calculates scores.
+   */
+  resolveNexusEndGame() {
+    if (this.mode !== 'NEXUS') {
+      return { success: false, message: 'Not in Nexus mode' };
+    }
+    if (this.nexusResolved) {
+      return { success: false, message: 'Game already resolved' };
+    }
+
+    this.nexusResolved = true;
+    const scoring = this.modeScoring;
+    const results = [];
+
+    // Score each placed piece
+    for (let i = 0; i < this.grid.length; i++) {
+      const piece = this.grid[i];
+      if (!piece) continue;
+
+      const placedBy = this.piecePlacedBy[i] || 'playerA';
+      const isCorrect = piece.correctPosition === i;
+      const mark = this.pieceMarks[i];
+
+      // Base placement score for the placer
+      const pts = isCorrect ? (scoring.correctPiece || 10) : (scoring.wrongPiece || -5);
+      this.scores[placedBy].score += pts;
+      if (isCorrect) {
+        this.scores[placedBy].correctPlacements++;
+      }
+      this.scores[placedBy].totalPlacements++;
+
+      const result = { gridIndex: i, pieceId: piece.id, placedBy, isCorrect, points: pts };
+
+      // Mark bonus/penalty
+      if (mark) {
+        let markPts = 0;
+        if (mark.type === 'suspect') {
+          markPts = isCorrect
+            ? (scoring.suspectCorrect || -3)   // false accusation
+            : (scoring.suspectWrong || 8);     // good detective work
+          this.scores[mark.marker].score += markPts;
+        } else if (mark.type === 'confident') {
+          markPts = isCorrect
+            ? (scoring.confidentCorrect || 5)  // correct confidence bonus
+            : (scoring.confidentWrong || -8);  // overconfidence penalty
+          this.scores[mark.marker].score += markPts;
+        }
+        result.mark = { ...mark, points: markPts };
+      }
+
+      results.push(result);
+    }
+
+    // Calculate accuracy
+    for (const player of ['playerA', 'playerB']) {
+      const s = this.scores[player];
+      s.accuracy = s.totalPlacements > 0
+        ? Math.round((s.correctPlacements / s.totalPlacements) * 100)
+        : 100;
+    }
+
+    // Sync revealed scores at end-game
+    this.syncRevealedScores();
+    this.gameState = 'finished';
+
+    return {
+      success: true,
+      results,
+      finalScores: { ...this.scores },
+      winner: this.getWinner()
+    };
   }
 
   updateScore(player, points, isCorrectPlacement) {
@@ -766,6 +943,10 @@ export class GameLogic {
       grid: [...this.grid],
       currentTurn: this.currentTurn,
       scores: scoresCopy,
+      revealedScores: {
+        playerA: { ...this.revealedScores.playerA },
+        playerB: { ...this.revealedScores.playerB }
+      },
       playerARack: [...this.playerARack],
       playerBRack: [...this.playerBRack],
       piecePoolCount: this.piecePool.length,
@@ -778,7 +959,11 @@ export class GameLogic {
       mode: this.mode,
       turnsRemaining: { ...this.turnsRemaining },
       checksRemaining: { ...this.checksRemaining },
-      nextCheckRevealProgress: this.nextCheckRevealProgress
+      nextCheckRevealProgress: this.nextCheckRevealProgress,
+      // Nexus mode state
+      piecePlacedBy: { ...this.piecePlacedBy },
+      pieceMarks: { ...this.pieceMarks },
+      nexusResolved: this.nexusResolved
     };
   }
 
@@ -895,6 +1080,14 @@ export class GameLogic {
       playerB: { ...defaultScore, ...(imported.playerB || {}) }
     };
 
+    // Import revealed scores (milestone-gated UI scores)
+    const defaultRevealed = { score: 0, accuracy: 100, streak: 0 };
+    const importedRevealed = data.revealedScores || data.revealed_scores || {};
+    this.revealedScores = {
+      playerA: { ...defaultRevealed, ...(importedRevealed.playerA || {}) },
+      playerB: { ...defaultRevealed, ...(importedRevealed.playerB || {}) }
+    };
+
     this.gameState = data.game_state || data.gameState || 'active';
     this.pendingCheck = data.pending_check || data.pendingCheck || null;
     this.moveHistory = data.move_history || data.moveHistory || [];
@@ -912,6 +1105,11 @@ export class GameLogic {
     if (data.checks_remaining || data.checksRemaining) {
       this.checksRemaining = data.checks_remaining || data.checksRemaining;
     }
+
+    // Import Nexus mode state
+    this.piecePlacedBy = data.piecePlacedBy || data.piece_placed_by || {};
+    this.pieceMarks = data.pieceMarks || data.piece_marks || {};
+    this.nexusResolved = data.nexusResolved || data.nexus_resolved || false;
 
     console.log('importGameState complete:', {
       gridLength: this.grid.length,

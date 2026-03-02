@@ -41,6 +41,20 @@ export const GAME_MODES = {
     multiplayer: true,
     available: true
   },
+  NEXUS: {
+    id: 'NEXUS',
+    name: 'Nexus Mode',
+    description: 'Simultaneous play — mark suspects, reveal at endgame',
+    icon: '🔮',
+    features: {
+      turns: 'simultaneous',
+      check: 'endgame',
+      turnsPerRound: Infinity,
+      checksPerTurn: 0
+    },
+    multiplayer: true,
+    available: true
+  },
   SAVANT: {
     id: 'SAVANT',
     name: 'Savant Mode',
@@ -78,7 +92,7 @@ export const MODE_SCORING = {
     checkWrong: 0,
     checkerSuccess: 5,
     checkerFail: -2,
-    passCorrect: 0,
+    passCorrect: 5,
     passWrong: -3,
     streakMultiplier: 1,
     streakBonusThreshold: 3
@@ -88,7 +102,7 @@ export const MODE_SCORING = {
     checkWrong: 0,
     checkerSuccess: 8,
     checkerFail: -3,
-    passCorrect: 0,
+    passCorrect: 8,
     passWrong: -5,
     streakMultiplier: 1.5,
     streakBonusThreshold: 3
@@ -98,7 +112,7 @@ export const MODE_SCORING = {
     checkWrong: 0,
     checkerSuccess: 10,
     checkerFail: -5,
-    passCorrect: 0,
+    passCorrect: 10,
     passWrong: -8,
     streakMultiplier: 2,
     streakBonusThreshold: 2
@@ -108,6 +122,16 @@ export const MODE_SCORING = {
     wrongPiece: 0,
     streakMultiplier: 2.5,
     streakBonusThreshold: 5
+  },
+  NEXUS: {
+    correctPiece: 10,
+    wrongPiece: -5,
+    suspectCorrect: -3,   // false accusation
+    suspectWrong: 8,      // good detective work
+    confidentCorrect: 5,  // bonus for confidence
+    confidentWrong: -8,   // overconfidence penalty
+    streakMultiplier: 1,
+    streakBonusThreshold: 99  // effectively disabled
   },
   SINGLE_PLAYER: {
     correctPiece: 10,

@@ -1264,7 +1264,8 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   };
 
 
-  const isMyTurn = gameState?.currentTurn === myPlayer && !awaitingDecision;
+  const isNexusMode = gameState?.mode === 'NEXUS';
+  const isMyTurn = isNexusMode || (gameState?.currentTurn === myPlayer && !awaitingDecision);
 
   // Handle piece selection
   const handlePieceSelect = (piece) => {
@@ -1364,6 +1365,43 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     }
   };
 
+  // Handle marking pieces (Nexus mode only)
+  const handleMarkPiece = async (gridIndex, markType) => {
+    if (!multiplayerRef.current || !isNexusMode) return;
+    try {
+      const result = await multiplayerRef.current.markPiece(gridIndex, markType);
+      if (result.success) {
+        setLastAction({
+          type: 'mark',
+          message: result.action === 'added'
+            ? `Marked piece as ${markType} 🔍`
+            : `Removed ${markType} mark`
+        });
+      } else {
+        setError(result.message);
+      }
+    } catch (err) {
+      setError('Failed to mark piece: ' + err.message);
+    }
+  };
+
+  // Handle end-game resolution (Nexus mode only)
+  const handleResolveEndGame = async () => {
+    if (!multiplayerRef.current || !isNexusMode) return;
+    try {
+      const result = await multiplayerRef.current.resolveEndGame();
+      if (result.success) {
+        setLastAction({
+          type: 'resolve',
+          message: `Game resolved! Winner: ${result.winner || 'Tie'}`,
+          results: result.results
+        });
+      }
+    } catch (err) {
+      setError('Failed to resolve game: ' + err.message);
+    }
+  };
+
   // Handle check/pass decision
   const handleCheckDecision = async (decision) => {
     if (!multiplayerRef.current) return;
@@ -1418,11 +1456,12 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     }
   };
 
-  // Get game state values
-  const myScore = gameState?.scores?.[myPlayer]?.score || 0;
-  const opponentScore = gameState?.scores?.[opponentPlayer]?.score || 0;
-  const myStreak = gameState?.scores?.[myPlayer]?.streak || 0;
-  const myAccuracy = gameState?.scores?.[myPlayer]?.accuracy || 100;
+  // Get displayed scores (milestone-gated revealed scores)
+  const displayScores = gameState?.revealedScores || gameState?.scores || {};
+  const myScore = displayScores?.[myPlayer]?.score || 0;
+  const opponentScore = displayScores?.[opponentPlayer]?.score || 0;
+  const myStreak = displayScores?.[myPlayer]?.streak || 0;
+  const myAccuracy = displayScores?.[myPlayer]?.accuracy || 100;
 
   // Memoize rack selection to prevent unnecessary re-renders
   const myRack = useMemo(() => {
