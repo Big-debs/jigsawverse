@@ -105,31 +105,57 @@ const ImageLibrary = ({ userId, onSelectImage, disabled = false }) => {
         setSelectedImage(image);
     };
 
+    // Compress image using canvas to stay under 5MB for Supabase uploads
+    const compressImage = (blob, maxDim = 2048, quality = 0.8) => {
+        return new Promise((resolve) => {
+            const img = new window.Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                let { width, height } = img;
+                // Scale down if larger than maxDim
+                if (width > maxDim || height > maxDim) {
+                    const ratio = Math.min(maxDim / width, maxDim / height);
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((compressed) => resolve(compressed), 'image/jpeg', quality);
+            };
+            img.onerror = () => resolve(blob); // Fallback to original on error
+            img.src = URL.createObjectURL(blob);
+        });
+    };
+
     const handleConfirm = async () => {
         if (!selectedImage) return;
 
-        if (selectedImage.isUserUpload) {
-            // User upload — use the stored URL directly
+        try {
+            const imageUrl = selectedImage.isUserUpload
+                ? (selectedImage.storage_url || selectedImage.url)
+                : selectedImage.url;
+            const name = selectedImage.file_name || selectedImage.name || 'library-image';
+
+            const response = await fetch(imageUrl);
+            let blob = await response.blob();
+
+            // Compress if over 5MB
+            if (blob.size > 5 * 1024 * 1024) {
+                blob = await compressImage(blob);
+            }
+
+            const file = new File([blob], `${name}.jpg`, { type: 'image/jpeg' });
             onSelectImage({
-                url: selectedImage.storage_url || selectedImage.url,
-                name: selectedImage.file_name || selectedImage.name,
+                file,
+                url: imageUrl,
+                name,
                 isLibrary: true
             });
-        } else {
-            // Built-in — fetch the image as a File for the game processor
-            try {
-                const response = await fetch(selectedImage.url);
-                const blob = await response.blob();
-                const file = new File([blob], `${selectedImage.name}.jpg`, { type: 'image/jpeg' });
-                onSelectImage({
-                    file,
-                    url: selectedImage.url,
-                    name: selectedImage.name,
-                    isLibrary: true
-                });
-            } catch (err) {
-                console.error('Failed to fetch image:', err);
-            }
+        } catch (err) {
+            console.error('Failed to load library image:', err);
         }
     };
 

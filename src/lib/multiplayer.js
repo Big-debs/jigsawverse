@@ -43,23 +43,23 @@ async function ensureAuthenticated() {
 
   // Full authentication flow only when needed
   const { data: { session }, error } = await supabase.auth.getSession();
-  
+
   if (error) {
     throw new Error('Failed to get session: ' + error.message);
   }
-  
+
   if (!session) {
     console.log('No session found, signing in anonymously...');
     const { data, error: signInError } = await supabase.auth.signInAnonymously();
-    
+
     if (signInError) {
       throw new Error('Anonymous sign-in failed: ' + signInError.message);
     }
-    
+
     if (!data.session) {
       throw new Error('No session after anonymous sign-in');
     }
-    
+
     await supabase.auth.updateUser({
       data: {
         username: `Guest_${Date.now() % 10000}`,
@@ -67,23 +67,23 @@ async function ensureAuthenticated() {
         is_anonymous: true
       }
     });
-    
+
     if (data.session?.access_token) {
       supabase.realtime.setAuth(data.session.access_token);
       console.log('Realtime auth token set for new session');
     }
-    
+
     console.log('Anonymous sign-in successful');
     cachedUser = data.user;
     cachedUserId = data.user.id;
     return data.user;
   }
-  
+
   if (session?.access_token) {
     supabase.realtime.setAuth(session.access_token);
     console.log('Realtime auth token set for existing session');
   }
-  
+
   cachedUser = session.user;
   cachedUserId = session.user.id;
   return session.user;
@@ -184,15 +184,15 @@ export class MultiplayerGameHost {
           isResolved = true;
           console.error('Channel subscription timeout');
           if (channel) {
-            supabase.removeChannel(channel). catch(console.error);
+            supabase.removeChannel(channel).catch(console.error);
           }
           reject(new Error('Channel subscription timeout'));
         }
-      }, RECONNECT_CONFIG. CHANNEL_TIMEOUT);
+      }, RECONNECT_CONFIG.CHANNEL_TIMEOUT);
 
       console.log('Creating broadcast channel for game:', gameId);
 
-      channel = supabase. channel(`game:${gameId}`, {
+      channel = supabase.channel(`game:${gameId}`, {
         config: {
           broadcast: { self: false },
           presence: { key: this.userId }
@@ -219,7 +219,7 @@ export class MultiplayerGameHost {
       channel.on('broadcast', { event: 'player_joined' }, (payload) => {
         console.log('Player joined via broadcast:', payload);
         if (payload.payload && this.onOpponentJoin) {
-          this.onOpponentJoin(payload.payload. playerName);
+          this.onOpponentJoin(payload.payload.playerName);
         }
       });
 
@@ -243,16 +243,16 @@ export class MultiplayerGameHost {
       // Subscribe to the channel
       channel.subscribe(async (status, err) => {
         console.log('Channel status:', status, err ? `Error: ${err.message}` : '');
-        
+
         if (isResolved) return;
-        
+
         if (status === CHANNEL_STATUS.SUBSCRIBED) {
           isResolved = true;
           clearTimeout(timeoutId);
           this.isConnected = true;
           this.reconnectAttempts = 0;
           console.log('✅ Subscribed to broadcast channel');
-          
+
           // Track presence
           try {
             await channel.track({
@@ -265,20 +265,20 @@ export class MultiplayerGameHost {
           } catch (trackErr) {
             console.warn('Failed to track presence:', trackErr);
           }
-          
+
           if (this.onConnectionChange) {
             this.onConnectionChange('connected');
           }
-          
+
           resolve(channel);
         } else if (status === CHANNEL_STATUS.CHANNEL_ERROR || status === CHANNEL_STATUS.TIMED_OUT) {
           console.error('Channel error:', status, err);
           this.isConnected = false;
-          
+
           if (this.onConnectionChange) {
             this.onConnectionChange('error');
           }
-          
+
           if (!isResolved) {
             isResolved = true;
             clearTimeout(timeoutId);
@@ -296,20 +296,37 @@ export class MultiplayerGameHost {
   }
 
   /**
-   * Broadcast game state to all connected players
+   * Broadcast game state to all connected players.
+   * Sends compact IDs-only payload to stay under Supabase ~1MB broadcast limit.
    */
   async broadcastGameState() {
-    if (! this.realtimeChannel || !this.gameLogic) return;
+    if (!this.realtimeChannel || !this.gameLogic) return;
 
-    const state = this.gameLogic.getGameState();
-    
+    const gl = this.gameLogic;
+    const compactState = {
+      grid: gl.grid.map(p => p ? { id: p.id, correctPosition: p.correctPosition } : null),
+      playerARack: gl.playerARack.map(p => p ? p.id : null),
+      playerBRack: gl.playerBRack.map(p => p ? p.id : null),
+      piecePool: gl.piecePool.map(p => p.id),
+      currentTurn: gl.currentTurn,
+      scores: gl.scores,
+      pendingCheck: gl.pendingCheck,
+      gameState: gl.gameState,
+      timerRemaining: gl.timerRemaining,
+      moveHistory: gl.moveHistory,
+      mode: gl.mode,
+      turnsRemaining: gl.turnsRemaining,
+      checksRemaining: gl.checksRemaining,
+      nextCheckRevealProgress: gl.nextCheckRevealProgress
+    };
+
     try {
       await this.realtimeChannel.send({
         type: 'broadcast',
         event: 'game_state',
-        payload: state
+        payload: compactState
       });
-      console.log('Game state broadcasted');
+      console.log('📤 Game state broadcasted (compact, IDs only)');
     } catch (err) {
       console.error('Failed to broadcast game state:', err);
     }
@@ -357,15 +374,15 @@ export class MultiplayerGameHost {
   }
 
   handlePresenceSync(state) {
-    const players = Object.values(state). flat();
+    const players = Object.values(state).flat();
     console.log('Players in game:', players);
-    
+
     // Check if opponent joined via presence
     const opponent = players.find(p => p.user_id !== this.userId);
     if (opponent && this.onOpponentJoin) {
       this.onOpponentJoin(opponent.user_name || 'Opponent');
     }
-    
+
     if (this.onPresenceUpdate) {
       this.onPresenceUpdate(players);
     }
@@ -376,9 +393,9 @@ export class MultiplayerGameHost {
     if (this.onPlayerJoin) {
       this.onPlayerJoin(presences);
     }
-    
+
     // Notify about opponent joining
-    const opponent = presences. find(p => p.user_id !== this.userId);
+    const opponent = presences.find(p => p.user_id !== this.userId);
     if (opponent && this.onOpponentJoin) {
       this.onOpponentJoin(opponent.user_name || 'Opponent');
     }
@@ -400,12 +417,16 @@ export class MultiplayerGameHost {
       throw new Error(result.message);
     }
 
-    // Run database updates in PARALLEL instead of sequential
-    await Promise.all([
+    // Broadcast FIRST for instant opponent update, then persist to DB in background
+    console.log('📤 Host broadcasting state with pendingCheck:', this.gameLogic.pendingCheck);
+    await this.broadcastGameState();
+
+    // DB writes in background — don't block the UI
+    Promise.all([
       realtimeService.updateGameState(this.gameId, {
-        grid: this.gameLogic.grid.map(p => p ? { 
-          id: p.id, 
-          correctPosition: p.correctPosition 
+        grid: this.gameLogic.grid.map(p => p ? {
+          id: p.id,
+          correctPosition: p.correctPosition
         } : null),
         player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
         player_b_rack: this.gameLogic.playerBRack.map(p => p ? p.id : null),
@@ -421,11 +442,7 @@ export class MultiplayerGameHost {
         player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
         player_a_streak: this.gameLogic.scores.playerA.streak
       })
-    ]);
-
-    // Broadcast state to opponent after DB updates complete
-    console.log('📤 Host broadcasting state with pendingCheck:', this.gameLogic.pendingCheck);
-    await this.broadcastGameState();
+    ]).catch(err => console.error('Background DB write failed:', err));
 
     return result;
   }
@@ -435,11 +452,14 @@ export class MultiplayerGameHost {
 
     const result = this.gameLogic.handleOpponentCheck('playerA', decision);
 
-    // Persist updated game state including current_turn and scores
-    await Promise.all([
+    // Broadcast FIRST for instant opponent update
+    await this.broadcastGameState();
+
+    // DB writes in background
+    Promise.all([
       realtimeService.updateGameState(this.gameId, {
         ...this.gameLogic.exportForDatabase(),
-        awaiting_decision: null // Clear awaiting_decision after resolution
+        awaiting_decision: null
       }),
       gameService.updateGame(this.gameId, {
         player_a_score: this.gameLogic.scores.playerA.score,
@@ -449,17 +469,14 @@ export class MultiplayerGameHost {
         player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
         player_b_streak: this.gameLogic.scores.playerB.streak
       })
-    ]);
-
-    // Broadcast state to opponent
-    await this.broadcastGameState();
+    ]).catch(err => console.error('Background DB write failed:', err));
 
     return result;
   }
 
   async disconnect() {
     this.isConnected = false;
-    
+
     if (this.realtimeChannel) {
       try {
         await supabase.removeChannel(this.realtimeChannel);
@@ -507,7 +524,7 @@ export class MultiplayerGameGuest {
 
       console.log('Step 1: Finding game by code...');
       const game = await gameService.getGameByCode(gameCode);
-      
+
       if (!game) {
         throw new Error('Game not found');
       }
@@ -615,42 +632,42 @@ export class MultiplayerGameGuest {
       // Subscribe to the channel
       channel.subscribe(async (status, err) => {
         console.log('Channel status:', status, err ? `Error: ${err.message}` : '');
-        
+
         if (isResolved) return;
-        
+
         if (status === CHANNEL_STATUS.SUBSCRIBED) {
           isResolved = true;
           clearTimeout(timeoutId);
           this.isConnected = true;
           this.reconnectAttempts = 0;
           console.log('✅ Subscribed to broadcast channel');
-          
+
           // Track presence
           try {
             await channel.track({
               user_id: this.userId,
               user_name: this.userName,
               role: 'guest',
-              online_at: new Date(). toISOString()
+              online_at: new Date().toISOString()
             });
             console.log('Presence tracked successfully');
           } catch (trackErr) {
             console.warn('Failed to track presence:', trackErr);
           }
-          
+
           if (this.onConnectionChange) {
             this.onConnectionChange('connected');
           }
-          
+
           resolve(channel);
         } else if (status === CHANNEL_STATUS.CHANNEL_ERROR || status === CHANNEL_STATUS.TIMED_OUT) {
           console.error('Channel error:', status, err);
           this.isConnected = false;
-          
+
           if (this.onConnectionChange) {
             this.onConnectionChange('error');
           }
-          
+
           if (!isResolved) {
             isResolved = true;
             clearTimeout(timeoutId);
@@ -671,7 +688,7 @@ export class MultiplayerGameGuest {
    * Notify host that this player joined
    */
   async notifyPlayerJoined() {
-    if (! this.realtimeChannel) return;
+    if (!this.realtimeChannel) return;
 
     try {
       await this.realtimeChannel.send({
@@ -689,20 +706,37 @@ export class MultiplayerGameGuest {
   }
 
   /**
-   * Broadcast game state to all connected players
+   * Broadcast game state to all connected players.
+   * Sends compact IDs-only payload to stay under Supabase ~1MB broadcast limit.
    */
   async broadcastGameState() {
     if (!this.realtimeChannel || !this.gameLogic) return;
 
-    const state = this.gameLogic.getGameState();
-    
+    const gl = this.gameLogic;
+    const compactState = {
+      grid: gl.grid.map(p => p ? { id: p.id, correctPosition: p.correctPosition } : null),
+      playerARack: gl.playerARack.map(p => p ? p.id : null),
+      playerBRack: gl.playerBRack.map(p => p ? p.id : null),
+      piecePool: gl.piecePool.map(p => p.id),
+      currentTurn: gl.currentTurn,
+      scores: gl.scores,
+      pendingCheck: gl.pendingCheck,
+      gameState: gl.gameState,
+      timerRemaining: gl.timerRemaining,
+      moveHistory: gl.moveHistory,
+      mode: gl.mode,
+      turnsRemaining: gl.turnsRemaining,
+      checksRemaining: gl.checksRemaining,
+      nextCheckRevealProgress: gl.nextCheckRevealProgress
+    };
+
     try {
       await this.realtimeChannel.send({
         type: 'broadcast',
         event: 'game_state',
-        payload: state
+        payload: compactState
       });
-      console.log('Game state broadcasted');
+      console.log('📤 Game state broadcasted (compact, IDs only)');
     } catch (err) {
       console.error('Failed to broadcast game state:', err);
     }
@@ -741,12 +775,16 @@ export class MultiplayerGameGuest {
       throw new Error(result.message);
     }
 
-    // Run database updates in PARALLEL instead of sequential
-    await Promise.all([
+    // Broadcast FIRST for instant host update, then persist to DB in background
+    console.log('📤 Guest broadcasting state with pendingCheck:', this.gameLogic.pendingCheck);
+    await this.broadcastGameState();
+
+    // DB writes in background — don't block the UI
+    Promise.all([
       realtimeService.updateGameState(this.gameId, {
-        grid: this.gameLogic.grid.map(p => p ? { 
-          id: p.id, 
-          correctPosition: p.correctPosition 
+        grid: this.gameLogic.grid.map(p => p ? {
+          id: p.id,
+          correctPosition: p.correctPosition
         } : null),
         player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
         player_b_rack: this.gameLogic.playerBRack.map(p => p ? p.id : null),
@@ -762,11 +800,7 @@ export class MultiplayerGameGuest {
         player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
         player_b_streak: this.gameLogic.scores.playerB.streak
       })
-    ]);
-
-    // Broadcast state to host after DB updates complete
-    console.log('📤 Guest broadcasting state with pendingCheck:', this.gameLogic.pendingCheck);
-    await this.broadcastGameState();
+    ]).catch(err => console.error('Background DB write failed:', err));
 
     return result;
   }
@@ -776,11 +810,14 @@ export class MultiplayerGameGuest {
 
     const result = this.gameLogic.handleOpponentCheck('playerB', decision);
 
-    // Persist updated game state including current_turn and scores
-    await Promise.all([
+    // Broadcast FIRST for instant host update
+    await this.broadcastGameState();
+
+    // DB writes in background
+    Promise.all([
       realtimeService.updateGameState(this.gameId, {
         ...this.gameLogic.exportForDatabase(),
-        awaiting_decision: null // Clear awaiting_decision after resolution
+        awaiting_decision: null
       }),
       gameService.updateGame(this.gameId, {
         player_a_score: this.gameLogic.scores.playerA.score,
@@ -790,17 +827,14 @@ export class MultiplayerGameGuest {
         player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
         player_b_streak: this.gameLogic.scores.playerB.streak
       })
-    ]);
-
-    // Broadcast state to host
-    await this.broadcastGameState();
+    ]).catch(err => console.error('Background DB write failed:', err));
 
     return result;
   }
 
   async disconnect() {
     this.isConnected = false;
-    
+
     if (this.realtimeChannel) {
       try {
         await supabase.removeChannel(this.realtimeChannel);
