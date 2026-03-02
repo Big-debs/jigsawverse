@@ -792,12 +792,12 @@ export class GameLogic {
       timer_remaining: this.timerRemaining,
       pending_check: this.pendingCheck,
       move_history: this.moveHistory,
-      gameplay_mode: this.mode,
       scores: this.scores,
       turns_remaining: this.turnsRemaining,
-      checks_remaining: this.checksRemaining
+      checks_remaining: this.checksRemaining,
+      // NOTE: gameplay_mode is only set during initializeGameState, not on updates
       // NOTE: 'pieces' exists but we don't update it after initialization
-      // NOTE: 'awaiting_decision' exists and is set separately in makeMove/respondToCheck
+      // NOTE: 'awaiting_decision' is set separately in makeMove/respondToCheck
     };
   }
 

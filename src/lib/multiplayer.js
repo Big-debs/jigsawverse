@@ -19,9 +19,9 @@ const CHANNEL_STATUS = {
 
 const RECONNECT_CONFIG = {
   BASE_DELAY: 1000,
-  MAX_DELAY: 15000,      // Reduced from 30000
-  MAX_ATTEMPTS: 3,        // Reduced from 5
-  CHANNEL_TIMEOUT: 10000  // Reduced from 30000
+  MAX_DELAY: 15000,
+  MAX_ATTEMPTS: 5,
+  CHANNEL_TIMEOUT: 30000
 };
 
 // Cache the authenticated user at module level
