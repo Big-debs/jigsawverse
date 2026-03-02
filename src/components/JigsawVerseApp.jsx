@@ -1570,8 +1570,8 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         </div>
       )}
 
-      {/* Check/Pass Decision UI */}
-      {awaitingDecision && (
+      {/* Check/Pass Decision UI (hidden in Nexus mode) */}
+      {awaitingDecision && !isNexusMode && (
         <div className="mb-3 sm:mb-6 bg-yellow-500/20 rounded-xl p-4 sm:p-6 border border-yellow-500/30">
           <h3 className="text-base sm:text-xl font-bold text-white mb-3 sm:mb-4 text-center">
             Opponent placed a piece! What do you want to do?
@@ -1655,6 +1655,25 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                           alt={`Piece ${piece.id}`}
                           className="w-full h-full object-cover rounded"
                         />
+                      )}
+                      {/* Nexus mark icons */}
+                      {isNexusMode && piece && gameState?.pieceMarks?.[index] && (
+                        <span className="absolute top-0 right-0 text-[10px] sm:text-sm bg-black/60 rounded-bl px-0.5">
+                          {gameState.pieceMarks[index].type === 'suspect' ? '🔍' : '💪'}
+                        </span>
+                      )}
+                      {/* Nexus mark buttons — tap placed piece to mark */}
+                      {isNexusMode && piece && !selectedPiece && (
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/40 transition-opacity gap-1">
+                          {gameState?.piecePlacedBy?.[index] !== myPlayer && (
+                            <button onClick={(e) => { e.stopPropagation(); handleMarkPiece(index, 'suspect'); }}
+                              className="text-[10px] sm:text-xs bg-red-500/80 text-white px-1 py-0.5 rounded">🔍</button>
+                          )}
+                          {gameState?.piecePlacedBy?.[index] === myPlayer && (
+                            <button onClick={(e) => { e.stopPropagation(); handleMarkPiece(index, 'confident'); }}
+                              className="text-[10px] sm:text-xs bg-green-500/80 text-white px-1 py-0.5 rounded">💪</button>
+                          )}
+                        </div>
                       )}
                       {/* Grid Label Overlay */}
                       {gridLabel && !piece && (
@@ -1758,6 +1777,21 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
                 <span className="text-white">{myStreak}</span>
               </div>
             </div>
+
+            {/* Nexus Mode: Resolve End Game button */}
+            {isNexusMode && !gameState?.nexusResolved && (
+              <button
+                onClick={handleResolveEndGame}
+                className="w-full mt-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all text-sm"
+              >
+                🔮 Reveal & Score
+              </button>
+            )}
+            {isNexusMode && gameState?.nexusResolved && (
+              <div className="w-full mt-2 px-4 py-2.5 bg-green-500/20 border border-green-500/30 text-green-300 font-bold rounded-xl text-sm text-center">
+                ✅ Game Resolved!
+              </div>
+            )}
           </div>
 
           {/* Puzzle Thumbnail — hidden on mobile to save space */}
