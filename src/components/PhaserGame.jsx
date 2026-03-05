@@ -141,32 +141,62 @@ const PhaserGame = ({
         }
     }, [onPieceSelected]);
 
-    // Register event listeners on scenes
+    // Keep stable refs for callbacks so the init useEffect can access latest handlers
+    const boardHandlerRef = useRef(handleBoardEvent);
+    const rackHandlerRef = useRef(handleRackEvent);
+    useEffect(() => { boardHandlerRef.current = handleBoardEvent; }, [handleBoardEvent]);
+    useEffect(() => { rackHandlerRef.current = handleRackEvent; }, [handleRackEvent]);
+
+    // Register event listeners AFTER Phaser scenes are ready
     useEffect(() => {
         const board = boardSceneRef.current;
         const rack = rackSceneRef.current;
-        if (!board || !rack) return;
+        const game = gameRef.current;
+        if (!board || !rack || !game) return;
 
-        const onBoardReady = () => {
-            board.events.on('boardEvent', handleBoardEvent);
-            if (gameState) board.updateGameState(gameState);
+        const setupListeners = () => {
+            // Board events — use a forwarding function that reads from ref
+            const boardForwarder = (event) => boardHandlerRef.current?.(event);
+            const rackForwarder = (event) => rackHandlerRef.current?.(event);
+
+            if (board.events) {
+                board.events.on('boardEvent', boardForwarder);
+            }
+            if (rack.events) {
+                rack.events.on('rackEvent', rackForwarder);
+            }
+
+            // Push initial state once scenes are active
+            if (board.scene?.isActive() && gameState) {
+                board.updateGameState(gameState);
+            }
+            if (rack.scene?.isActive() && myRack) {
+                rack.updateRack(myRack);
+            }
         };
-        const onRackReady = () => {
-            rack.events.on('rackEvent', handleRackEvent);
-            if (myRack) rack.updateRack(myRack);
-        };
 
-        if (board.scene?.isActive()) onBoardReady();
-        else board.events.once('create', onBoardReady);
-
-        if (rack.scene?.isActive()) onRackReady();
-        else rack.events.once('create', onRackReady);
+        // Phaser game 'ready' fires after all scenes have booted
+        if (game.isBooted) {
+            // Already booted (e.g. useEffect re-ran) — setup now
+            // Small delay to ensure scenes have finished create()
+            setTimeout(setupListeners, 100);
+        } else {
+            game.events.once('ready', () => {
+                setTimeout(setupListeners, 100);
+            });
+        }
 
         return () => {
-            board.events.off('boardEvent', handleBoardEvent);
-            rack.events.off('rackEvent', handleRackEvent);
+            if (board.events) {
+                board.events.removeAllListeners('boardEvent');
+            }
+            if (rack.events) {
+                rack.events.removeAllListeners('rackEvent');
+            }
         };
-    }, [handleBoardEvent, handleRackEvent, gameState, myRack]);
+        // Only run once after init
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div
