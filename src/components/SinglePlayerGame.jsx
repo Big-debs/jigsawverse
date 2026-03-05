@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Trophy, Clock, Target, Zap, ArrowLeft } from 'lucide-react';
 import { GameLogic } from '../lib/gameLogic';
 import { MODE_SCORING } from '../lib/gameModes';
 import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
-import PuzzleCanvas from './PuzzleCanvas';
-import ZoomControls from './ZoomControls';
 import HintsPanel from './HintsPanel';
 import GameSettingsPanel from './GameSettingsPanel';
+
+const PhaserGame = lazy(() => import('./PhaserGame'));
 
 const SinglePlayerGame = ({
   imageUrl,
@@ -43,19 +43,16 @@ const SinglePlayerGame = ({
   const [totalPlacements, setTotalPlacements] = useState(0);
   const [accuracy, setAccuracy] = useState(100);
   const [, setTotalAttempts] = useState(0);
-  const [gameStatus, setGameStatus] = useState('playing'); // 'playing' | 'completed' | 'timeout'
+  const [gameStatus, setGameStatus] = useState('playing');
   const [lastResult, setLastResult] = useState(null);
   const [selectedPiece, setSelectedPiece] = useState(null);
-  const [draggedPiece, setDraggedPiece] = useState(null);
-  const [dragPosition, setDragPosition] = useState(null);
-  const [zoom, setZoom] = useState(1);
-  const offset = { x: 0, y: 0 }; // No pan support for now (zoom only)
   const [gameSettings, setGameSettings] = useState(settings);
   const [activeHint, setActiveHint] = useState(null);
 
   const scoring = MODE_SCORING.SINGLE_PLAYER;
   const timerRef = useRef(null);
   const feedbackTimeoutRef = useRef(null);
+  const lastScoreRef = useRef(null);
 
   // Timer countdown
   useEffect(() => {
@@ -123,20 +120,20 @@ const SinglePlayerGame = ({
       gameLogic.fillRack('playerA');
     }
 
-    // Update actual scores (hidden)
+    // --- Adjacency-based scoring ---
     if (validation.correct) {
+      const scoreResult = gameLogic.calculatePlacementScore(validation.piece, gridIndex);
       const newStreak = gameLogic.scores.playerA.streak + 1;
-      let points = scoring.correctPiece;
-      if (newStreak >= scoring.streakBonusThreshold) {
-        const multiplier = 1 + (scoring.streakMultiplier * 0.2);
-        points = Math.floor(points * multiplier);
-      }
-      gameLogic.scores.playerA.score += points;
+      gameLogic.scores.playerA.score += scoreResult.total;
       gameLogic.scores.playerA.streak = newStreak;
       gameLogic.scores.playerA.correctPlacements++;
+
+      // Store last score breakdown for Phaser popup
+      lastScoreRef.current = { gridIndex, ...scoreResult };
     } else {
       gameLogic.scores.playerA.streak = 0;
-      gameLogic.scores.playerA.score += scoring.wrongPiece; // negative points
+      gameLogic.scores.playerA.score += scoring.wrongPiece;
+      lastScoreRef.current = { gridIndex, total: scoring.wrongPiece, breakdown: null };
     }
     gameLogic.scores.playerA.totalPlacements++;
     gameLogic.scores.playerA.accuracy = Math.round(
@@ -148,18 +145,15 @@ const SinglePlayerGame = ({
     const progress = gameLogic.totalPieces > 0 ? filledCells / gameLogic.totalPieces : 0;
     const isMilestone = progress >= gameLogic.nextCheckRevealProgress;
 
-    // Always update total placements for the UI
     setTotalPlacements(gameLogic.scores.playerA.totalPlacements);
 
     if (isMilestone) {
-      // 1. Sync revealed scores
       setScore(gameLogic.scores.playerA.score);
       setStreak(gameLogic.scores.playerA.streak);
       setBestStreak(prev => Math.max(prev, gameLogic.scores.playerA.streak));
       setCorrectPlacements(gameLogic.scores.playerA.correctPlacements);
       setAccuracy(gameLogic.scores.playerA.accuracy);
 
-      // 2. Remove incorrect pieces and return to rack
       let removedCount = 0;
       for (let i = 0; i < gameLogic.grid.length; i++) {
         const piece = gameLogic.grid[i];
@@ -170,75 +164,35 @@ const SinglePlayerGame = ({
         }
       }
 
-      // 3. Update next milestone
       const bucket = Math.floor(progress / 0.2);
       gameLogic.nextCheckRevealProgress = Math.min((bucket + 1) * 0.2, 1);
 
-      // 4. Show milestone feedback
       setLastResult({
         correct: true,
-        message: `Milestone Reached! Scores updated. ${removedCount > 0 ? `${removedCount} incorrect piece(s) returned to rack.` : 'All placements correct!'}`
+        message: `Milestone! ${removedCount > 0 ? `${removedCount} wrong piece(s) returned.` : 'All correct!'}`
       });
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
       feedbackTimeoutRef.current = setTimeout(() => setLastResult(null), 4000);
     } else {
-      // Generic "Piece Placed" feedback
+      // Before milestone: hide correctness — just show neutral placement feedback
       setLastResult({
-        correct: true,
+        correct: null,  // null = neutral (no green/red reveal)
         message: 'Piece placed'
       });
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
-      feedbackTimeoutRef.current = setTimeout(() => setLastResult(null), 1000);
+      feedbackTimeoutRef.current = setTimeout(() => setLastResult(null), 800);
     }
 
-    // Update game state to re-render
     setGameState(gameLogic.getGameState());
     setSelectedPiece(null);
-    setDraggedPiece(null);
-    setDragPosition(null);
   }, [gameLogic, gameStatus, scoring]);
-
-  const handleCellClick = useCallback((gridIndex) => {
-    if (!selectedPiece || gameStatus !== 'playing') return;
-    handlePiecePlacement(selectedPiece.id, gridIndex);
-  }, [selectedPiece, gameStatus, handlePiecePlacement]);
-
-  const handlePieceDrop = useCallback((pieceId, gridIndex) => {
-    if (gameStatus !== 'playing') return;
-    handlePiecePlacement(pieceId, gridIndex);
-  }, [gameStatus, handlePiecePlacement]);
-
-  const handlePieceSelect = (piece) => {
-    if (gameStatus !== 'playing') return;
-    setSelectedPiece(piece);
-  };
-
-  const handleDragStart = (piece, e) => {
-    if (gameStatus !== 'playing') return;
-    setDraggedPiece(piece);
-    setDragPosition({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleDragMove = useCallback((e) => {
-    if (!draggedPiece) return;
-    setDragPosition({ x: e.clientX, y: e.clientY });
-  }, [draggedPiece]);
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedPiece(null);
-    setDragPosition(null);
-  }, []);
-
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 2.0));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
-  const handleZoomReset = () => setZoom(1);
 
   const handleUseHint = (hintType) => {
     const result = gameLogic.useHint('playerA', hintType);
     if (result.success) {
       setScore(gameLogic.scores.playerA.score);
       setActiveHint(result.hint);
-      setTimeout(() => setActiveHint(null), 5000); // Clear hint after 5 seconds
+      setTimeout(() => setActiveHint(null), 5000);
     }
   };
 
@@ -247,19 +201,6 @@ const SinglePlayerGame = ({
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
-
-  // Mouse move listener
-  useEffect(() => {
-    if (!draggedPiece) return;
-
-    window.addEventListener('mousemove', handleDragMove);
-    window.addEventListener('mouseup', handleDragEnd);
-
-    return () => {
-      window.removeEventListener('mousemove', handleDragMove);
-      window.removeEventListener('mouseup', handleDragEnd);
-    };
-  }, [draggedPiece, handleDragMove, handleDragEnd]);
 
   if (gameStatus !== 'playing') {
     return (
@@ -379,12 +320,18 @@ const SinglePlayerGame = ({
       {/* Feedback */}
       {lastResult && (
         <div
-          className={`mb-4 p-4 rounded-xl text-center font-semibold transition-all ${lastResult.correct
-            ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-            : 'bg-red-500/20 text-red-300 border border-red-500/30'
+          className={`mb-4 p-3 rounded-xl text-center font-semibold transition-all text-sm sm:text-base ${lastResult.correct === null
+            ? 'bg-white/10 text-white/70 border border-white/10'
+            : lastResult.correct
+              ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+              : 'bg-red-500/20 text-red-300 border border-red-500/30'
             }`}
         >
-          {lastResult.correct ? '✓' : '✗'} {lastResult.correct ? 'Correct' : 'Wrong'}! {lastResult.points > 0 ? '+' : ''}{lastResult.points} points
+          {lastResult.correct === null
+            ? `◆ ${lastResult.message}`
+            : lastResult.correct
+              ? `✓ ${lastResult.message}`
+              : `✗ ${lastResult.message}`}
         </div>
       )}
 
@@ -415,59 +362,28 @@ const SinglePlayerGame = ({
           )}
         </div>
 
-        {/* Center - Canvas */}
-        <div className="lg:col-span-6">
-          <div className="mb-2 sm:mb-4 flex justify-center">
-            <ZoomControls
-              zoom={zoom}
-              onZoomIn={handleZoomIn}
-              onZoomOut={handleZoomOut}
-              onZoomReset={handleZoomReset}
-            />
-          </div>
-
-          <div className="flex justify-center game-board-container">
-            <PuzzleCanvas
-              grid={gameState.grid}
+        {/* Center - Phaser Game Canvas */}
+        <div className="lg:col-span-9">
+          <Suspense fallback={
+            <div className="w-full bg-slate-900/50 rounded-xl flex items-center justify-center" style={{ minHeight: '400px' }}>
+              <div className="text-purple-300 text-lg">Loading game...</div>
+            </div>
+          }>
+            <PhaserGame
+              gameState={gameState}
               gridSize={gridSize}
               ghostImage={imageUrl}
               settings={gameSettings}
-              onCellClick={handleCellClick}
-              onPieceDrop={handlePieceDrop}
-              draggedPiece={draggedPiece}
-              dragPosition={dragPosition}
-              zoom={zoom}
-              offset={offset}
+              myRack={gameState.playerARack}
+              myPlayer="playerA"
+              selectedPiece={selectedPiece}
+              activeHint={activeHint}
+              onPieceSelected={(piece) => setSelectedPiece(piece)}
+              onPiecePlaced={(pieceId, gridIndex) => {
+                handlePiecePlacement(pieceId, gridIndex);
+              }}
             />
-          </div>
-        </div>
-
-        {/* Right Panel - Piece Rack */}
-        <div className="lg:col-span-3">
-          <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-slate-700">
-            <h3 className="text-white font-semibold mb-2 sm:mb-4 text-sm sm:text-base">Your Pieces</h3>
-            <div className="grid grid-cols-5 lg:grid-cols-2 gap-1.5 sm:gap-2 max-h-[200px] lg:max-h-[600px] overflow-y-auto hide-scrollbar">
-              {gameState.playerARack.filter(p => p !== null).map((piece) => (
-                <button
-                  key={piece.id}
-                  onClick={() => handlePieceSelect(piece)}
-                  onMouseDown={(e) => handleDragStart(piece, e)}
-                  className={`relative rounded-lg border-2 transition-all cursor-grab active:cursor-grabbing touch-target ${selectedPiece?.id === piece.id
-                    ? 'border-purple-500 shadow-lg shadow-purple-500/50'
-                    : 'border-slate-600 hover:border-slate-500'
-                    }`}
-                  draggable={false}
-                >
-                  <img
-                    src={piece.imageData}
-                    alt={`Piece ${piece.id}`}
-                    className="w-full h-full object-cover rounded-lg"
-                    draggable={false}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
+          </Suspense>
         </div>
 
         {/* Mobile-only Settings & Hints */}

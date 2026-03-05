@@ -2,7 +2,7 @@
 // IMAGE PROCESSOR - Slice images into puzzle pieces
 // =====================================================
 
-import { getModeConfig as importedGetModeConfig, getModeScoring as importedGetModeScoring } from './gameModes.js';
+import { getModeConfig as importedGetModeConfig, getModeScoring as importedGetModeScoring, ADJACENCY_SCORING } from './gameModes.js';
 import { HINT_CONFIG } from './gameConfig.js';
 
 export class ImageProcessor {
@@ -597,6 +597,7 @@ export class GameLogic {
   /**
    * Mark a placed piece as 'suspect' (opponent's piece you think is wrong)
    * or 'confident' (your own piece you're sure is right).
+   * Pass markType=null to explicitly remove an existing mark.
    */
   markPiece(player, gridIndex, markType) {
     if (this.mode !== 'NEXUS') {
@@ -606,6 +607,12 @@ export class GameLogic {
     const piece = this.grid[gridIndex];
     if (!piece) {
       return { success: false, message: 'No piece at this position' };
+    }
+
+    // Explicit removal (tap-toggle sends null to clear)
+    if (markType === null || markType === undefined) {
+      delete this.pieceMarks[gridIndex];
+      return { success: true, action: 'removed', gridIndex };
     }
 
     const placedBy = this.piecePlacedBy[gridIndex];
@@ -739,6 +746,128 @@ export class GameLogic {
       const bonus = Math.floor(score.streak / streakThreshold) * 2 * streakMultiplier;
       score.score += bonus;
     }
+  }
+
+  // =====================================================
+  // ADJACENCY SCORING HELPERS
+  // =====================================================
+
+  /**
+   * Count how many orthogonal neighbors of gridIndex are correctly placed.
+   */
+  getAdjacentCorrectCount(gridIndex) {
+    const row = Math.floor(gridIndex / this.gridSize);
+    const col = gridIndex % this.gridSize;
+    const neighbors = [
+      row > 0 ? gridIndex - this.gridSize : -1,                    // up
+      row < this.gridSize - 1 ? gridIndex + this.gridSize : -1,    // down
+      col > 0 ? gridIndex - 1 : -1,                                // left
+      col < this.gridSize - 1 ? gridIndex + 1 : -1                 // right
+    ].filter(i => i >= 0);
+
+    let count = 0;
+    for (const ni of neighbors) {
+      const piece = this.grid[ni];
+      if (piece && piece.correctPosition === ni) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Check if placing at gridIndex completes a row, column, or the full border.
+   * Returns { row: bool, column: bool, border: bool }.
+   */
+  checkRegionCompletion(gridIndex) {
+    const row = Math.floor(gridIndex / this.gridSize);
+    const col = gridIndex % this.gridSize;
+    const gs = this.gridSize;
+
+    // Check if entire row is correctly placed
+    let rowComplete = true;
+    for (let c = 0; c < gs; c++) {
+      const idx = row * gs + c;
+      const p = this.grid[idx];
+      if (!p || p.correctPosition !== idx) { rowComplete = false; break; }
+    }
+
+    // Check if entire column is correctly placed
+    let colComplete = true;
+    for (let r = 0; r < gs; r++) {
+      const idx = r * gs + col;
+      const p = this.grid[idx];
+      if (!p || p.correctPosition !== idx) { colComplete = false; break; }
+    }
+
+    // Check if entire border is correctly placed
+    let borderComplete = true;
+    for (let i = 0; i < gs * gs; i++) {
+      const r = Math.floor(i / gs);
+      const c = i % gs;
+      if (r === 0 || r === gs - 1 || c === 0 || c === gs - 1) {
+        const p = this.grid[i];
+        if (!p || p.correctPosition !== i) { borderComplete = false; break; }
+      }
+    }
+
+    return { row: rowComplete, column: colComplete, border: borderComplete };
+  }
+
+  /**
+   * Get difficulty multiplier based on piece type (corner/edge/interior).
+   */
+  getPieceDifficultyMultiplier(piece) {
+    if (!piece) return 1.0;
+    const diff = ADJACENCY_SCORING.difficulty;
+    if (piece.edges) {
+      const edgeCount = [piece.edges.top, piece.edges.bottom, piece.edges.left, piece.edges.right]
+        .filter(Boolean).length;
+      if (edgeCount >= 2) return diff.corner;
+      if (edgeCount === 1) return diff.edge;
+    } else if (piece.isEdge) {
+      return diff.edge;
+    }
+    return diff.interior;
+  }
+
+  /**
+   * Calculate full adjacency score for a correct placement at gridIndex.
+   * Returns { base, neighborBonus, difficultyMult, regionBonuses, total, breakdown }.
+   */
+  calculatePlacementScore(piece, gridIndex) {
+    const adj = ADJACENCY_SCORING;
+    const base = this.modeScoring.correctPiece || 10;
+    const neighborCount = this.getAdjacentCorrectCount(gridIndex);
+    const neighborBonus = adj.neighborBonus[neighborCount] || 0;
+    const difficultyMult = this.getPieceDifficultyMultiplier(piece);
+
+    // Region completion
+    const regions = this.checkRegionCompletion(gridIndex);
+    let regionBonus = 0;
+    const regionBonuses = [];
+    if (regions.row) { regionBonus += adj.region.row; regionBonuses.push('Row Complete!'); }
+    if (regions.column) { regionBonus += adj.region.column; regionBonuses.push('Column Complete!'); }
+    if (regions.border) { regionBonus += adj.region.border; regionBonuses.push('Border Complete!'); }
+
+    const subtotal = Math.round((base + neighborBonus) * difficultyMult);
+    const total = subtotal + regionBonus;
+
+    return {
+      base,
+      neighborCount,
+      neighborBonus,
+      difficultyMult,
+      regionBonus,
+      regionBonuses,
+      total,
+      breakdown: {
+        base,
+        adjacent: neighborBonus > 0 ? `+${neighborBonus} (${neighborCount} neighbors)` : null,
+        difficulty: difficultyMult !== 1.0 ? `×${difficultyMult}` : null,
+        region: regionBonuses.length > 0 ? regionBonuses.join(', ') : null
+      }
+    };
   }
 
   /**

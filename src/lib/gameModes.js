@@ -11,7 +11,8 @@ export const GAME_MODES = {
       checksPerTurn: 1
     },
     multiplayer: true,
-    available: true
+    available: false,
+    comingSoon: true
   },
   SUPER: {
     id: 'SUPER',
@@ -25,7 +26,8 @@ export const GAME_MODES = {
       checksPerTurn: 1
     },
     multiplayer: true,
-    available: true
+    available: false,
+    comingSoon: true
   },
   SAGE: {
     id: 'SAGE',
@@ -39,7 +41,8 @@ export const GAME_MODES = {
       checksPerTurn: 2
     },
     multiplayer: true,
-    available: true
+    available: false,
+    comingSoon: true
   },
   NEXUS: {
     id: 'NEXUS',
@@ -139,6 +142,18 @@ export const MODE_SCORING = {
     streakMultiplier: 1,
     streakBonusThreshold: 3
   }
+};
+
+// Adjacency-based scoring — shared across all modes
+export const ADJACENCY_SCORING = {
+  // Points by number of correct orthogonal neighbors
+  neighborBonus: { 0: 0, 1: 3, 2: 7, 3: 13, 4: 20 },
+  // Piece type difficulty multiplier
+  difficulty: { corner: 0.8, edge: 1.0, interior: 1.5 },
+  // Region completion bonuses
+  region: { row: 15, column: 15, border: 50 },
+  // Adjacency streak: consecutive adjacent placements
+  adjacencyStreak: { threshold: 2, multiplier: 0.2 }  // +20% per streak beyond threshold
 };
 
 export const getModeConfig = (modeId) => GAME_MODES[modeId] || GAME_MODES.CLASSIC;

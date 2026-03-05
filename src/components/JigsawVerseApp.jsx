@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
 import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Eye, Upload, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import { authService } from '../services/auth.service';
@@ -9,10 +9,11 @@ import GameSettingsPanel from './GameSettingsPanel';
 import MoveHistoryPanel from './MoveHistoryPanel';
 import HintsPanel from './HintsPanel';
 import SinglePlayerGame from './SinglePlayerGame';
-import ZoomControls from './ZoomControls';
 import ImageLibrary from './ImageLibrary';
 import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
 import { isModeMultiplayer } from '../lib/gameModes';
+
+const PhaserGame = lazy(() => import('./PhaserGame'));
 
 // =====================================================
 // CONNECTION STATUS CONSTANTS
@@ -1091,8 +1092,6 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
 // GAMEPLAY SCREEN - INTEGRATED WITH GAME LOGIC
 // =====================================================
 
-// Game constants
-const RACK_SIZE = 10; // Maximum number of pieces in a player's rack
 
 const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSettingsChange, onGameEnd, onExit, setError }) => {
   const [gameState, setGameState] = useState(null);
@@ -1101,12 +1100,6 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   const [lastAction, setLastAction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
-
-  // Drag-and-drop state
-  const [draggedPiece, setDraggedPiece] = useState(null);
-
-  // Zoom state
-  const [zoom, setZoom] = useState(1);
 
   // Track previous pending check state and scores to detect when opponent responds
   const prevPendingCheckRef = useRef(null);
@@ -1293,66 +1286,13 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
   // Handle piece selection
   const handlePieceSelect = (piece) => {
-    if (!isMyTurn || awaitingDecision) return;
+    // In Nexus: always allow selection (no turn-gating)
+    if (!isNexusMode && (!isMyTurn || awaitingDecision)) return;
     setSelectedPiece(piece);
   };
 
-  // Drag-and-drop handlers
-  const handleDragStart = useCallback((piece) => {
-    if (!isMyTurn || awaitingDecision) return;
-    setDraggedPiece(piece);
-  }, [isMyTurn, awaitingDecision]);
 
-  const handleDragEnd = useCallback(() => {
-    setDraggedPiece(null);
-  }, []);
 
-  const handlePieceDrop = useCallback(async (pieceId, gridIndex) => {
-    if (!isMyTurn || !multiplayerRef.current) return;
-
-    // UI-level check: ensure position is empty
-    const currentGrid = gameState?.grid || [];
-    if (currentGrid[gridIndex] !== null && currentGrid[gridIndex] !== undefined) {
-      console.warn('Position already occupied at UI level');
-      setError('This position is already occupied. Please choose an empty spot.');
-      handleDragEnd();
-      return;
-    }
-
-    try {
-      const result = await multiplayerRef.current.makeMove(pieceId, gridIndex);
-
-      if (result.awaitingCheck) {
-        setLastAction({
-          type: 'placed',
-          correct: result.correct,
-          message: 'Piece placed. Waiting for opponent to check or pass...'
-        });
-      }
-    } catch (err) {
-      console.error('Move error:', err);
-      setError('Failed to place piece: ' + err.message);
-    } finally {
-      handleDragEnd();
-    }
-  }, [isMyTurn, gameState, multiplayerRef, setError, handleDragEnd]);
-
-  // Zoom handlers
-  const handleZoomIn = useCallback(() => setZoom(prev => Math.min(prev + 0.25, 2.0)), []);
-  const handleZoomOut = useCallback(() => setZoom(prev => Math.max(prev - 0.25, 0.5)), []);
-  const handleZoomReset = useCallback(() => setZoom(1), []);
-
-  // Mouse up listener for drag
-  useEffect(() => {
-    if (!draggedPiece) return;
-
-    const handleMouseUp = () => handleDragEnd();
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [draggedPiece, handleDragEnd]);
 
   // Handle piece placement
   const handlePlacement = async (gridIndex) => {
@@ -1372,9 +1312,14 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     try {
       const result = await multiplayerRef.current.makeMove(pieceToPlace.id, gridIndex);
 
-      if (result.awaitingCheck) {
-        // We placed a piece, now waiting for opponent to check
-        // Don't set awaitingDecision for ourselves - the opponent will see it
+      if (isNexusMode) {
+        // Nexus: never reveal correctness — deferred to end-game reveal
+        setLastAction({
+          type: 'placed',
+          correct: null,
+          message: 'Piece placed ◆'
+        });
+      } else if (result.awaitingCheck) {
         setLastAction({
           type: 'placed',
           correct: result.correct,
@@ -1492,14 +1437,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     return isHost ? (gameState?.playerARack || []) : (gameState?.playerBRack || []);
   }, [isHost, gameState?.playerARack, gameState?.playerBRack]);
 
-  // Pad rack to exactly RACK_SIZE slots for consistent UI layout (memoized for performance)
-  const paddedRack = useMemo(() => {
-    // Slice to RACK_SIZE max (intentional - game logic maintains max 10 pieces per rack)
-    // Pad with nulls to reach exactly RACK_SIZE slots for consistent grid layout
-    const sliced = myRack.slice(0, RACK_SIZE);
-    const padding = Math.max(0, RACK_SIZE - sliced.length);
-    return [...sliced, ...Array(padding).fill(null)];
-  }, [myRack]);
+
 
   const grid = gameState?.grid || [];
 
@@ -1531,7 +1469,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
       {/* Game Header — compact on mobile */}
       <div className="bg-white/5 backdrop-blur-md rounded-xl p-2.5 sm:p-4 mb-3 sm:mb-6">
         <div className="flex items-center justify-between">
-          <div className={`flex-1 min-w-0 ${isMyTurn ? 'ring-2 ring-yellow-400 rounded-lg p-1.5 sm:p-2' : 'opacity-70 p-1.5 sm:p-2'}`}>
+          {/* You */}
+          <div className={`flex-1 min-w-0 rounded-lg p-1.5 sm:p-2 ${isNexusMode
+              ? 'ring-2 ring-purple-400'
+              : isMyTurn ? 'ring-2 ring-yellow-400' : 'opacity-70'
+            }`}>
             <p className="text-white font-bold text-xs sm:text-base truncate">You {isHost ? '(Host)' : '(Guest)'}</p>
             <p className="text-purple-300 text-xs sm:text-base">Score: {myScore}</p>
             <p className="text-purple-400 text-[10px] sm:text-sm hidden sm:block">Streak: {myStreak} | Accuracy: {myAccuracy}%</p>
@@ -1539,14 +1481,20 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
           <div className="text-center px-2 sm:px-4 flex-shrink-0">
             <p className="text-lg sm:text-2xl font-mono font-bold text-white">{formatTime(timer)}</p>
-            {isMyTurn ? (
+            {isNexusMode ? (
+              <p className="text-purple-400 font-bold text-xs sm:text-base">◆ Both Playing</p>
+            ) : isMyTurn ? (
               <p className="text-yellow-400 font-bold animate-pulse text-xs sm:text-base">Your Turn</p>
             ) : (
               <p className="text-cyan-400 text-xs sm:text-base">Opponent&apos;s Turn</p>
             )}
           </div>
 
-          <div className={`flex-1 min-w-0 text-right ${!isMyTurn && !awaitingDecision ? 'ring-2 ring-cyan-400 rounded-lg p-1.5 sm:p-2' : 'opacity-70 p-1.5 sm:p-2'}`}>
+          {/* Opponent */}
+          <div className={`flex-1 min-w-0 text-right rounded-lg p-1.5 sm:p-2 ${isNexusMode
+              ? 'ring-2 ring-purple-400'
+              : !isMyTurn && !awaitingDecision ? 'ring-2 ring-cyan-400' : 'opacity-70'
+            }`}>
             <p className="text-white font-bold text-xs sm:text-base">Opponent</p>
             <p className="text-purple-300 text-xs sm:text-base">Score: {opponentScore}</p>
           </div>
@@ -1594,171 +1542,31 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
       )}
 
       <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3 sm:gap-6">
-        {/* Puzzle Grid */}
+        {/* Phaser Game Board + Rack */}
         <div className="lg:col-span-2">
-          <div className="bg-white/5 backdrop-blur-md rounded-xl p-2 sm:p-4 border border-white/10">
-            <div className="flex items-center justify-between mb-2 sm:mb-4">
-              <h3 className="text-white font-semibold text-sm sm:text-base">Puzzle Board</h3>
-              <ZoomControls
-                zoom={zoom}
-                onZoomIn={handleZoomIn}
-                onZoomOut={handleZoomOut}
-                onZoomReset={handleZoomReset}
-                minZoom={0.5}
-                maxZoom={2.0}
-              />
+          <Suspense fallback={
+            <div className="w-full bg-slate-900/50 rounded-xl flex items-center justify-center" style={{ minHeight: '400px' }}>
+              <div className="text-purple-300 text-lg">Loading game...</div>
             </div>
-            <div className="w-full max-w-full overflow-auto relative game-board-container hide-scrollbar">
-              {/* Ghost Image Background */}
-              {gameSettings?.showGhostImage && (gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
-                <div className="absolute inset-0 z-0 pointer-events-none">
-                  <img
-                    src={gameData?.imagePreview || multiplayerRef?.current?.imageUrl}
-                    alt="Ghost preview"
-                    className="w-full h-full object-cover rounded"
-                    style={{ opacity: 0.15 }}
-                  />
-                </div>
-              )}
-
-              <div
-                className="grid gap-0.5 sm:gap-1 aspect-square w-full relative z-10 transition-transform"
-                style={{
-                  gridTemplateColumns: `repeat(${gridSize}, 1fr)`,
-                  transform: `scale(${zoom})`,
-                  transformOrigin: 'top left'
-                }}
-              >
-                {grid.map((piece, index) => {
-                  const row = Math.floor(index / gridSize);
-                  const col = index % gridSize;
-                  const gridLabel = gameSettings?.showGridLabels
-                    ? `${String.fromCharCode(65 + col)}${row + 1}`
-                    : '';
-
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => handlePlacement(index)}
-                      onMouseUp={() => draggedPiece && handlePieceDrop(draggedPiece.id, index)}
-                      disabled={!selectedPiece || piece !== null || !isMyTurn}
-                      className={`aspect-square rounded border transition-all overflow-hidden relative ${piece
-                        ? 'bg-gradient-to-br from-purple-500 to-pink-500 border-white/40'
-                        : selectedPiece && isMyTurn
-                          ? 'bg-white/10 border-cyan-400 hover:bg-cyan-500/20 cursor-pointer'
-                          : 'bg-white/5 border-white/10'
-                        }`}
-                    >
-                      {piece && piece.imageData && (
-                        <img
-                          src={piece.imageData}
-                          alt={`Piece ${piece.id}`}
-                          className="w-full h-full object-cover rounded"
-                        />
-                      )}
-                      {/* Nexus mark icons */}
-                      {isNexusMode && piece && gameState?.pieceMarks?.[index] && (
-                        <span className="absolute top-0 right-0 text-[10px] sm:text-sm bg-black/60 rounded-bl px-0.5">
-                          {gameState.pieceMarks[index].type === 'suspect' ? '🔍' : '💪'}
-                        </span>
-                      )}
-                      {/* Nexus mark buttons — tap placed piece to mark */}
-                      {isNexusMode && piece && !selectedPiece && (
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/40 transition-opacity gap-1">
-                          {gameState?.piecePlacedBy?.[index] !== myPlayer && (
-                            <button onClick={(e) => { e.stopPropagation(); handleMarkPiece(index, 'suspect'); }}
-                              className="text-[10px] sm:text-xs bg-red-500/80 text-white px-1 py-0.5 rounded">🔍</button>
-                          )}
-                          {gameState?.piecePlacedBy?.[index] === myPlayer && (
-                            <button onClick={(e) => { e.stopPropagation(); handleMarkPiece(index, 'confident'); }}
-                              className="text-[10px] sm:text-xs bg-green-500/80 text-white px-1 py-0.5 rounded">💪</button>
-                          )}
-                        </div>
-                      )}
-                      {/* Grid Label Overlay */}
-                      {gridLabel && !piece && (
-                        <span
-                          className="absolute inset-0 flex items-center justify-center text-white/60 text-[8px] sm:text-xs font-mono pointer-events-none"
-                          style={{ opacity: 0.6 }}
-                        >
-                          {gridLabel}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          }>
+            <PhaserGame
+              gameState={gameState}
+              gridSize={gridSize}
+              ghostImage={gameData?.imagePreview || multiplayerRef?.current?.imageUrl}
+              settings={gameSettings}
+              myRack={myRack}
+              myPlayer={myPlayer}
+              isNexusMode={isNexusMode}
+              selectedPiece={selectedPiece}
+              onPieceSelected={(piece) => handlePieceSelect(piece)}
+              onPiecePlaced={(pieceId, gridIndex) => handlePlacement(gridIndex)}
+              onPieceMarked={(gridIndex, markType) => handleMarkPiece(gridIndex, markType)}
+            />
+          </Suspense>
         </div>
 
-        {/* Player Rack and Actions */}
+        {/* Sidebar: Stats + Actions */}
         <div className="space-y-4">
-          {/* Your Rack */}
-          <div className="bg-white/5 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-white/10">
-            <h3 className="text-white font-semibold mb-2 sm:mb-4 text-sm sm:text-base">
-              Your Pieces ({myRack.filter(p => p !== null).length})
-            </h3>
-            <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-              {paddedRack.map((piece, index) => {
-                // Determine if piece is edge or corner for highlighting
-                const isEdge = piece?.isEdge;
-                const isCorner = piece?.edges && (
-                  (piece.edges.top && piece.edges.left) ||
-                  (piece.edges.top && piece.edges.right) ||
-                  (piece.edges.bottom && piece.edges.left) ||
-                  (piece.edges.bottom && piece.edges.right)
-                );
-                const showEdgeHighlight = gameSettings?.highlightEdges && isEdge;
-
-                return (
-                  <button
-                    key={index}
-                    onClick={() => piece && handlePieceSelect(piece)}
-                    onMouseDown={() => piece && handleDragStart(piece)}
-                    disabled={!isMyTurn || !piece}
-                    className={`aspect-square rounded-lg border-2 transition-all relative cursor-grab active:cursor-grabbing touch-target ${piece && selectedPiece?.id === piece.id
-                      ? 'border-yellow-400 ring-2 ring-yellow-400 scale-105 sm:scale-110'
-                      : piece && isMyTurn
-                        ? showEdgeHighlight && isCorner
-                          ? 'border-red-400 hover:border-cyan-400 shadow-lg shadow-red-400/50'
-                          : showEdgeHighlight
-                            ? 'border-amber-400 hover:border-cyan-400 shadow-lg shadow-amber-400/50'
-                            : 'border-white/20 hover:border-cyan-400'
-                        : piece
-                          ? 'border-white/10 opacity-50'
-                          : 'border-white/10 bg-white/5 opacity-30'
-                      }`}
-                    draggable={false}
-                  >
-                    {piece ? (
-                      piece.imageData ? (
-                        <img
-                          src={piece.imageData}
-                          alt={`Piece ${piece.id}`}
-                          className="w-full h-full object-cover rounded"
-                          draggable={false}
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-purple-500/50 to-pink-500/50 rounded flex items-center justify-center text-white text-[10px] sm:text-xs">
-                          {piece.id}
-                        </div>
-                      )
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white/20"></div>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            {selectedPiece && (
-              <p className="text-cyan-400 text-xs sm:text-sm mt-2 sm:mt-3 text-center">
-                Tap an empty cell to place the selected piece
-              </p>
-            )}
-          </div>
 
           {/* Game Stats */}
           <div className="bg-white/5 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-white/10">

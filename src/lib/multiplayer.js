@@ -415,6 +415,7 @@ export class MultiplayerGameHost {
     if (!this.gameLogic) throw new Error('Game not initialized');
 
     const currentPlayer = 'playerA';
+    const isNexus = this.gameLogic.mode === 'NEXUS';
     const result = this.gameLogic.placePiece(currentPlayer, pieceId, gridIndex);
 
     if (!result.success) {
@@ -422,7 +423,6 @@ export class MultiplayerGameHost {
     }
 
     // Broadcast FIRST for instant opponent update, then persist to DB in background
-    console.log('📤 Host broadcasting state with pendingCheck:', this.gameLogic.pendingCheck);
     await this.broadcastGameState();
 
     // DB writes in background — don't block the UI
@@ -435,9 +435,10 @@ export class MultiplayerGameHost {
         player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
         player_b_rack: this.gameLogic.playerBRack.map(p => p ? p.id : null),
         piece_pool: this.gameLogic.piecePool.map(p => p.id),
-        current_turn: this.gameLogic.currentTurn,
-        pending_check: this.gameLogic.pendingCheck,
-        awaiting_decision: result.awaitingCheck ? 'opponent_check' : null,
+        // In Nexus: don't broadcast turn or awaiting_decision — truly simultaneous
+        current_turn: isNexus ? null : this.gameLogic.currentTurn,
+        pending_check: isNexus ? null : this.gameLogic.pendingCheck,
+        awaiting_decision: isNexus ? null : (result.awaitingCheck ? 'opponent_check' : null),
         move_history: this.gameLogic.moveHistory,
         timer_remaining: this.gameLogic.timerRemaining
       }),
@@ -808,6 +809,7 @@ export class MultiplayerGameGuest {
     if (!this.gameLogic) throw new Error('Game not initialized');
 
     const currentPlayer = 'playerB';
+    const isNexus = this.gameLogic.mode === 'NEXUS';
     const result = this.gameLogic.placePiece(currentPlayer, pieceId, gridIndex);
 
     if (!result.success) {
@@ -815,7 +817,6 @@ export class MultiplayerGameGuest {
     }
 
     // Broadcast FIRST for instant host update, then persist to DB in background
-    console.log('📤 Guest broadcasting state with pendingCheck:', this.gameLogic.pendingCheck);
     await this.broadcastGameState();
 
     // DB writes in background — don't block the UI
@@ -828,9 +829,10 @@ export class MultiplayerGameGuest {
         player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
         player_b_rack: this.gameLogic.playerBRack.map(p => p ? p.id : null),
         piece_pool: this.gameLogic.piecePool.map(p => p.id),
-        current_turn: this.gameLogic.currentTurn,
-        pending_check: this.gameLogic.pendingCheck,
-        awaiting_decision: result.awaitingCheck ? 'opponent_check' : null,
+        // In Nexus: don't broadcast turn or awaiting_decision
+        current_turn: isNexus ? null : this.gameLogic.currentTurn,
+        pending_check: isNexus ? null : this.gameLogic.pendingCheck,
+        awaiting_decision: isNexus ? null : (result.awaitingCheck ? 'opponent_check' : null),
         move_history: this.gameLogic.moveHistory,
         timer_remaining: this.gameLogic.timerRemaining
       }),
