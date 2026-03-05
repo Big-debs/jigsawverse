@@ -44,6 +44,7 @@ export class BoardScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor('#0f0b1e');
         this.calculateLayout();
         this.createGrid();
+        this.createRackBar();
         this.loadGhostImage();
         this.setupInput();
         this.events.emit('create');
