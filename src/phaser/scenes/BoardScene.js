@@ -426,7 +426,7 @@ export class BoardScene extends Phaser.Scene {
                     this.createPieceSprite(textureKey, piece, index, x, y);
                 }
             } else {
-                const rect = this.add.rectangle(x, y, this.cellSize - 4, this.cellSize - 4, 0x7c3aed, 1);
+                const rect = this.add.rectangle(x, y, this.cellSize - 2, this.cellSize - 2, 0x7c3aed, 1);
                 this.boardContainer?.add(rect);
                 rect.setData('pieceId', piece.id);
                 rect.setData('gridIndex', index);
@@ -446,7 +446,7 @@ export class BoardScene extends Phaser.Scene {
     createPieceSprite(textureKey, piece, index, x, y) {
         const sprite = this.add.image(x, y, textureKey);
         this.boardContainer?.add(sprite);
-        sprite.setDisplaySize(this.cellSize - 4, this.cellSize - 4);
+        sprite.setDisplaySize(this.cellSize - 2, this.cellSize - 2);
         sprite.setData('pieceId', piece.id);
         sprite.setData('gridIndex', index);
         sprite.setDepth(1);
