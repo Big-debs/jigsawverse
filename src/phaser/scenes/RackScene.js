@@ -33,7 +33,7 @@ export class RackScene extends Phaser.Scene {
     }
 
     setSelectedPiece(piece) {
-        this.selectedPieceId = piece?.id || null;
+        this.selectedPieceId = piece?.id ?? null;
         this.updateSelectionHighlight();
     }
 
