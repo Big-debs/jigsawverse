@@ -30,10 +30,6 @@ export class BoardScene extends Phaser.Scene {
         // Render layers
         this.boardContainer = null;
         this.rackContainer = null;
-        this.boardZoom = 1;
-        this.minBoardZoom = 0.5;
-        this.maxBoardZoom = 2.5;
-
         // Layout dimensions
         this.boardOffsetX = 0;
         this.boardOffsetY = 0;
@@ -57,7 +53,6 @@ export class BoardScene extends Phaser.Scene {
         this.createGrid();
         this.createRackBar();
         this.loadGhostImage();
-        this.setupInput();
         this.events.emit('create');
 
         this.scale.on('resize', () => {
@@ -103,11 +98,9 @@ export class BoardScene extends Phaser.Scene {
         this.rackSprites = [];
         this.boardContainer = null;
         this.rackContainer = null;
-        this.cameras.main.setZoom(1);
 
         this.calculateLayout();
         this.createRenderLayers();
-        this.applyBoardZoom();
         this.createGrid();
         this.loadGhostImage();
         this.createRackBar();
@@ -127,19 +120,6 @@ export class BoardScene extends Phaser.Scene {
 
         this.rackContainer = this.add.container(0, 0);
         this.rackContainer.setDepth(4);
-    }
-
-    applyBoardZoom() {
-        if (!this.boardContainer) return;
-
-        const centerX = this.boardOffsetX + (this.cellSize * this.cols) / 2;
-        const centerY = this.boardOffsetY + (this.cellSize * this.rows) / 2;
-
-        this.boardContainer.setScale(this.boardZoom);
-        this.boardContainer.setPosition(
-            centerX - centerX * this.boardZoom,
-            centerY - centerY * this.boardZoom
-        );
     }
 
     // ========== GRID ==========
@@ -204,11 +184,11 @@ export class BoardScene extends Phaser.Scene {
         const w = this.scale.width;
         const bg = this.add.rectangle(
             w / 2, this.rackOffsetY + this.rackAreaH / 2,
-            w, this.rackAreaH,
-            0x130f24, 0.6
+            w - 12, Math.max(0, this.rackAreaH - 10),
+            0x130f24, 0.96
         );
         this.rackContainer?.add(bg);
-        bg.setDepth(0);
+        bg.setStrokeStyle(2, 0x4a3b6e, 0.85);
     }
 
     renderRack() {
@@ -368,25 +348,10 @@ export class BoardScene extends Phaser.Scene {
             key
         );
         this.boardContainer?.add(this.ghostSprite);
+        this.boardContainer?.moveTo(this.ghostSprite, 0);
         this.ghostSprite.setDisplaySize(boardWidth, boardHeight);
         this.ghostSprite.setAlpha(0.12);
         this.ghostSprite.setDepth(-1);
-    }
-
-    // ========== INPUT ==========
-
-    setupInput() {
-        // Mouse wheel zoom on board area only
-        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
-            if (pointer.y < this.rackOffsetY) {
-                this.boardZoom = Phaser.Math.Clamp(
-                    this.boardZoom + (deltaY > 0 ? -0.1 : 0.1),
-                    this.minBoardZoom,
-                    this.maxBoardZoom
-                );
-                this.applyBoardZoom();
-            }
-        });
     }
 
     // ========== STATE UPDATES (called from PhaserGame) ==========
