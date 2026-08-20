@@ -24,6 +24,8 @@ export class BoardScene extends Phaser.Scene {
         // Rack state
         this.rackPieces = [];
         this.rackSprites = [];
+        this.rackSlotSprites = [];
+        this.rackCapacity = 10;
         this.selectedPieceId = null;
         this.hintCells = [];
 
@@ -96,6 +98,7 @@ export class BoardScene extends Phaser.Scene {
         this.markSprites = {};
         this.ghostSprite = null;
         this.rackSprites = [];
+        this.rackSlotSprites = [];
         this.boardContainer = null;
         this.rackContainer = null;
 
@@ -192,37 +195,39 @@ export class BoardScene extends Phaser.Scene {
     }
 
     renderRack() {
-        // Clear existing rack sprites
+        // Clear the prior rack contents and rebuild the fixed tray layout.
         this.rackSprites.forEach(s => s.container?.destroy());
+        this.rackSlotSprites.forEach(slot => slot.destroy());
         this.rackSprites = [];
-
-        const pieces = this.rackPieces.filter(p => p !== null);
-        if (pieces.length === 0) return;
+        this.rackSlotSprites = [];
 
         const w = this.scale.width;
-        const padding = 6;
-        const maxPieceSize = 64;
-
-        // Calculate piece size to fit all pieces in one row
+        const padding = 12;
+        const gap = 6;
         const availableWidth = w - padding * 2;
-        const availableHeight = this.rackAreaH - padding * 2;
-        const pieceSize = Math.min(
-            Math.floor(availableWidth / Math.max(pieces.length, 5)) - padding,
-            availableHeight - 10,
-            maxPieceSize
-        );
-
-        const totalWidth = pieces.length * (pieceSize + padding) - padding;
+        const availableHeight = Math.max(1, this.rackAreaH - padding * 2);
+        const slotSize = Math.max(1, Math.floor(Math.min(
+            availableHeight,
+            (availableWidth - gap * (this.rackCapacity - 1)) / this.rackCapacity
+        )));
+        const totalWidth = this.rackCapacity * slotSize + gap * (this.rackCapacity - 1);
         const startX = Math.floor((w - totalWidth) / 2);
         const y = this.rackOffsetY + Math.floor(this.rackAreaH / 2);
 
-        pieces.forEach((piece, i) => {
-            if (!piece) return;
+        for (let i = 0; i < this.rackCapacity; i++) {
+            const x = startX + i * (slotSize + gap) + slotSize / 2;
+            const slot = this.add.rectangle(x, y, slotSize, slotSize, 0x1a1130, 0.75);
+            slot.setStrokeStyle(1, 0x4a3b6e, 0.7);
+            this.rackContainer?.add(slot);
+            this.rackSlotSprites.push(slot);
+        }
 
-            const x = startX + i * (pieceSize + padding) + pieceSize / 2;
+        const pieces = this.rackPieces.filter(Boolean).slice(0, this.rackCapacity);
+        const pieceSize = Math.max(1, slotSize - 4);
+        pieces.forEach((piece, i) => {
+            const x = startX + i * (slotSize + gap) + slotSize / 2;
             const container = this.add.container(x, y);
             this.rackContainer?.add(container);
-            container.setDepth(5);
 
             // Background card
             const isSelected = this.selectedPieceId === piece.id;
@@ -236,14 +241,14 @@ export class BoardScene extends Phaser.Scene {
 
             // Selected ring glow
             if (isSelected) {
-                const glow = this.add.rectangle(0, 0, pieceSize + 6, pieceSize + 6);
+                const glow = this.add.rectangle(0, 0, slotSize, slotSize);
                 glow.setStrokeStyle(2, 0xfbbf24, 0.5);
                 container.add(glow);
             }
 
             // Edge highlight
             if (piece.isEdge) {
-                const edgeGlow = this.add.rectangle(0, 0, pieceSize + 4, pieceSize + 4);
+                const edgeGlow = this.add.rectangle(0, 0, slotSize - 2, slotSize - 2);
                 edgeGlow.setStrokeStyle(2, 0xf59e0b, 0.5);
                 container.add(edgeGlow);
             }
@@ -253,7 +258,7 @@ export class BoardScene extends Phaser.Scene {
                 const textureKey = `rack_${piece.id}`;
                 if (this.textures.exists(textureKey)) {
                     const img = this.add.image(0, 0, textureKey);
-                    img.setDisplaySize(pieceSize - 6, pieceSize - 6);
+                    img.setDisplaySize(pieceSize - 4, pieceSize - 4);
                     container.add(img);
                 } else {
                     this.load.image(textureKey, piece.imageData);
@@ -261,7 +266,7 @@ export class BoardScene extends Phaser.Scene {
                         if (!container.scene) return;
                         try {
                             const img = this.add.image(0, 0, textureKey);
-                            img.setDisplaySize(pieceSize - 6, pieceSize - 6);
+                            img.setDisplaySize(pieceSize - 4, pieceSize - 4);
                             container.add(img);
                         } catch { /* container may have been destroyed */ }
                     });
@@ -605,11 +610,13 @@ export class BoardScene extends Phaser.Scene {
     // ========== ANIMATIONS ==========
 
     playSnapAnimation(target) {
-        target.setScale(0.3);
+        const targetScaleX = target.scaleX;
+        const targetScaleY = target.scaleY;
+        target.setScale(targetScaleX * 0.3, targetScaleY * 0.3);
         target.setAlpha(0.5);
         this.tweens.add({
             targets: target,
-            scaleX: target.scaleX || 1, scaleY: target.scaleY || 1,
+            scaleX: targetScaleX, scaleY: targetScaleY,
             alpha: 1,
             duration: 350,
             ease: 'Back.easeOut'
