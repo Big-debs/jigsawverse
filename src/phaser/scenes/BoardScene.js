@@ -132,9 +132,8 @@ export class BoardScene extends Phaser.Scene {
     applyBoardZoom() {
         if (!this.boardContainer) return;
 
-        const boardSize = this.cellSize * this.gridSize;
-        const centerX = this.boardOffsetX + boardSize / 2;
-        const centerY = this.boardOffsetY + boardSize / 2;
+        const centerX = this.boardOffsetX + (this.cellSize * this.cols) / 2;
+        const centerY = this.boardOffsetY + (this.cellSize * this.rows) / 2;
 
         this.boardContainer.setScale(this.boardZoom);
         this.boardContainer.setPosition(
