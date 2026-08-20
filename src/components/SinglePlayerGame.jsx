@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Trophy, Clock, Target, Zap, ArrowLeft } from 'lucide-react';
 import { GameLogic } from '../lib/gameLogic';
-import { MODE_SCORING } from '../lib/gameModes';
 import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
 import HintsPanel from './HintsPanel';
 import GameSettingsPanel from './GameSettingsPanel';
@@ -24,19 +23,7 @@ const SinglePlayerGame = ({
 
   const [gameLogic] = useState(() => {
     const logic = new GameLogic(puzzleDimensions, pieces, 'SINGLE_PLAYER');
-
-    // Shuffle pieces manually using Fisher-Yates algorithm
-    const shuffled = [...pieces];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-
-    // Put all shuffled pieces in player rack for single player
-    logic.piecePool = shuffled;
-    logic.playerARack = [];
-    logic.fillRack('playerA');
-    logic.gameState = 'active';
+    logic.initializeSinglePlayer();
     return logic;
   });
 
@@ -55,7 +42,6 @@ const SinglePlayerGame = ({
   const [gameSettings, setGameSettings] = useState(settings);
   const [activeHint, setActiveHint] = useState(null);
 
-  const scoring = MODE_SCORING.SINGLE_PLAYER;
   const timerRef = useRef(null);
   const feedbackTimeoutRef = useRef(null);
   const lastScoreRef = useRef(null);
@@ -106,76 +92,25 @@ const SinglePlayerGame = ({
   const handlePiecePlacement = useCallback((pieceId, gridIndex) => {
     if (gameStatus !== 'playing') return;
 
-    const validation = gameLogic.isValidPlacement(pieceId, gridIndex);
-    if (!validation.valid) return;
+    const result = gameLogic.placePiece('playerA', pieceId, gridIndex);
+    if (!result.success) return;
 
     setTotalAttempts(prev => prev + 1);
-
-    // Place piece on grid regardless of correctness
-    gameLogic.grid[gridIndex] = validation.piece;
-
-    // Remove from rack
-    const pieceIndex = gameLogic.playerARack.findIndex(p => p && p.id === pieceId);
-    if (pieceIndex !== -1) {
-      gameLogic.playerARack[pieceIndex] = null;
-    }
-
-    // Refill rack if empty
-    const rackIsEmpty = gameLogic.playerARack.filter(p => p !== null).length === 0;
-    if (rackIsEmpty && gameLogic.piecePool.length > 0) {
-      gameLogic.fillRack('playerA');
-    }
-
-    // --- Adjacency-based scoring ---
-    if (validation.correct) {
-      const scoreResult = gameLogic.calculatePlacementScore(validation.piece, gridIndex);
-      const newStreak = gameLogic.scores.playerA.streak + 1;
-      gameLogic.scores.playerA.score += scoreResult.total;
-      gameLogic.scores.playerA.streak = newStreak;
-      gameLogic.scores.playerA.correctPlacements++;
-
-      // Store last score breakdown for Phaser popup
-      lastScoreRef.current = { gridIndex, ...scoreResult };
-    } else {
-      gameLogic.scores.playerA.streak = 0;
-      gameLogic.scores.playerA.score += scoring.wrongPiece;
-      lastScoreRef.current = { gridIndex, total: scoring.wrongPiece, breakdown: null };
-    }
-    gameLogic.scores.playerA.totalPlacements++;
-    gameLogic.scores.playerA.accuracy = Math.round(
-      (gameLogic.scores.playerA.correctPlacements / gameLogic.scores.playerA.totalPlacements) * 100
-    );
-
-    // Check if milestone reached
-    const filledCells = gameLogic.grid.filter(cell => cell !== null && cell !== undefined).length;
-    const progress = gameLogic.totalPieces > 0 ? filledCells / gameLogic.totalPieces : 0;
-    const isMilestone = progress >= gameLogic.nextCheckRevealProgress;
+    lastScoreRef.current = { gridIndex, ...result.scoreResult };
+    const milestone = gameLogic.reconcileSinglePlayerMilestone();
 
     setTotalPlacements(gameLogic.scores.playerA.totalPlacements);
 
-    if (isMilestone) {
+    if (milestone.reached) {
       setScore(gameLogic.scores.playerA.score);
       setStreak(gameLogic.scores.playerA.streak);
       setBestStreak(prev => Math.max(prev, gameLogic.scores.playerA.streak));
       setCorrectPlacements(gameLogic.scores.playerA.correctPlacements);
       setAccuracy(gameLogic.scores.playerA.accuracy);
 
-      let removedCount = 0;
-      for (let i = 0; i < gameLogic.grid.length; i++) {
-        const piece = gameLogic.grid[i];
-        if (piece && piece.correctPosition !== i) {
-          gameLogic.grid[i] = null;
-          gameLogic.returnPieceToRack('playerA', piece);
-          removedCount++;
-        }
-      }
-
-      const bucket = Math.floor(progress / 0.2);
-      gameLogic.nextCheckRevealProgress = Math.min((bucket + 1) * 0.2, 1);
-
       setLastResult({
         correct: true,
-        message: `Milestone! ${removedCount > 0 ? `${removedCount} wrong piece(s) returned.` : 'All correct!'}`
+        message: `Milestone! ${milestone.removedCount > 0 ? `${milestone.removedCount} wrong piece(s) returned.` : 'All correct!'}`
       });
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
       feedbackTimeoutRef.current = setTimeout(() => setLastResult(null), 4000);
@@ -191,7 +126,7 @@ const SinglePlayerGame = ({
 
     setGameState(gameLogic.getGameState());
     setSelectedPiece(null);
-  }, [gameLogic, gameStatus, scoring]);
+  }, [gameLogic, gameStatus]);
 
   const handleUseHint = (hintType) => {
     const result = gameLogic.useHint('playerA', hintType);

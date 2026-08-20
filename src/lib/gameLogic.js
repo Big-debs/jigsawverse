@@ -182,6 +182,7 @@ export class GameLogic {
     this.piecePool = [...pieces];
     this.playerARack = [];
     this.playerBRack = [];
+    this.rackCapacity = 10;
     this.currentTurn = 'playerA';
     this.scores = {
       playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 },
@@ -226,6 +227,14 @@ export class GameLogic {
     this.gameState = 'active';
   }
 
+  initializeSinglePlayer() {
+    this.piecePool = this.shufflePieces();
+    this.playerARack = [];
+    this.playerBRack = [];
+    this.fillRack('playerA');
+    this.gameState = 'active';
+  }
+
   shufflePieces() {
     const shuffled = [...this.pieces];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -241,7 +250,7 @@ export class GameLogic {
 
     // Filter out null AND undefined, then count actual pieces
     const actualPieces = rack.filter(p => p !== null && p !== undefined);
-    const needed = 10 - actualPieces.length;
+    const needed = this.rackCapacity - actualPieces.length;
 
     // Create new rack with actual pieces first
     const newRack = [...actualPieces];
@@ -262,6 +271,7 @@ export class GameLogic {
     }
 
     console.log(`Refilled ${player} rack: now has ${newRack.length} pieces`);
+    return newRack;
   }
 
   returnPieceToRack(player, piece) {
@@ -280,18 +290,14 @@ export class GameLogic {
       }
     }
 
-    // Find first null/undefined slot
-    const firstEmptySlot = rack.findIndex(p => p === null || p === undefined);
-
-    if (firstEmptySlot !== -1) {
-      // Fill the first empty slot
-      rack[firstEmptySlot] = completePiece;
-    } else {
-      // No empty slot, push to end
+    const returnedToRack = rack.filter(Boolean).length < this.rackCapacity;
+    if (returnedToRack) {
       rack.push(completePiece);
+    } else {
+      this.piecePool.unshift(completePiece);
     }
 
-    console.log(`Returned piece ${completePiece.id} to ${player} rack (hasImageData: ${!!completePiece.imageData})`);
+    console.log(`Returned piece ${completePiece.id} to ${returnedToRack ? `${player} rack` : 'piece pool'} (hasImageData: ${!!completePiece.imageData})`);
   }
 
   isValidPlacement(pieceId, gridIndex) {
@@ -353,15 +359,19 @@ export class GameLogic {
       return { success: false, message: validation.reason };
     }
 
+    const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
+    const pieceIndex = rack.findIndex(p => p && p.id === pieceId);
+    if (pieceIndex === -1) {
+      this.isPlacementInProgress = false;
+      return { success: false, message: 'Piece is not available in your rack' };
+    }
+
     // Place piece on grid
     this.grid[gridIndex] = validation.piece;
 
-    // Remove from rack
-    const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
-    const pieceIndex = rack.findIndex(p => p && p.id === pieceId);
-    if (pieceIndex !== -1) {
-      rack[pieceIndex] = null;
-    }
+    // Remove the placed piece and restore the rack to its deterministic capacity.
+    rack.splice(pieceIndex, 1);
+    this.fillRack(player);
 
     // Record move
     const move = {
@@ -410,24 +420,19 @@ export class GameLogic {
     } else {
       // No-check modes (SAVANT, SINGLE_PLAYER) — score immediately
       this.pendingCheck = null;
-      const correctPts = this.modeScoring.correctPiece || 10;
-      const wrongPts = this.modeScoring.wrongPiece || 0;
-
-      if (validation.correct) {
-        this.updateScore(player, correctPts, true);
+      if (this.mode === 'SINGLE_PLAYER') {
+        move.scoreResult = this.scoreSinglePlayerPlacement(player, validation.piece, gridIndex, validation.correct);
       } else {
-        this.updateScore(player, wrongPts, false);
+        const points = validation.correct
+          ? this.modeScoring.correctPiece || 10
+          : this.modeScoring.wrongPiece || 0;
+        this.updateScore(player, points, validation.correct);
+        this.consumeTurn(player);
       }
-
-      // Decrement turns and switch if exhausted
-      this.consumeTurn(player);
     }
 
-    // Check if rack needs refilling (when all pieces used)
-    const activeRack = player === 'playerA' ? this.playerARack : this.playerBRack;
-    const remainingPieces = activeRack.filter(p => p !== null).length;
-    if (remainingPieces === 0 && this.piecePool.length > 0) {
-      this.fillRack(player);
+    if (this.mode === 'SINGLE_PLAYER') {
+      this.isPlacementInProgress = false;
     }
 
     return {
@@ -435,8 +440,51 @@ export class GameLogic {
       correct: validation.correct,
       piece: validation.piece,
       awaitingCheck: supportsCheckFlow,
-      scored: !supportsCheckFlow
+      scored: !supportsCheckFlow,
+      scoreResult: move.scoreResult || null
     };
+  }
+
+  scoreSinglePlayerPlacement(player, piece, gridIndex, isCorrect) {
+    const score = this.scores[player];
+    score.totalPlacements++;
+
+    if (isCorrect) {
+      const scoreResult = this.calculatePlacementScore(piece, gridIndex);
+      score.score += scoreResult.total;
+      score.streak++;
+      score.correctPlacements++;
+      score.accuracy = Math.round((score.correctPlacements / score.totalPlacements) * 100);
+      return scoreResult;
+    }
+
+    const points = this.modeScoring.wrongPiece || 0;
+    score.score += points;
+    score.streak = 0;
+    score.accuracy = Math.round((score.correctPlacements / score.totalPlacements) * 100);
+    return { total: points, breakdown: null };
+  }
+
+  reconcileSinglePlayerMilestone() {
+    const filledCells = this.grid.filter(cell => cell !== null && cell !== undefined).length;
+    const progress = this.totalPieces > 0 ? filledCells / this.totalPieces : 0;
+    if (progress < this.nextCheckRevealProgress) {
+      return { reached: false, removedCount: 0 };
+    }
+
+    const returnedPieces = [];
+    this.grid.forEach((piece, index) => {
+      if (piece && piece.correctPosition !== index) {
+        this.grid[index] = null;
+        returnedPieces.push(piece);
+      }
+    });
+    this.piecePool = [...returnedPieces, ...this.piecePool];
+
+    const bucket = Math.floor(progress / 0.2);
+    this.nextCheckRevealProgress = Math.min((bucket + 1) * 0.2, 1);
+
+    return { reached: true, removedCount: returnedPieces.length };
   }
 
   shouldRevealCheckAtCurrentProgress() {
