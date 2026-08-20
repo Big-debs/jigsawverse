@@ -15,7 +15,7 @@ import { BoardScene } from '../phaser/scenes/BoardScene';
  */
 const PhaserGame = ({
     gameState,
-    gridSize,
+    gridDimensions,
     ghostImage,
     settings,
     myRack = [],
@@ -89,7 +89,7 @@ const PhaserGame = ({
         sceneRef.current = boardScene;
 
         game.scene.add('BoardScene', boardScene, true, {
-            gridSize,
+            gridDimensions,
             ghostImage,
             settings,
             isNexusMode,

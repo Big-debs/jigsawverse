@@ -453,7 +453,7 @@ const JigsawVerseApp = () => {
         {currentRoute === ROUTES.SINGLE_PLAYER_GAME && gameData && (
           <SinglePlayerGame
             imageUrl={gameData.imagePreview}
-            gridSize={gameData.gridDimensions?.cols || 10}
+            gridDimensions={gameData.gridDimensions}
             pieces={gameData.pieces}
             settings={gameSettings}
             onExit={() => {
@@ -1551,7 +1551,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
           }>
             <PhaserGame
               gameState={gameState}
-              gridSize={gridSize}
+              gridDimensions={gameData?.gridDimensions || {
+                rows: gridSize,
+                cols: gridSize,
+                totalPieces: grid.length
+              }}
               ghostImage={gameData?.imagePreview || multiplayerRef?.current?.imageUrl}
               settings={gameSettings}
               myRack={myRack}

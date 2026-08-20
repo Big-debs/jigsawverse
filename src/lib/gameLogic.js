@@ -166,9 +166,17 @@ export class ImageProcessor {
 // =====================================================
 
 export class GameLogic {
-  constructor(totalPieces = 100, pieces = [], mode = 'CLASSIC') {
+  constructor(dimensions = 100, pieces = [], mode = 'CLASSIC') {
+    const totalPieces = typeof dimensions === 'number'
+      ? dimensions
+      : dimensions.totalPieces;
+    const legacyGridSize = Math.round(Math.sqrt(totalPieces));
+
     this.totalPieces = totalPieces;
-    this.gridSize = Math.round(Math.sqrt(totalPieces));
+    this.rows = typeof dimensions === 'number' ? legacyGridSize : dimensions.rows;
+    this.cols = typeof dimensions === 'number' ? legacyGridSize : dimensions.cols;
+    // Kept for consumers that still display the square puzzle size.
+    this.gridSize = this.cols;
     this.pieces = pieces;
     this.grid = Array(this.totalPieces).fill(null);
     this.piecePool = [...pieces];
@@ -756,13 +764,13 @@ export class GameLogic {
    * Count how many orthogonal neighbors of gridIndex are correctly placed.
    */
   getAdjacentCorrectCount(gridIndex) {
-    const row = Math.floor(gridIndex / this.gridSize);
-    const col = gridIndex % this.gridSize;
+    const row = Math.floor(gridIndex / this.cols);
+    const col = gridIndex % this.cols;
     const neighbors = [
-      row > 0 ? gridIndex - this.gridSize : -1,                    // up
-      row < this.gridSize - 1 ? gridIndex + this.gridSize : -1,    // down
+      row > 0 ? gridIndex - this.cols : -1,                        // up
+      row < this.rows - 1 ? gridIndex + this.cols : -1,            // down
       col > 0 ? gridIndex - 1 : -1,                                // left
-      col < this.gridSize - 1 ? gridIndex + 1 : -1                 // right
+      col < this.cols - 1 ? gridIndex + 1 : -1                     // right
     ].filter(i => i >= 0);
 
     let count = 0;
@@ -780,32 +788,31 @@ export class GameLogic {
    * Returns { row: bool, column: bool, border: bool }.
    */
   checkRegionCompletion(gridIndex) {
-    const row = Math.floor(gridIndex / this.gridSize);
-    const col = gridIndex % this.gridSize;
-    const gs = this.gridSize;
+    const row = Math.floor(gridIndex / this.cols);
+    const col = gridIndex % this.cols;
 
     // Check if entire row is correctly placed
     let rowComplete = true;
-    for (let c = 0; c < gs; c++) {
-      const idx = row * gs + c;
+    for (let c = 0; c < this.cols; c++) {
+      const idx = row * this.cols + c;
       const p = this.grid[idx];
       if (!p || p.correctPosition !== idx) { rowComplete = false; break; }
     }
 
     // Check if entire column is correctly placed
     let colComplete = true;
-    for (let r = 0; r < gs; r++) {
-      const idx = r * gs + col;
+    for (let r = 0; r < this.rows; r++) {
+      const idx = r * this.cols + col;
       const p = this.grid[idx];
       if (!p || p.correctPosition !== idx) { colComplete = false; break; }
     }
 
     // Check if entire border is correctly placed
     let borderComplete = true;
-    for (let i = 0; i < gs * gs; i++) {
-      const r = Math.floor(i / gs);
-      const c = i % gs;
-      if (r === 0 || r === gs - 1 || c === 0 || c === gs - 1) {
+    for (let i = 0; i < this.totalPieces; i++) {
+      const r = Math.floor(i / this.cols);
+      const c = i % this.cols;
+      if (r === 0 || r === this.rows - 1 || c === 0 || c === this.cols - 1) {
         const p = this.grid[i];
         if (!p || p.correctPosition !== i) { borderComplete = false; break; }
       }
@@ -1018,16 +1025,16 @@ export class GameLogic {
       }
       case 'region': {
         const hintPiece = availablePieces[Math.floor(Math.random() * availablePieces.length)];
-        const correctRow = Math.floor(hintPiece.correctPosition / this.gridSize);
-        const correctCol = hintPiece.correctPosition % this.gridSize;
+        const correctRow = Math.floor(hintPiece.correctPosition / this.cols);
+        const correctCol = hintPiece.correctPosition % this.cols;
         hintInfo = {
           type: 'region',
           pieceId: hintPiece.id,
           region: {
             rowStart: Math.max(0, correctRow - 1),
-            rowEnd: Math.min(this.gridSize - 1, correctRow + 1),
+            rowEnd: Math.min(this.rows - 1, correctRow + 1),
             colStart: Math.max(0, correctCol - 1),
-            colEnd: Math.min(this.gridSize - 1, correctCol + 1)
+            colEnd: Math.min(this.cols - 1, correctCol + 1)
           }
         };
         break;

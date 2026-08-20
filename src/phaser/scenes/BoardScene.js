@@ -9,7 +9,8 @@ import Phaser from 'phaser';
 export class BoardScene extends Phaser.Scene {
     constructor() {
         super({ key: 'BoardScene' });
-        this.gridSize = 5;
+        this.rows = 5;
+        this.cols = 5;
         this.cellSize = 60;
         this.cellSprites = [];
         this.pieceSprites = {};
@@ -40,7 +41,8 @@ export class BoardScene extends Phaser.Scene {
     }
 
     init(data) {
-        this.gridSize = data.gridSize || 5;
+        this.rows = data.gridDimensions?.rows || 5;
+        this.cols = data.gridDimensions?.cols || 5;
         this.isNexusMode = data.isNexusMode || false;
         this.myPlayer = data.myPlayer || 'playerA';
         this.settings = data.settings || {};
@@ -75,16 +77,16 @@ export class BoardScene extends Phaser.Scene {
         const boardAreaH = Math.floor(h * 0.78);
         const rackAreaH = h - boardAreaH;
 
-        // Board: fit square grid into the board area
+        // Board: fit the full puzzle dimensions into the board area
         const margin = 8;
         const availableW = w - margin * 2;
         const availableH = boardAreaH - margin * 2;
-        const fitSize = Math.min(availableW, availableH);
-        this.cellSize = Math.floor(fitSize / this.gridSize);
-        const boardSize = this.cellSize * this.gridSize;
+        this.cellSize = Math.floor(Math.min(availableW / this.cols, availableH / this.rows));
+        const boardWidth = this.cellSize * this.cols;
+        const boardHeight = this.cellSize * this.rows;
 
-        this.boardOffsetX = Math.floor((w - boardSize) / 2);
-        this.boardOffsetY = Math.floor((boardAreaH - boardSize) / 2);
+        this.boardOffsetX = Math.floor((w - boardWidth) / 2);
+        this.boardOffsetY = Math.floor((boardAreaH - boardHeight) / 2);
 
         // Rack area starts after the board area
         this.rackOffsetY = boardAreaH;
@@ -146,11 +148,11 @@ export class BoardScene extends Phaser.Scene {
     createGrid() {
         this.cellSprites = [];
 
-        for (let r = 0; r < this.gridSize; r++) {
-            for (let c = 0; c < this.gridSize; c++) {
+        for (let r = 0; r < this.rows; r++) {
+            for (let c = 0; c < this.cols; c++) {
                 const x = this.boardOffsetX + c * this.cellSize + this.cellSize / 2;
                 const y = this.boardOffsetY + r * this.cellSize + this.cellSize / 2;
-                const index = r * this.gridSize + c;
+                const index = r * this.cols + c;
 
                 const cell = this.add.rectangle(
                     x, y,
@@ -359,14 +361,15 @@ export class BoardScene extends Phaser.Scene {
     createGhostSprite(key) {
         if (this.ghostSprite) this.ghostSprite.destroy();
 
-        const boardSize = this.cellSize * this.gridSize;
+        const boardWidth = this.cellSize * this.cols;
+        const boardHeight = this.cellSize * this.rows;
         this.ghostSprite = this.add.image(
-            this.boardOffsetX + boardSize / 2,
-            this.boardOffsetY + boardSize / 2,
+            this.boardOffsetX + boardWidth / 2,
+            this.boardOffsetY + boardHeight / 2,
             key
         );
         this.boardContainer?.add(this.ghostSprite);
-        this.ghostSprite.setDisplaySize(boardSize, boardSize);
+        this.ghostSprite.setDisplaySize(boardWidth, boardHeight);
         this.ghostSprite.setAlpha(0.12);
         this.ghostSprite.setDepth(-1);
     }
@@ -442,8 +445,8 @@ export class BoardScene extends Phaser.Scene {
             if (existing && existing.getData('pieceId') === piece.id) return;
             if (existing) existing.destroy();
 
-            const r = Math.floor(index / this.gridSize);
-            const c = index % this.gridSize;
+            const r = Math.floor(index / this.cols);
+            const c = index % this.cols;
             const x = this.boardOffsetX + c * this.cellSize + this.cellSize / 2;
             const y = this.boardOffsetY + r * this.cellSize + this.cellSize / 2;
 
@@ -520,8 +523,8 @@ export class BoardScene extends Phaser.Scene {
 
         Object.entries(state.pieceMarks).forEach(([indexStr, mark]) => {
             const index = parseInt(indexStr);
-            const r = Math.floor(index / this.gridSize);
-            const c = index % this.gridSize;
+            const r = Math.floor(index / this.cols);
+            const c = index % this.cols;
             const x = this.boardOffsetX + (c + 1) * this.cellSize - 8;
             const y = this.boardOffsetY + r * this.cellSize + 8;
 
@@ -551,8 +554,6 @@ export class BoardScene extends Phaser.Scene {
         this.clearHintHighlights();
         if (!hint) return;
 
-        const gs = this.gridSize;
-
         switch (hint.type) {
             case 'position': {
                 const idx = hint.correctPosition;
@@ -565,9 +566,9 @@ export class BoardScene extends Phaser.Scene {
             }
             case 'edge': {
                 const cells = [];
-                for (let i = 0; i < gs * gs; i++) {
-                    const r = Math.floor(i / gs), c = i % gs;
-                    if (r === 0 || r === gs - 1 || c === 0 || c === gs - 1) cells.push(i);
+                for (let i = 0; i < this.rows * this.cols; i++) {
+                    const r = Math.floor(i / this.cols), c = i % this.cols;
+                    if (r === 0 || r === this.rows - 1 || c === 0 || c === this.cols - 1) cells.push(i);
                 }
                 cells.forEach(idx => {
                     if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
@@ -579,7 +580,7 @@ export class BoardScene extends Phaser.Scene {
                 break;
             }
             case 'corner': {
-                const corners = [0, gs - 1, gs * (gs - 1), gs * gs - 1];
+                const corners = [0, this.cols - 1, this.cols * (this.rows - 1), this.rows * this.cols - 1];
                 corners.forEach(idx => {
                     if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
                         this.cellSprites[idx].setFillStyle(0xfbbf24, 0.5);
@@ -594,7 +595,7 @@ export class BoardScene extends Phaser.Scene {
                 const cells = [];
                 for (let r = rowStart; r <= rowEnd; r++) {
                     for (let c = colStart; c <= colEnd; c++) {
-                        const idx = r * gs + c;
+                        const idx = r * this.cols + c;
                         if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
                             this.cellSprites[idx].setFillStyle(0xfbbf24, 0.35);
                             this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 0.8);
@@ -652,8 +653,8 @@ export class BoardScene extends Phaser.Scene {
     }
 
     playScorePopup(gridIndex, points, breakdown) {
-        const r = Math.floor(gridIndex / this.gridSize);
-        const c = gridIndex % this.gridSize;
+        const r = Math.floor(gridIndex / this.cols);
+        const c = gridIndex % this.cols;
         const x = this.boardOffsetX + c * this.cellSize + this.cellSize / 2;
         const y = this.boardOffsetY + r * this.cellSize;
 
