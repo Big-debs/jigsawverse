@@ -26,6 +26,13 @@ export class BoardScene extends Phaser.Scene {
         this.selectedPieceId = null;
         this.hintCells = [];
 
+        // Render layers
+        this.boardContainer = null;
+        this.rackContainer = null;
+        this.boardZoom = 1;
+        this.minBoardZoom = 0.5;
+        this.maxBoardZoom = 2.5;
+
         // Layout dimensions
         this.boardOffsetX = 0;
         this.boardOffsetY = 0;
@@ -42,7 +49,9 @@ export class BoardScene extends Phaser.Scene {
 
     create() {
         this.cameras.main.setBackgroundColor('#0f0b1e');
+        this.cameras.main.setZoom(1);
         this.calculateLayout();
+        this.createRenderLayers();
         this.createGrid();
         this.createRackBar();
         this.loadGhostImage();
@@ -90,8 +99,13 @@ export class BoardScene extends Phaser.Scene {
         this.markSprites = {};
         this.ghostSprite = null;
         this.rackSprites = [];
+        this.boardContainer = null;
+        this.rackContainer = null;
+        this.cameras.main.setZoom(1);
 
         this.calculateLayout();
+        this.createRenderLayers();
+        this.applyBoardZoom();
         this.createGrid();
         this.loadGhostImage();
         this.createRackBar();
@@ -103,6 +117,28 @@ export class BoardScene extends Phaser.Scene {
         if (this.rackPieces.length > 0) {
             this.renderRack();
         }
+    }
+
+    createRenderLayers() {
+        this.boardContainer = this.add.container(0, 0);
+        this.boardContainer.setDepth(1);
+
+        this.rackContainer = this.add.container(0, 0);
+        this.rackContainer.setDepth(4);
+    }
+
+    applyBoardZoom() {
+        if (!this.boardContainer) return;
+
+        const boardSize = this.cellSize * this.gridSize;
+        const centerX = this.boardOffsetX + boardSize / 2;
+        const centerY = this.boardOffsetY + boardSize / 2;
+
+        this.boardContainer.setScale(this.boardZoom);
+        this.boardContainer.setPosition(
+            centerX - centerX * this.boardZoom,
+            centerY - centerY * this.boardZoom
+        );
     }
 
     // ========== GRID ==========
@@ -121,6 +157,7 @@ export class BoardScene extends Phaser.Scene {
                     this.cellSize - 2, this.cellSize - 2,
                     0x1a1130, 0.6
                 );
+                this.boardContainer?.add(cell);
                 cell.setStrokeStyle(1, 0x4a3b6e, 0.5);
                 cell.setInteractive({ useHandCursor: true });
                 cell.setData('gridIndex', index);
@@ -154,6 +191,7 @@ export class BoardScene extends Phaser.Scene {
         // Draw a subtle separator line between board and rack
         const w = this.scale.width;
         const line = this.add.line(0, 0, 20, this.rackOffsetY, w - 20, this.rackOffsetY, 0x4a3b6e, 0.3);
+        this.rackContainer?.add(line);
         line.setOrigin(0, 0);
         line.setDepth(0);
     }
@@ -168,6 +206,7 @@ export class BoardScene extends Phaser.Scene {
             w, this.rackAreaH,
             0x130f24, 0.6
         );
+        this.rackContainer?.add(bg);
         bg.setDepth(0);
     }
 
@@ -201,6 +240,7 @@ export class BoardScene extends Phaser.Scene {
 
             const x = startX + i * (pieceSize + padding) + pieceSize / 2;
             const container = this.add.container(x, y);
+            this.rackContainer?.add(container);
             container.setDepth(5);
 
             // Background card
@@ -325,6 +365,7 @@ export class BoardScene extends Phaser.Scene {
             this.boardOffsetY + boardSize / 2,
             key
         );
+        this.boardContainer?.add(this.ghostSprite);
         this.ghostSprite.setDisplaySize(boardSize, boardSize);
         this.ghostSprite.setAlpha(0.12);
         this.ghostSprite.setDepth(-1);
@@ -336,9 +377,12 @@ export class BoardScene extends Phaser.Scene {
         // Mouse wheel zoom on board area only
         this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
             if (pointer.y < this.rackOffsetY) {
-                const cam = this.cameras.main;
-                const newZoom = Phaser.Math.Clamp(cam.zoom + (deltaY > 0 ? -0.1 : 0.1), 0.5, 2.5);
-                cam.setZoom(newZoom);
+                this.boardZoom = Phaser.Math.Clamp(
+                    this.boardZoom + (deltaY > 0 ? -0.1 : 0.1),
+                    this.minBoardZoom,
+                    this.maxBoardZoom
+                );
+                this.applyBoardZoom();
             }
         });
     }
@@ -416,6 +460,7 @@ export class BoardScene extends Phaser.Scene {
                 }
             } else {
                 const rect = this.add.rectangle(x, y, this.cellSize - 4, this.cellSize - 4, 0x7c3aed, 1);
+                this.boardContainer?.add(rect);
                 rect.setData('pieceId', piece.id);
                 rect.setData('gridIndex', index);
                 rect.setDepth(1);
@@ -433,6 +478,7 @@ export class BoardScene extends Phaser.Scene {
 
     createPieceSprite(textureKey, piece, index, x, y) {
         const sprite = this.add.image(x, y, textureKey);
+        this.boardContainer?.add(sprite);
         sprite.setDisplaySize(this.cellSize - 4, this.cellSize - 4);
         sprite.setData('pieceId', piece.id);
         sprite.setData('gridIndex', index);
@@ -483,6 +529,7 @@ export class BoardScene extends Phaser.Scene {
             const text = this.add.text(x, y, icon, {
                 fontSize: `${Math.max(12, this.cellSize / 4)}px`
             });
+            this.boardContainer?.add(text);
             text.setOrigin(1, 0);
             text.setDepth(3);
 
@@ -618,6 +665,7 @@ export class BoardScene extends Phaser.Scene {
             fontStyle: 'bold', color,
             stroke: '#000000', strokeThickness: 3
         });
+        this.boardContainer?.add(text);
         text.setOrigin(0.5, 1);
         text.setDepth(10);
 
@@ -639,6 +687,7 @@ export class BoardScene extends Phaser.Scene {
                     color: '#c4b5fd',
                     stroke: '#000000', strokeThickness: 2
                 });
+                this.boardContainer?.add(sub);
                 sub.setOrigin(0.5, 0);
                 sub.setDepth(10);
 
