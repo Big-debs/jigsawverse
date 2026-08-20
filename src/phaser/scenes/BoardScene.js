@@ -371,7 +371,7 @@ export class BoardScene extends Phaser.Scene {
 
     // Called by PhaserGame to update selected piece
     setSelectedPiece(piece) {
-        this.selectedPieceId = piece?.id || null;
+        this.selectedPieceId = piece?.id ?? null;
         this.updateRackSelection();
     }
 
