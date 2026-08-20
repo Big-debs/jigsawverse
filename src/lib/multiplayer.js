@@ -139,7 +139,7 @@ export class MultiplayerGameHost {
       this.gameId = game.id;
 
       console.log('Step 4: Initializing game logic...');
-      this.gameLogic = new GameLogic(gridDimensions.totalPieces, pieces, settings.mode || 'CLASSIC');
+      this.gameLogic = new GameLogic(gridDimensions, pieces, settings.mode || 'CLASSIC');
       this.gameLogic.initialize();
 
       console.log('Step 5: Setting up realtime state...');

@@ -10,14 +10,20 @@ const PhaserGame = lazy(() => import('./PhaserGame'));
 
 const SinglePlayerGame = ({
   imageUrl,
+  gridDimensions,
   gridSize = 10,
   pieces = [],
   settings = ACCESSIBILITY_DEFAULTS,
   onExit
 }) => {
+  const puzzleDimensions = gridDimensions || {
+    rows: gridSize,
+    cols: gridSize,
+    totalPieces: gridSize * gridSize
+  };
+
   const [gameLogic] = useState(() => {
-    const totalPieces = gridSize * gridSize;
-    const logic = new GameLogic(totalPieces, pieces, 'SINGLE_PLAYER');
+    const logic = new GameLogic(puzzleDimensions, pieces, 'SINGLE_PLAYER');
 
     // Shuffle pieces manually using Fisher-Yates algorithm
     const shuffled = [...pieces];
@@ -312,7 +318,7 @@ const SinglePlayerGame = ({
             <span className="text-slate-400 text-[10px] sm:text-sm">Placed</span>
           </div>
           <div className="text-lg sm:text-2xl font-bold text-white">
-            {totalPlacements}/{gridSize * gridSize}
+            {totalPlacements}/{puzzleDimensions.totalPieces}
           </div>
         </div>
       </div>
@@ -371,7 +377,7 @@ const SinglePlayerGame = ({
           }>
             <PhaserGame
               gameState={gameState}
-              gridSize={gridSize}
+              gridDimensions={puzzleDimensions}
               ghostImage={imageUrl}
               settings={gameSettings}
               myRack={gameState.playerARack}
