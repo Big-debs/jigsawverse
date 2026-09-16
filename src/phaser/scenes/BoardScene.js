@@ -26,6 +26,9 @@ export class BoardScene extends Phaser.Scene {
         this.rackSprites = [];
         this.rackSlotSprites = [];
         this.rackCapacity = 10;
+        this.rackSignature = '';
+        this.pendingTextureKeys = new Set();
+        this.rackRenderQueued = false;
         this.selectedPieceId = null;
         this.hintCells = [];
 
@@ -194,6 +197,31 @@ export class BoardScene extends Phaser.Scene {
         bg.setStrokeStyle(2, 0x4a3b6e, 0.85);
     }
 
+    loadTexture(textureKey, source, onLoaded) {
+        if (this.textures.exists(textureKey)) {
+            onLoaded();
+            return;
+        }
+        if (this.pendingTextureKeys.has(textureKey)) return;
+
+        this.pendingTextureKeys.add(textureKey);
+        this.load.once('complete', () => {
+            this.pendingTextureKeys.delete(textureKey);
+            if (this.textures.exists(textureKey)) onLoaded();
+        });
+        this.load.image(textureKey, source);
+        this.load.start();
+    }
+
+    queueRackRender() {
+        if (this.rackRenderQueued) return;
+        this.rackRenderQueued = true;
+        this.time.delayedCall(0, () => {
+            this.rackRenderQueued = false;
+            this.renderRack();
+        });
+    }
+
     renderRack() {
         // Clear the prior rack contents and rebuild the fixed tray layout.
         this.rackSprites.forEach(s => s.container?.destroy());
@@ -261,16 +289,7 @@ export class BoardScene extends Phaser.Scene {
                     img.setDisplaySize(pieceSize - 4, pieceSize - 4);
                     container.add(img);
                 } else {
-                    this.load.image(textureKey, piece.imageData);
-                    this.load.once('complete', () => {
-                        if (!container.scene) return;
-                        try {
-                            const img = this.add.image(0, 0, textureKey);
-                            img.setDisplaySize(pieceSize - 4, pieceSize - 4);
-                            container.add(img);
-                        } catch { /* container may have been destroyed */ }
-                    });
-                    this.load.start();
+                    this.loadTexture(textureKey, piece.imageData, () => this.queueRackRender());
                 }
             } else {
                 // Fallback: piece ID text
@@ -335,11 +354,7 @@ export class BoardScene extends Phaser.Scene {
             return;
         }
 
-        this.load.image(key, this.ghostImageUrl);
-        this.load.once('complete', () => {
-            this.createGhostSprite(key);
-        });
-        this.load.start();
+        this.loadTexture(key, this.ghostImageUrl, () => this.createGhostSprite(key));
     }
 
     createGhostSprite(key) {
@@ -382,6 +397,9 @@ export class BoardScene extends Phaser.Scene {
     updateRack(rack) {
         if (!rack) return;
         this.rackPieces = rack;
+        const signature = rack.map(piece => piece?.id ?? '').join('|');
+        if (signature === this.rackSignature) return;
+        this.rackSignature = signature;
         this.renderRack();
     }
 
@@ -422,11 +440,7 @@ export class BoardScene extends Phaser.Scene {
             if (piece.imageData) {
                 const textureKey = `piece_${piece.id}`;
                 if (!this.textures.exists(textureKey)) {
-                    this.load.image(textureKey, piece.imageData);
-                    this.load.once('complete', () => {
-                        this.createPieceSprite(textureKey, piece, index, x, y);
-                    });
-                    this.load.start();
+                    this.loadTexture(textureKey, piece.imageData, () => this.renderPieces(this.gameState));
                 } else {
                     this.createPieceSprite(textureKey, piece, index, x, y);
                 }
@@ -449,6 +463,8 @@ export class BoardScene extends Phaser.Scene {
     }
 
     createPieceSprite(textureKey, piece, index, x, y) {
+        if (this.pieceSprites[index] || this.gameState?.grid?.[index]?.id !== piece.id) return;
+
         const sprite = this.add.image(x, y, textureKey);
         this.boardContainer?.add(sprite);
         sprite.setDisplaySize(this.cellSize - 2, this.cellSize - 2);
