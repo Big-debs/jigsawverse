@@ -132,33 +132,6 @@ export class ImageProcessor {
     return shuffled;
   }
 
-  getPiecesForRack(count = 10) {
-    // Distribute pieces across the grid to avoid clustering
-    const shuffled = this.shufflePieces();
-    const rackPieces = [];
-    const selectedIndices = new Set();
-    const step = Math.max(1, Math.floor(shuffled.length / count));
-
-    for (let i = 0; i < count && rackPieces.length < count && i < shuffled.length; i++) {
-      let index = (i * step) % shuffled.length;
-      // If already selected, find the next available index
-      while (selectedIndices.has(index) && selectedIndices.size < shuffled.length) {
-        index = (index + 1) % shuffled.length;
-      }
-      if (!selectedIndices.has(index)) {
-        selectedIndices.add(index);
-        rackPieces.push(shuffled[index]);
-      }
-    }
-
-    // Final shuffle of the selected pieces
-    for (let i = rackPieces.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [rackPieces[i], rackPieces[j]] = [rackPieces[j], rackPieces[i]];
-    }
-
-    return rackPieces;
-  }
 }
 
 // =====================================================
