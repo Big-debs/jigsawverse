@@ -1100,10 +1100,17 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   const [lastAction, setLastAction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
+  const [activeHint, setActiveHint] = useState(null);
+  const [gameplayEffect, setGameplayEffect] = useState(null);
+  const [hintBusy, setHintBusy] = useState(false);
+  const [hintError, setHintError] = useState('');
 
   // Track previous pending check state and scores to detect when opponent responds
   const prevPendingCheckRef = useRef(null);
   const prevScoresRef = useRef(null);
+  const hintTimeoutRef = useRef(null);
+  const gameplayEventSequenceRef = useRef(0);
+  const lastGameplayEffectIdRef = useRef(null);
 
   // Get player identifier
   const myPlayer = isHost ? 'playerA' : 'playerB';
@@ -1207,6 +1214,14 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
       prevPendingCheckRef.current = currentPendingCheck;
       prevScoresRef.current = newState.scores;
 
+      if (
+        newState.lastGameplayEvent?.id &&
+        newState.lastGameplayEvent.id !== lastGameplayEffectIdRef.current
+      ) {
+        lastGameplayEffectIdRef.current = newState.lastGameplayEvent.id;
+        setGameplayEffect(newState.lastGameplayEvent);
+      }
+
       setGameState(newState);
       setLoading(false);
 
@@ -1284,11 +1299,28 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   const isNexusMode = gameState?.mode === 'NEXUS';
   const isMyTurn = isNexusMode || (gameState?.currentTurn === myPlayer && !awaitingDecision);
 
+  const emitGameplayEffect = useCallback((type, payload = {}) => {
+    const event = {
+      id: `multi-${type}-${Date.now()}-${++gameplayEventSequenceRef.current}`,
+      type,
+      timestamp: Date.now(),
+      ...payload
+    };
+    lastGameplayEffectIdRef.current = event.id;
+    setGameplayEffect(event);
+    return event;
+  }, []);
+
+  useEffect(() => () => {
+    if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+  }, []);
+
   // Handle piece selection
   const handlePieceSelect = (piece) => {
     // In Nexus: always allow selection (no turn-gating)
     if (!isNexusMode && (!isMyTurn || awaitingDecision)) return;
     setSelectedPiece(piece);
+    emitGameplayEffect('piece_selected', { actor: myPlayer, pieceId: piece?.id });
   };
 
 
@@ -1311,6 +1343,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
     try {
       const result = await multiplayerRef.current.makeMove(pieceToPlace.id, gridIndex);
+      const placementEvent = multiplayerRef.current.gameLogic?.lastGameplayEvent;
+      if (placementEvent) {
+        lastGameplayEffectIdRef.current = placementEvent.id;
+        setGameplayEffect(placementEvent);
+      }
 
       if (isNexusMode) {
         // Nexus: never reveal correctness — deferred to end-game reveal
@@ -1329,6 +1366,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     } catch (err) {
       console.error('Move error:', err);
       setError('Failed to place piece: ' + err.message);
+      emitGameplayEffect('placement_rejected', {
+        actor: myPlayer,
+        gridIndex,
+        pieceId: pieceToPlace.id
+      });
       // Restore selection on error
       setSelectedPiece(pieceToPlace);
     }
@@ -1562,6 +1604,8 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
               myPlayer={myPlayer}
               isNexusMode={isNexusMode}
               selectedPiece={selectedPiece}
+              activeHint={activeHint}
+              gameplayEffect={gameplayEffect}
               onPieceSelected={(piece) => handlePieceSelect(piece)}
               onPiecePlaced={(pieceId, gridIndex) => handlePlacement(gridIndex)}
               onPieceMarked={(gridIndex, markType) => handleMarkPiece(gridIndex, markType)}
@@ -1648,26 +1692,43 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
           {/* Hints Panel */}
           <HintsPanel
             onUseHint={async (hintType) => {
-              if (!multiplayerRef.current?.gameLogic) return;
+              if (!multiplayerRef.current?.gameLogic || hintBusy) return;
+              setHintBusy(true);
+              setHintError('');
               try {
-                const result = multiplayerRef.current.gameLogic.useHint(myPlayer, hintType);
-                if (result.success) {
-                  setLastAction({
-                    type: 'hint',
-                    message: `Hint used! ${result.cost} points deducted. ${result.hintsUsed}/${5} hints used.`
-                  });
-                  // Trigger state update to refresh UI
-                  const newState = multiplayerRef.current.gameLogic.getGameState();
-                  setGameState(newState);
-                } else {
-                  setError(result.message);
+                const result = await multiplayerRef.current.useHint(hintType);
+                if (!result.success) {
+                  setHintError(result.message);
+                  return;
                 }
+
+                setActiveHint(result.hint);
+                emitGameplayEffect('hint_activated', {
+                  actor: myPlayer,
+                  hintType,
+                  hintId: result.hint.id
+                });
+                setLastAction({
+                  type: 'hint',
+                  message: `Hint used. ${Math.abs(result.cost)} points deducted; ${result.hintsUsed}/5 used.`
+                });
+                setGameState(multiplayerRef.current.gameLogic.getGameState());
+
+                if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+                hintTimeoutRef.current = setTimeout(() => {
+                  setActiveHint(current => current?.id === result.hint.id ? null : current);
+                }, result.hint.duration);
               } catch (err) {
-                setError('Failed to use hint: ' + err.message);
+                setHintError('Failed to use hint: ' + err.message);
+              } finally {
+                setHintBusy(false);
               }
             }}
             hintsUsed={gameState?.scores?.[myPlayer]?.hintsUsed || 0}
-            disabled={!isMyTurn}
+            disabled={!isMyTurn || !!awaitingDecision}
+            busy={hintBusy}
+            error={hintError}
+            activeHint={activeHint}
           />
         </div>
       </div>
