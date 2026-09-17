@@ -81,3 +81,118 @@ describe('GameLogic placement pipeline', () => {
     expect(logic.piecePool).toContainEqual(piece);
   });
 });
+
+
+const createGridPieces = (rows, cols) => Array.from({ length: rows * cols }, (_, id) => {
+  const row = Math.floor(id / cols);
+  const col = id % cols;
+  const edges = {
+    top: row === 0,
+    right: col === cols - 1,
+    bottom: row === rows - 1,
+    left: col === 0
+  };
+  return {
+    id,
+    correctPosition: id,
+    row,
+    col,
+    edges,
+    isEdge: Object.values(edges).some(Boolean)
+  };
+});
+
+describe('GameLogic hint engine', () => {
+  it('returns piece and cell targets for a position hint, including piece ID zero', () => {
+    const logic = new GameLogic(
+      { rows: 1, cols: 1, totalPieces: 1 },
+      createGridPieces(1, 1),
+      'SINGLE_PLAYER'
+    );
+    logic.initializeSinglePlayer();
+
+    const result = logic.useHint('playerA', 'position');
+
+    expect(result.success).toBe(true);
+    expect(result.hint.pieceIds).toEqual([0]);
+    expect(result.hint.cellIndices).toEqual([0]);
+    expect(result.hint.player).toBe('playerA');
+  });
+
+  it('uses explicit columns when producing a rectangular region', () => {
+    const logic = new GameLogic(
+      { rows: 2, cols: 3, totalPieces: 6 },
+      createGridPieces(2, 3),
+      'SINGLE_PLAYER'
+    );
+    logic.initializeSinglePlayer();
+    logic.playerARack = [logic.pieces[5]];
+
+    const result = logic.useHint('playerA', 'region');
+
+    expect(result.success).toBe(true);
+    expect(result.hint.pieceIds).toEqual([5]);
+    expect(result.hint.region).toEqual({
+      rowStart: 0,
+      rowEnd: 1,
+      colStart: 1,
+      colEnd: 2
+    });
+    expect(result.hint.cellIndices).toEqual([1, 2, 4, 5]);
+  });
+
+  it('does not charge when no eligible edge piece is in the rack', () => {
+    const logic = new GameLogic(
+      { rows: 3, cols: 3, totalPieces: 9 },
+      createGridPieces(3, 3),
+      'SINGLE_PLAYER'
+    );
+    logic.initializeSinglePlayer();
+    logic.playerARack = [logic.pieces[4]];
+    const before = { ...logic.scores.playerA };
+
+    const result = logic.useHint('playerA', 'edge');
+
+    expect(result).toMatchObject({
+      success: false,
+      message: 'No edge pieces are currently in your rack'
+    });
+    expect(logic.scores.playerA).toEqual(before);
+  });
+
+  it('highlights rack edge pieces and all board-edge cells', () => {
+    const pieces = createGridPieces(3, 3);
+    const logic = new GameLogic(
+      { rows: 3, cols: 3, totalPieces: 9 },
+      pieces,
+      'SINGLE_PLAYER'
+    );
+    logic.initializeSinglePlayer();
+    logic.playerARack = [pieces[1], pieces[4]];
+
+    const result = logic.useHint('playerA', 'edge');
+
+    expect(result.success).toBe(true);
+    expect(result.hint.pieceIds).toEqual([1]);
+    expect(result.hint.cellIndices).toEqual([0, 1, 2, 3, 5, 6, 7, 8]);
+  });
+
+  it('enforces the configured per-game hint limit', () => {
+    const logic = new GameLogic(
+      { rows: 2, cols: 2, totalPieces: 4 },
+      createGridPieces(2, 2),
+      'SINGLE_PLAYER'
+    );
+    logic.initializeSinglePlayer();
+
+    for (let index = 0; index < 5; index++) {
+      expect(logic.useHint('playerA', 'position').success).toBe(true);
+    }
+
+    expect(logic.useHint('playerA', 'position')).toMatchObject({
+      success: false,
+      message: 'Maximum hints used for this game'
+    });
+    expect(logic.scores.playerA.hintsUsed).toBe(5);
+  });
+});
