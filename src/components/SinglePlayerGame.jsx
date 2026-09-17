@@ -41,9 +41,14 @@ const SinglePlayerGame = ({
   const [selectedPiece, setSelectedPiece] = useState(null);
   const [gameSettings, setGameSettings] = useState(settings);
   const [activeHint, setActiveHint] = useState(null);
+  const [gameplayEffect, setGameplayEffect] = useState(null);
+  const [hintBusy, setHintBusy] = useState(false);
+  const [hintError, setHintError] = useState('');
 
   const timerRef = useRef(null);
   const feedbackTimeoutRef = useRef(null);
+  const hintTimeoutRef = useRef(null);
+  const gameplayEventSequenceRef = useRef(0);
   const lastScoreRef = useRef(null);
 
   // Timer countdown
@@ -86,14 +91,34 @@ const SinglePlayerGame = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+      if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
     };
+  }, []);
+
+  const emitGameplayEffect = useCallback((type, payload = {}) => {
+    setGameplayEffect({
+      id: `single-${type}-${Date.now()}-${++gameplayEventSequenceRef.current}`,
+      type,
+      timestamp: Date.now(),
+      ...payload
+    });
   }, []);
 
   const handlePiecePlacement = useCallback((pieceId, gridIndex) => {
     if (gameStatus !== 'playing') return;
 
     const result = gameLogic.placePiece('playerA', pieceId, gridIndex);
-    if (!result.success) return;
+    if (!result.success) {
+      emitGameplayEffect('placement_rejected', { gridIndex, pieceId });
+      return;
+    }
+
+    emitGameplayEffect('piece_placed', {
+      actor: 'playerA',
+      gridIndex,
+      pieceId,
+      points: result.scoreResult?.total || 0
+    });
 
     setTotalAttempts(prev => prev + 1);
     lastScoreRef.current = { gridIndex, ...result.scoreResult };
@@ -126,14 +151,30 @@ const SinglePlayerGame = ({
 
     setGameState(gameLogic.getGameState());
     setSelectedPiece(null);
-  }, [gameLogic, gameStatus]);
+  }, [emitGameplayEffect, gameLogic, gameStatus]);
 
-  const handleUseHint = (hintType) => {
-    const result = gameLogic.useHint('playerA', hintType);
-    if (result.success) {
+  const handleUseHint = async (hintType) => {
+    if (hintBusy) return;
+    setHintBusy(true);
+    setHintError('');
+    try {
+      const result = gameLogic.useHint('playerA', hintType);
+      if (!result.success) {
+        setHintError(result.message);
+        return;
+      }
+
       setScore(gameLogic.scores.playerA.score);
+      setGameState(gameLogic.getGameState());
       setActiveHint(result.hint);
-      setTimeout(() => setActiveHint(null), 5000);
+      emitGameplayEffect('hint_activated', { hintType, hintId: result.hint.id });
+
+      if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+      hintTimeoutRef.current = setTimeout(() => {
+        setActiveHint(current => current?.id === result.hint.id ? null : current);
+      }, result.hint.duration);
+    } finally {
+      setHintBusy(false);
     }
   };
 
@@ -286,8 +327,11 @@ const SinglePlayerGame = ({
 
           <HintsPanel
             onUseHint={handleUseHint}
-            hintsUsed={gameLogic.scores.playerA.hintsUsed}
+            hintsUsed={gameState?.scores?.playerA?.hintsUsed || 0}
             disabled={gameStatus !== 'playing'}
+            busy={hintBusy}
+            error={hintError}
+            activeHint={activeHint}
           />
 
           {activeHint && (
@@ -319,7 +363,11 @@ const SinglePlayerGame = ({
               myPlayer="playerA"
               selectedPiece={selectedPiece}
               activeHint={activeHint}
-              onPieceSelected={(piece) => setSelectedPiece(piece)}
+              gameplayEffect={gameplayEffect}
+              onPieceSelected={(piece) => {
+                setSelectedPiece(piece);
+                emitGameplayEffect('piece_selected', { pieceId: piece?.id });
+              }}
               onPiecePlaced={(pieceId, gridIndex) => {
                 handlePiecePlacement(pieceId, gridIndex);
               }}
