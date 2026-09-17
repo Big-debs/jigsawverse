@@ -201,8 +201,8 @@ const PhaserGame = ({
     return (
         <div
             ref={containerRef}
-            className="w-full rounded-xl overflow-hidden border border-white/10"
-            style={{ minHeight: '500px', aspectRatio: '3/4' }}
+            className="w-full max-w-[760px] mx-auto rounded-xl overflow-hidden border border-white/10"
+            style={{ minHeight: '500px', aspectRatio: '5/8' }}
         />
     );
 };

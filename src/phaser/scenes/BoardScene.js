@@ -26,6 +26,9 @@ export class BoardScene extends Phaser.Scene {
         this.rackSprites = [];
         this.rackSlotSprites = [];
         this.rackCapacity = 10;
+        this.rackColumns = 5;
+        this.rackRows = 2;
+        this.rackPadding = 6;
         this.rackSignature = '';
         this.pendingTextureKeys = new Set();
         this.rackRenderQueued = false;
@@ -73,24 +76,32 @@ export class BoardScene extends Phaser.Scene {
 
         if (w < 10 || h < 10) return; // Canvas not ready yet
 
-        // Reserve top 78% for board, bottom 22% for rack
-        const boardAreaH = Math.floor(h * 0.78);
-        const rackAreaH = h - boardAreaH;
-
-        // Board: fit the full puzzle dimensions into the board area
+        // The board and rack share one tile scale. The rack is a fixed
+        // 5 × 2 continuation of the board rather than a miniature strip.
         const margin = 8;
+        const separatorGap = 12;
+        const layoutColumns = Math.max(this.cols, this.rackColumns);
+        const layoutRows = this.rows + this.rackRows;
         const availableW = w - margin * 2;
-        const availableH = boardAreaH - margin * 2;
-        this.cellSize = Math.floor(Math.min(availableW / this.cols, availableH / this.rows));
+        const availableH = h - margin * 2 - separatorGap - this.rackPadding * 2;
+
+        this.cellSize = Math.max(1, Math.floor(Math.min(
+            availableW / layoutColumns,
+            availableH / layoutRows
+        )));
+
         const boardWidth = this.cellSize * this.cols;
         const boardHeight = this.cellSize * this.rows;
+        const rackHeight = this.cellSize * this.rackRows + this.rackPadding * 2;
+        const contentHeight = boardHeight + separatorGap + rackHeight;
+        const contentTop = Math.floor((h - contentHeight) / 2);
 
         this.boardOffsetX = Math.floor((w - boardWidth) / 2);
-        this.boardOffsetY = Math.floor((boardAreaH - boardHeight) / 2);
+        this.boardOffsetY = Math.max(margin, contentTop);
 
-        // Rack area starts after the board area
-        this.rackOffsetY = boardAreaH;
-        this.rackAreaH = rackAreaH;
+        // Keep enough real canvas space for two full-size rack rows.
+        this.rackOffsetY = this.boardOffsetY + boardHeight + separatorGap;
+        this.rackAreaH = rackHeight;
     }
 
     rebuildAll() {
@@ -188,9 +199,11 @@ export class BoardScene extends Phaser.Scene {
     createRackBar() {
         // Background for rack area
         const w = this.scale.width;
+        const rackWidth = this.rackColumns * this.cellSize;
         const bg = this.add.rectangle(
             w / 2, this.rackOffsetY + this.rackAreaH / 2,
-            w - 12, Math.max(0, this.rackAreaH - 10),
+            rackWidth + this.rackPadding * 2,
+            this.rackAreaH,
             0x130f24, 0.96
         );
         this.rackContainer?.add(bg);
@@ -230,30 +243,34 @@ export class BoardScene extends Phaser.Scene {
         this.rackSlotSprites = [];
 
         const w = this.scale.width;
-        const padding = 12;
-        const gap = 6;
-        const availableWidth = w - padding * 2;
-        const availableHeight = Math.max(1, this.rackAreaH - padding * 2);
-        const slotSize = Math.max(1, Math.floor(Math.min(
-            availableHeight,
-            (availableWidth - gap * (this.rackCapacity - 1)) / this.rackCapacity
-        )));
-        const totalWidth = this.rackCapacity * slotSize + gap * (this.rackCapacity - 1);
+        const slotSize = this.cellSize;
+        const totalWidth = this.rackColumns * slotSize;
         const startX = Math.floor((w - totalWidth) / 2);
-        const y = this.rackOffsetY + Math.floor(this.rackAreaH / 2);
+        const startY = this.rackOffsetY + this.rackPadding;
 
         for (let i = 0; i < this.rackCapacity; i++) {
-            const x = startX + i * (slotSize + gap) + slotSize / 2;
-            const slot = this.add.rectangle(x, y, slotSize, slotSize, 0x1a1130, 0.75);
+            const row = Math.floor(i / this.rackColumns);
+            const col = i % this.rackColumns;
+            const x = startX + col * slotSize + slotSize / 2;
+            const y = startY + row * slotSize + slotSize / 2;
+            const slot = this.add.rectangle(
+                x, y,
+                Math.max(1, slotSize - 2),
+                Math.max(1, slotSize - 2),
+                0x1a1130, 0.75
+            );
             slot.setStrokeStyle(1, 0x4a3b6e, 0.7);
             this.rackContainer?.add(slot);
             this.rackSlotSprites.push(slot);
         }
 
         const pieces = this.rackPieces.filter(Boolean).slice(0, this.rackCapacity);
-        const pieceSize = Math.max(1, slotSize - 4);
+        const pieceSize = Math.max(1, slotSize - 2);
         pieces.forEach((piece, i) => {
-            const x = startX + i * (slotSize + gap) + slotSize / 2;
+            const row = Math.floor(i / this.rackColumns);
+            const col = i % this.rackColumns;
+            const x = startX + col * slotSize + slotSize / 2;
+            const y = startY + row * slotSize + slotSize / 2;
             const container = this.add.container(x, y);
             this.rackContainer?.add(container);
 
