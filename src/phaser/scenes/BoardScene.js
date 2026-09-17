@@ -34,6 +34,10 @@ export class BoardScene extends Phaser.Scene {
         this.rackRenderQueued = false;
         this.selectedPieceId = null;
         this.hintCells = [];
+        this.hintPieceIds = new Set();
+        this.hintTimeout = null;
+        this.lastGameplayEffectId = null;
+        this.audioContext = null;
 
         // Render layers
         this.boardContainer = null;
@@ -61,6 +65,7 @@ export class BoardScene extends Phaser.Scene {
         this.createGrid();
         this.createRackBar();
         this.loadGhostImage();
+        this.setupAudioUnlock();
         this.events.emit('create');
 
         this.scale.on('resize', () => {
@@ -349,14 +354,19 @@ export class BoardScene extends Phaser.Scene {
     }
 
     updateRackSelection() {
-        this.rackSprites.forEach(({ bg, piece }) => {
+        this.rackSprites.forEach(({ container, bg, piece }) => {
             if (!bg || !piece) return;
             const isSelected = this.selectedPieceId === piece.id;
+            const isHinted = this.hintPieceIds.has(piece.id);
             bg.setStrokeStyle(
-                isSelected ? 3 : 2,
-                isSelected ? 0xfbbf24 : 0x4a3b6e,
+                isSelected ? 4 : isHinted ? 4 : 2,
+                isSelected ? 0xfbbf24 : isHinted ? 0x22d3ee : 0x4a3b6e,
                 1
             );
+            if (container) {
+                this.tweens.killTweensOf(container);
+                container.setScale(isHinted ? 1.06 : 1);
+            }
         });
     }
 
@@ -401,7 +411,7 @@ export class BoardScene extends Phaser.Scene {
     }
 
     updateSettings(settings, ghostImage) {
-        this.settings = settings;
+        this.settings = settings || {};
         this.ghostImageUrl = ghostImage;
         if (ghostImage && settings?.showGhostImage) {
             this.loadGhostImage();
@@ -556,79 +566,51 @@ export class BoardScene extends Phaser.Scene {
         this.clearHintHighlights();
         if (!hint) return;
 
-        switch (hint.type) {
-            case 'position': {
-                const idx = hint.correctPosition;
-                if (this.cellSprites[idx]) {
-                    this.cellSprites[idx].setFillStyle(0xfbbf24, 0.5);
-                    this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 1);
-                    this.hintCells = [idx];
-                }
-                break;
-            }
-            case 'edge': {
-                const cells = [];
-                for (let i = 0; i < this.rows * this.cols; i++) {
-                    const r = Math.floor(i / this.cols), c = i % this.cols;
-                    if (r === 0 || r === this.rows - 1 || c === 0 || c === this.cols - 1) cells.push(i);
-                }
-                cells.forEach(idx => {
-                    if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
-                        this.cellSprites[idx].setFillStyle(0xfbbf24, 0.35);
-                        this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 0.8);
-                    }
-                });
-                this.hintCells = cells;
-                break;
-            }
-            case 'corner': {
-                const corners = [0, this.cols - 1, this.cols * (this.rows - 1), this.rows * this.cols - 1];
-                corners.forEach(idx => {
-                    if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
-                        this.cellSprites[idx].setFillStyle(0xfbbf24, 0.5);
-                        this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 1);
-                    }
-                });
-                this.hintCells = corners;
-                break;
-            }
-            case 'region': {
-                const { rowStart, rowEnd, colStart, colEnd } = hint.region || {};
-                const cells = [];
-                for (let r = rowStart; r <= rowEnd; r++) {
-                    for (let c = colStart; c <= colEnd; c++) {
-                        const idx = r * this.cols + c;
-                        if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
-                            this.cellSprites[idx].setFillStyle(0xfbbf24, 0.35);
-                            this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 0.8);
-                            cells.push(idx);
-                        }
-                    }
-                }
-                this.hintCells = cells;
-                break;
-            }
-        }
+        this.hintPieceIds = new Set(hint.pieceIds || []);
+        this.updateRackSelection();
 
-        // Pulse
-        (this.hintCells || []).forEach(idx => {
-            const cell = this.cellSprites[idx];
+        const cells = Array.isArray(hint.cellIndices) ? hint.cellIndices : [];
+        cells.forEach(index => {
+            const cell = this.cellSprites[index];
             if (!cell) return;
+            const isExact = hint.type === 'position';
+            cell.setFillStyle(0xfbbf24, isExact ? 0.58 : 0.3);
+            cell.setStrokeStyle(isExact ? 3 : 2, isExact ? 0xfbbf24 : 0x22d3ee, 0.95);
+        });
+        this.hintCells = cells.filter(index => !!this.cellSprites[index]);
+
+        this.hintCells.forEach(index => {
+            const cell = this.cellSprites[index];
+            this.tweens.killTweensOf(cell);
             this.tweens.add({
-                targets: cell, fillAlpha: 0.8,
-                duration: 700, yoyo: true, repeat: 3,
+                targets: cell,
+                fillAlpha: 0.78,
+                duration: this.settings?.reducedMotion ? 1 : 650,
+                yoyo: !this.settings?.reducedMotion,
+                repeat: this.settings?.reducedMotion ? 0 : 3,
                 ease: 'Sine.easeInOut'
             });
         });
 
-        this.time.delayedCall(5000, () => this.clearHintHighlights());
+        this.playSoundEffect('hint');
+        const remaining = Math.max(250, (hint.expiresAt || Date.now() + (hint.duration || 5000)) - Date.now());
+        this.hintTimeout = this.time.delayedCall(remaining, () => {
+            this.hintTimeout = null;
+            this.clearHintHighlights(false);
+        });
     }
 
-    clearHintHighlights() {
-        (this.hintCells || []).forEach(idx => {
-            const cell = this.cellSprites[idx];
+    clearHintHighlights(cancelTimer = true) {
+        if (cancelTimer && this.hintTimeout) {
+            this.hintTimeout.remove(false);
+            this.hintTimeout = null;
+        }
+
+        (this.hintCells || []).forEach(index => {
+            const cell = this.cellSprites[index];
             if (!cell) return;
-            const piece = this.gameState?.grid?.[idx];
+            this.tweens.killTweensOf(cell);
+            const piece = this.gameState?.grid?.[index];
             if (piece) {
                 cell.setFillStyle(0x2d1f5e, 0.3);
                 cell.setStrokeStyle(1, 0x6c5ce7, 0.6);
@@ -637,7 +619,100 @@ export class BoardScene extends Phaser.Scene {
                 cell.setStrokeStyle(1, 0x4a3b6e, 0.5);
             }
         });
+
         this.hintCells = [];
+        this.hintPieceIds = new Set();
+        this.updateRackSelection();
+    }
+
+    setupAudioUnlock() {
+        this.input.once('pointerdown', () => {
+            if (!this.settings?.soundEnabled) return;
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+            if (!this.audioContext) this.audioContext = new AudioContextClass();
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume().catch(() => {});
+            }
+        });
+    }
+
+    playSoundEffect(kind) {
+        if (!this.settings?.soundEnabled || !this.audioContext) return;
+        if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume().catch(() => {});
+            return;
+        }
+
+        const sounds = {
+            select: [330, 0.045, 'sine'],
+            place: [180, 0.07, 'triangle'],
+            reject: [95, 0.12, 'square'],
+            hint: [660, 0.12, 'sine'],
+            success: [520, 0.16, 'sine'],
+            failure: [120, 0.18, 'sawtooth'],
+            refill: [260, 0.06, 'triangle'],
+            complete: [784, 0.28, 'sine']
+        };
+        const [frequency, duration, wave] = sounds[kind] || sounds.place;
+        const volume = Math.max(0, Math.min(1, this.settings?.soundVolume ?? 0.7));
+        const now = this.audioContext.currentTime;
+        const oscillator = this.audioContext.createOscillator();
+        const gain = this.audioContext.createGain();
+        oscillator.type = wave;
+        oscillator.frequency.setValueAtTime(frequency, now);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume * 0.12), now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        oscillator.connect(gain);
+        gain.connect(this.audioContext.destination);
+        oscillator.start(now);
+        oscillator.stop(now + duration + 0.02);
+    }
+
+    playGameplayEffect(event) {
+        if (!event?.id || event.id === this.lastGameplayEffectId) return;
+        this.lastGameplayEffectId = event.id;
+
+        switch (event.type) {
+            case 'piece_selected':
+                this.playSoundEffect('select');
+                break;
+            case 'piece_placed':
+                this.pulseCell(event.gridIndex);
+                this.playSoundEffect('place');
+                break;
+            case 'placement_rejected':
+                this.playShakeAnimation(event.gridIndex);
+                this.playSoundEffect('reject');
+                break;
+            case 'hint_activated':
+                // updateHint owns the visual pulse and sound.
+                break;
+            case 'check_resolved':
+                if (event.outcome === 'successful_check' || event.outcome === 'opponent_passed_incorrect') {
+                    this.playEjectAnimation(event.gridIndex);
+                    this.playSoundEffect('failure');
+                } else {
+                    this.playCorrectGlow(event.gridIndex);
+                    this.playSoundEffect('success');
+                }
+                break;
+            case 'rack_refilled':
+                this.playRefillAnimation();
+                this.playSoundEffect('refill');
+                break;
+            case 'streak_increased':
+                this.playStreakEffect(event.streak);
+                this.playSoundEffect('success');
+                break;
+            case 'game_completed':
+                this.cameras.main.flash(this.settings?.reducedMotion ? 1 : 500, 251, 191, 36, false);
+                this.playSoundEffect('complete');
+                break;
+            default:
+                break;
+        }
     }
 
     // ========== ANIMATIONS ==========
