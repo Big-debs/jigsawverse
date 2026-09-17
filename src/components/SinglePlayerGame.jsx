@@ -51,6 +51,10 @@ const SinglePlayerGame = ({
   const gameplayEventSequenceRef = useRef(0);
   const lastScoreRef = useRef(null);
 
+  useEffect(() => {
+    window.localStorage.setItem('jigsawverse-settings', JSON.stringify(gameSettings));
+  }, [gameSettings]);
+
   // Timer countdown
   useEffect(() => {
     if (gameStatus !== 'playing') return;
