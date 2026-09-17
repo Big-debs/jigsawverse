@@ -452,6 +452,27 @@ export class MultiplayerGameHost {
     return result;
   }
 
+  async useHint(hintType) {
+    if (!this.gameLogic) throw new Error('Game not initialized');
+
+    const result = this.gameLogic.useHint('playerA', hintType);
+    if (!result.success) return result;
+
+    // Synchronize the public cost/count only. The private hint payload is
+    // returned to this player and is never included in the broadcast.
+    await this.broadcastGameState();
+    Promise.all([
+      realtimeService.updateGameState(this.gameId, this.gameLogic.exportForDatabase()),
+      gameService.updateGame(this.gameId, {
+        player_a_score: this.gameLogic.scores.playerA.score,
+        player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
+        player_a_streak: this.gameLogic.scores.playerA.streak
+      })
+    ]).catch(err => console.error('Failed to persist player A hint usage:', err));
+
+    return result;
+  }
+
   async respondToCheck(decision) {
     if (!this.gameLogic) throw new Error('Game not initialized');
 
@@ -842,6 +863,27 @@ export class MultiplayerGameGuest {
         player_b_streak: this.gameLogic.scores.playerB.streak
       })
     ]).catch(err => console.error('Background DB write failed:', err));
+
+    return result;
+  }
+
+  async useHint(hintType) {
+    if (!this.gameLogic) throw new Error('Game not initialized');
+
+    const result = this.gameLogic.useHint('playerB', hintType);
+    if (!result.success) return result;
+
+    // Synchronize the public cost/count only. The private hint payload is
+    // returned to this player and is never included in the broadcast.
+    await this.broadcastGameState();
+    Promise.all([
+      realtimeService.updateGameState(this.gameId, this.gameLogic.exportForDatabase()),
+      gameService.updateGame(this.gameId, {
+        player_b_score: this.gameLogic.scores.playerB.score,
+        player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
+        player_b_streak: this.gameLogic.scores.playerB.streak
+      })
+    ]).catch(err => console.error('Failed to persist player B hint usage:', err));
 
     return result;
   }
