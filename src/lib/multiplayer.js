@@ -321,7 +321,8 @@ export class MultiplayerGameHost {
       nextCheckRevealProgress: gl.nextCheckRevealProgress,
       piecePlacedBy: gl.piecePlacedBy,
       pieceMarks: gl.pieceMarks,
-      nexusResolved: gl.nexusResolved
+      nexusResolved: gl.nexusResolved,
+      lastGameplayEvent: gl.lastGameplayEvent
     };
 
     try {
@@ -422,6 +423,13 @@ export class MultiplayerGameHost {
       throw new Error(result.message);
     }
 
+    this.gameLogic.recordGameplayEvent('piece_placed', {
+      actor: currentPlayer,
+      pieceId,
+      gridIndex,
+      awaitingCheck: !!result.awaitingCheck
+    });
+
     // Broadcast FIRST for instant opponent update, then persist to DB in background
     await this.broadcastGameState();
 
@@ -476,7 +484,17 @@ export class MultiplayerGameHost {
   async respondToCheck(decision) {
     if (!this.gameLogic) throw new Error('Game not initialized');
 
+    const pending = this.gameLogic.pendingCheck;
     const result = this.gameLogic.handleOpponentCheck('playerA', decision);
+    if (result.success) {
+      this.gameLogic.recordGameplayEvent('check_resolved', {
+        actor: 'playerA',
+        gridIndex: pending?.gridIndex,
+        pieceId: pending?.pieceId,
+        decision,
+        outcome: result.result
+      });
+    }
 
     // Broadcast FIRST for instant opponent update
     await this.broadcastGameState();
@@ -788,7 +806,8 @@ export class MultiplayerGameGuest {
       nextCheckRevealProgress: gl.nextCheckRevealProgress,
       piecePlacedBy: gl.piecePlacedBy,
       pieceMarks: gl.pieceMarks,
-      nexusResolved: gl.nexusResolved
+      nexusResolved: gl.nexusResolved,
+      lastGameplayEvent: gl.lastGameplayEvent
     };
 
     try {
@@ -836,6 +855,13 @@ export class MultiplayerGameGuest {
     if (!result.success) {
       throw new Error(result.message);
     }
+
+    this.gameLogic.recordGameplayEvent('piece_placed', {
+      actor: currentPlayer,
+      pieceId,
+      gridIndex,
+      awaitingCheck: !!result.awaitingCheck
+    });
 
     // Broadcast FIRST for instant host update, then persist to DB in background
     await this.broadcastGameState();
@@ -891,7 +917,17 @@ export class MultiplayerGameGuest {
   async respondToCheck(decision) {
     if (!this.gameLogic) throw new Error('Game not initialized');
 
+    const pending = this.gameLogic.pendingCheck;
     const result = this.gameLogic.handleOpponentCheck('playerB', decision);
+    if (result.success) {
+      this.gameLogic.recordGameplayEvent('check_resolved', {
+        actor: 'playerB',
+        gridIndex: pending?.gridIndex,
+        pieceId: pending?.pieceId,
+        decision,
+        outcome: result.result
+      });
+    }
 
     // Broadcast FIRST for instant host update
     await this.broadcastGameState();
