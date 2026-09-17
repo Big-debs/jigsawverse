@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Grid3x3, Sparkles, History } from 'lucide-react';
+import { Eye, EyeOff, Grid3x3, Sparkles, History, Volume2, Gauge } from 'lucide-react';
 
 const GameSettingsPanel = ({ settings, onSettingsChange }) => {
   const toggleSetting = (key) => {
@@ -32,6 +32,18 @@ const GameSettingsPanel = ({ settings, onSettingsChange }) => {
       label: 'Move History',
       description: 'Display move history panel',
       icon: History
+    },
+    {
+      key: 'soundEnabled',
+      label: 'Sound Effects',
+      description: 'Play responsive gameplay sounds',
+      icon: Volume2
+    },
+    {
+      key: 'reducedMotion',
+      label: 'Reduced Motion',
+      description: 'Use calmer, shorter gameplay effects',
+      icon: Gauge
     }
   ];
 
@@ -79,6 +91,29 @@ const GameSettingsPanel = ({ settings, onSettingsChange }) => {
             </button>
           );
         })}
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-slate-700">
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="sound-volume" className="text-sm text-white">Sound volume</label>
+          <span className="text-xs text-purple-300">
+            {Math.round((settings.soundVolume ?? 0.7) * 100)}%
+          </span>
+        </div>
+        <input
+          id="sound-volume"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={settings.soundVolume ?? 0.7}
+          disabled={!settings.soundEnabled}
+          onChange={(event) => onSettingsChange({
+            ...settings,
+            soundVolume: Number(event.target.value)
+          })}
+          className="w-full disabled:opacity-40"
+        />
       </div>
     </div>
   );
