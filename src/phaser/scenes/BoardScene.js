@@ -626,7 +626,7 @@ export class BoardScene extends Phaser.Scene {
     }
 
     setupAudioUnlock() {
-        this.input.once('pointerdown', () => {
+        this.input.on('pointerdown', () => {
             if (!this.settings?.soundEnabled) return;
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             if (!AudioContextClass) return;
