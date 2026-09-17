@@ -680,6 +680,10 @@ export class BoardScene extends Phaser.Scene {
                 break;
             case 'piece_placed':
                 this.pulseCell(event.gridIndex);
+                if (typeof event.points === 'number' && event.points !== 0) {
+                    this.playScorePopup(event.gridIndex, event.points, event.breakdown);
+                }
+                if (event.streak >= 3) this.playStreakEffect(event.streak);
                 this.playSoundEffect('place');
                 break;
             case 'placement_rejected':
