@@ -1127,6 +1127,8 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   const hintTimeoutRef = useRef(null);
   const gameplayEventSequenceRef = useRef(0);
   const lastGameplayEffectIdRef = useRef(null);
+  const gameEndScheduledRef = useRef(false);
+  const gameEndTimeoutRef = useRef(null);
 
   // Get player identifier
   const myPlayer = isHost ? 'playerA' : 'playerB';
@@ -1241,16 +1243,25 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
       setGameState(newState);
       setLoading(false);
 
-      // Check for game completion
-      if (newState.isComplete) {
+      // Check for game completion after the shared final-board effect.
+      if (newState.isComplete && !gameEndScheduledRef.current) {
+        gameEndScheduledRef.current = true;
+        const completionEvent = {
+          id: `multi-game-completed-${Date.now()}-${++gameplayEventSequenceRef.current}`,
+          type: 'game_completed',
+          timestamp: Date.now()
+        };
+        lastGameplayEffectIdRef.current = completionEvent.id;
+        setGameplayEffect(completionEvent);
+
         const winner = newState.winner;
-        if (winner === myPlayer) {
-          onGameEnd('you');
-        } else if (winner === opponentPlayer) {
-          onGameEnd('opponent');
-        } else {
-          onGameEnd('tie');
-        }
+        const outcome = winner === myPlayer
+          ? 'you'
+          : winner === opponentPlayer ? 'opponent' : 'tie';
+        gameEndTimeoutRef.current = setTimeout(
+          () => onGameEnd(outcome),
+          gameSettings.reducedMotion ? 50 : 650
+        );
       }
 
       // Check for pending decisions
@@ -1273,7 +1284,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     return () => {
       multiplayer.onStateUpdate = null;
     };
-  }, [multiplayerRef, gameData, myPlayer, opponentPlayer, onGameEnd, setError]);
+  }, [gameSettings.reducedMotion, multiplayerRef, gameData, myPlayer, opponentPlayer, onGameEnd, setError]);
 
   // Timer countdown effect
   useEffect(() => {
@@ -1329,6 +1340,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
   useEffect(() => () => {
     if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+    if (gameEndTimeoutRef.current) clearTimeout(gameEndTimeoutRef.current);
   }, []);
 
   // Handle piece selection
