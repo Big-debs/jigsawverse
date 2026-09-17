@@ -165,7 +165,19 @@ const JigsawVerseApp = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedMode, setSelectedMode] = useState('CLASSIC');
-  const [gameSettings, setGameSettings] = useState(ACCESSIBILITY_DEFAULTS);
+  const [gameSettings, setGameSettings] = useState(() => {
+    if (typeof window === 'undefined') return ACCESSIBILITY_DEFAULTS;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('jigsawverse-settings') || '{}');
+      return {
+        ...ACCESSIBILITY_DEFAULTS,
+        reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false,
+        ...saved
+      };
+    } catch {
+      return ACCESSIBILITY_DEFAULTS;
+    }
+  });
 
   // Refs for multiplayer instances and connection manager
   const multiplayerRef = useRef(null);
@@ -211,6 +223,10 @@ const JigsawVerseApp = () => {
       subscription?.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('jigsawverse-settings', JSON.stringify(gameSettings));
+  }, [gameSettings]);
 
   // Setup connection manager callbacks
   useEffect(() => {
