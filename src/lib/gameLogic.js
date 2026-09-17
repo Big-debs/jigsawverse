@@ -173,6 +173,8 @@ export class GameLogic {
     this.timerRemaining = 600; // Default 10 minutes
     this.isPlacementInProgress = false; // Add placement lock
     this.hintSequence = 0;
+    this.gameplayEventSequence = 0;
+    this.lastGameplayEvent = null;
 
     // Game mode support
     this.mode = mode || 'CLASSIC';
@@ -981,6 +983,17 @@ export class GameLogic {
     }
   }
 
+  recordGameplayEvent(type, payload = {}) {
+    const timestamp = Date.now();
+    this.lastGameplayEvent = {
+      id: `${type}-${timestamp}-${++this.gameplayEventSequence}`,
+      type,
+      timestamp,
+      ...payload
+    };
+    return this.lastGameplayEvent;
+  }
+
   useHint(player, hintType) {
     const score = this.scores[player];
     if (!score) {
@@ -1148,6 +1161,7 @@ export class GameLogic {
       turnsRemaining: { ...this.turnsRemaining },
       checksRemaining: { ...this.checksRemaining },
       nextCheckRevealProgress: this.nextCheckRevealProgress,
+      lastGameplayEvent: this.lastGameplayEvent ? { ...this.lastGameplayEvent } : null,
       // Nexus mode state
       piecePlacedBy: { ...this.piecePlacedBy },
       pieceMarks: { ...this.pieceMarks },
@@ -1168,6 +1182,7 @@ export class GameLogic {
       scores: this.scores,
       turns_remaining: this.turnsRemaining,
       checks_remaining: this.checksRemaining,
+      last_gameplay_event: this.lastGameplayEvent,
       // NOTE: gameplay_mode is only set during initializeGameState, not on updates
       // NOTE: 'pieces' exists but we don't update it after initialization
       // NOTE: 'awaiting_decision' is set separately in makeMove/respondToCheck
@@ -1279,6 +1294,7 @@ export class GameLogic {
     this.gameState = data.game_state || data.gameState || 'active';
     this.pendingCheck = data.pending_check || data.pendingCheck || null;
     this.moveHistory = data.move_history || data.moveHistory || [];
+    this.lastGameplayEvent = data.last_gameplay_event || data.lastGameplayEvent || null;
 
     // Import mode data
     const importedMode = data.gameplay_mode || data.mode;
