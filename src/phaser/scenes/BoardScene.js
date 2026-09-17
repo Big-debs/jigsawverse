@@ -718,6 +718,10 @@ export class BoardScene extends Phaser.Scene {
     // ========== ANIMATIONS ==========
 
     playSnapAnimation(target) {
+        if (this.settings?.reducedMotion) {
+            target.setAlpha(1);
+            return;
+        }
         const targetScaleX = target.scaleX;
         const targetScaleY = target.scaleY;
         target.setScale(targetScaleX * 0.3, targetScaleY * 0.3);
@@ -784,7 +788,15 @@ export class BoardScene extends Phaser.Scene {
 
     playShakeAnimation(gridIndex) {
         const sprite = this.pieceSprites[gridIndex];
-        if (!sprite) return;
+        if (!sprite) {
+            this.pulseCell(gridIndex);
+            return;
+        }
+        if (this.settings?.reducedMotion) {
+            sprite.setTint(0xf87171);
+            this.time.delayedCall(180, () => sprite.clearTint());
+            return;
+        }
         this.tweens.add({
             targets: sprite,
             x: sprite.x - 4,
@@ -795,8 +807,21 @@ export class BoardScene extends Phaser.Scene {
 
     playEjectAnimation(gridIndex, onComplete) {
         const sprite = this.pieceSprites[gridIndex];
-        if (!sprite) { onComplete?.(); return; }
+        if (!sprite) {
+            this.pulseCell(gridIndex);
+            onComplete?.();
+            return;
+        }
         sprite.setTint(0xff4444);
+        if (this.settings?.reducedMotion) {
+            sprite.setAlpha(0);
+            this.time.delayedCall(100, () => {
+                sprite.destroy();
+                delete this.pieceSprites[gridIndex];
+                onComplete?.();
+            });
+            return;
+        }
         this.tweens.add({
             targets: sprite,
             scaleX: 0, scaleY: 0, alpha: 0, angle: 180,
@@ -824,11 +849,25 @@ export class BoardScene extends Phaser.Scene {
     pulseCell(gridIndex) {
         const cell = this.cellSprites[gridIndex];
         if (!cell) return;
+        this.tweens.killTweensOf(cell);
+        const restore = () => {
+            const piece = this.gameState?.grid?.[gridIndex];
+            cell.setFillStyle(piece ? 0x2d1f5e : 0x1a1130, piece ? 0.3 : 0.6);
+            cell.setStrokeStyle(1, piece ? 0x6c5ce7 : 0x4a3b6e, piece ? 0.6 : 0.5);
+        };
+        if (this.settings?.reducedMotion) {
+            cell.setStrokeStyle(2, 0xfbbf24, 0.9);
+            this.time.delayedCall(160, restore);
+            return;
+        }
         this.tweens.add({
-            targets: cell, fillAlpha: 0.9,
-            duration: 400, yoyo: true, repeat: 2,
+            targets: cell,
+            fillAlpha: 0.9,
+            duration: 400,
+            yoyo: true,
+            repeat: 2,
             ease: 'Sine.easeInOut',
-            onComplete: () => cell.setFillStyle(0x1a1130, 0.6)
+            onComplete: restore
         });
     }
 
@@ -843,16 +882,17 @@ export class BoardScene extends Phaser.Scene {
         const hexColor = Phaser.Display.Color.GetColor(color.r, color.g, color.b);
         Object.values(this.pieceSprites).forEach(sprite => {
             sprite.setTint(hexColor);
-            this.time.delayedCall(300, () => sprite.clearTint());
+            this.time.delayedCall(this.settings?.reducedMotion ? 120 : 300, () => sprite.clearTint());
         });
     }
 
     playTimerUrgency(secondsLeft) {
         if (secondsLeft > 30) return;
-        this.cameras.main.flash(200, 255, 50, 50, false);
+        this.cameras.main.flash(this.settings?.reducedMotion ? 1 : 200, 255, 50, 50, false);
     }
 
     playRefillAnimation() {
+        if (this.settings?.reducedMotion) return;
         this.rackSprites.forEach(({ container }, i) => {
             if (!container) return;
             const targetX = container.x;
