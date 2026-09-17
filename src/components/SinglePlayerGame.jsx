@@ -49,6 +49,8 @@ const SinglePlayerGame = ({
   const feedbackTimeoutRef = useRef(null);
   const hintTimeoutRef = useRef(null);
   const gameplayEventSequenceRef = useRef(0);
+  const completionPendingRef = useRef(false);
+  const completionTimeoutRef = useRef(null);
   const lastScoreRef = useRef(null);
 
   useEffect(() => {
@@ -80,15 +82,25 @@ const SinglePlayerGame = ({
     if (gameStatus !== 'playing') return;
 
     const allPlaced = gameState.grid.every(cell => cell !== null);
-    if (allPlaced) {
-      setGameStatus('completed');
+    if (allPlaced && !completionPendingRef.current) {
+      completionPendingRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
 
-      // Award time bonus
+      setGameplayEffect({
+        id: `single-game-completed-${Date.now()}-${++gameplayEventSequenceRef.current}`,
+        type: 'game_completed',
+        timestamp: Date.now()
+      });
+
+      // Award time bonus, then leave enough time for the final board effect.
       const timeBonus = timeRemaining;
       setScore(prev => prev + timeBonus);
+      completionTimeoutRef.current = setTimeout(
+        () => setGameStatus('completed'),
+        gameSettings.reducedMotion ? 50 : 650
+      );
     }
-  }, [gameState.grid, gameStatus, timeRemaining]);
+  }, [gameSettings.reducedMotion, gameState.grid, gameStatus, timeRemaining]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -96,6 +108,7 @@ const SinglePlayerGame = ({
       if (timerRef.current) clearInterval(timerRef.current);
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
       if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+      if (completionTimeoutRef.current) clearTimeout(completionTimeoutRef.current);
     };
   }, []);
 
@@ -121,7 +134,9 @@ const SinglePlayerGame = ({
       actor: 'playerA',
       gridIndex,
       pieceId,
-      points: result.scoreResult?.total || 0
+      points: result.scoreResult?.total || 0,
+      breakdown: result.scoreResult?.breakdown || null,
+      streak: gameLogic.scores.playerA.streak
     });
 
     setTotalAttempts(prev => prev + 1);
