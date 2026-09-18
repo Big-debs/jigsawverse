@@ -172,6 +172,9 @@ export class GameLogic {
     this.nextCheckRevealProgress = 0.2;
     this.timerRemaining = 600; // Default 10 minutes
     this.isPlacementInProgress = false; // Add placement lock
+    this.hintSequence = 0;
+    this.gameplayEventSequence = 0;
+    this.lastGameplayEvent = null;
 
     // Game mode support
     this.mode = mode || 'CLASSIC';
@@ -442,14 +445,19 @@ export class GameLogic {
     const filledCells = this.grid.filter(cell => cell !== null && cell !== undefined).length;
     const progress = this.totalPieces > 0 ? filledCells / this.totalPieces : 0;
     if (progress < this.nextCheckRevealProgress) {
-      return { reached: false, removedCount: 0 };
+      return { reached: false, removedCount: 0, removedCells: [], correctCells: [] };
     }
 
     const returnedPieces = [];
+    const removedCells = [];
+    const correctCells = [];
     this.grid.forEach((piece, index) => {
       if (piece && piece.correctPosition !== index) {
         this.grid[index] = null;
         returnedPieces.push(piece);
+        removedCells.push(index);
+      } else if (piece) {
+        correctCells.push(index);
       }
     });
     this.piecePool = [...returnedPieces, ...this.piecePool];
@@ -457,7 +465,8 @@ export class GameLogic {
     const bucket = Math.floor(progress / 0.2);
     this.nextCheckRevealProgress = Math.min((bucket + 1) * 0.2, 1);
 
-    return { reached: true, removedCount: returnedPieces.length };
+    this.syncRevealedScores();
+    return { reached: true, removedCount: returnedPieces.length, removedCells, correctCells };
   }
 
   shouldRevealCheckAtCurrentProgress() {
@@ -980,21 +989,27 @@ export class GameLogic {
     }
   }
 
+  recordGameplayEvent(type, payload = {}) {
+    const timestamp = Date.now();
+    this.lastGameplayEvent = {
+      id: `${type}-${timestamp}-${++this.gameplayEventSequence}`,
+      type,
+      timestamp,
+      ...payload
+    };
+    return this.lastGameplayEvent;
+  }
+
   useHint(player, hintType) {
-
     const score = this.scores[player];
-
-    // Check if player has exceeded hint limit
+    if (!score) {
+      return { success: false, message: 'Unknown player' };
+    }
+    if (this.gameState === 'finished' || this.isGameComplete()) {
+      return { success: false, message: 'Hints are unavailable after the game ends' };
+    }
     if (score.hintsUsed >= HINT_CONFIG.MAX_HINTS_PER_GAME) {
       return { success: false, message: 'Maximum hints used for this game' };
-    }
-
-    // Get hint information based on type
-    const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
-    const availablePieces = rack.filter(p => p !== null);
-
-    if (availablePieces.length === 0) {
-      return { success: false, message: 'No pieces available for hint' };
     }
 
     const validHintTypes = Object.keys(HINT_CONFIG.COSTS);
@@ -1002,73 +1017,113 @@ export class GameLogic {
       return { success: false, message: 'Unknown hint type' };
     }
 
-    // Get hint cost and deduct points only after validation passes
-    const cost = HINT_CONFIG.COSTS[hintType];
-    this.updateScore(player, cost, false);
-    score.hintsUsed++;
+    const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
+    const availablePieces = rack.filter(Boolean);
+    if (availablePieces.length === 0) {
+      return { success: false, message: 'No pieces available for hint' };
+    }
 
-    let hintInfo = {};
+    const randomPiece = (pieces) => pieces[Math.floor(Math.random() * pieces.length)];
+    const edgeCount = (piece) => {
+      const edges = piece.edges || {};
+      return [edges.top, edges.right, edges.bottom, edges.left].filter(Boolean).length;
+    };
+    const boardEdgeCells = [];
+    for (let index = 0; index < this.totalPieces; index++) {
+      const row = Math.floor(index / this.cols);
+      const col = index % this.cols;
+      if (row === 0 || row === this.rows - 1 || col === 0 || col === this.cols - 1) {
+        boardEdgeCells.push(index);
+      }
+    }
+    const cornerCells = [
+      0,
+      this.cols - 1,
+      this.cols * (this.rows - 1),
+      this.rows * this.cols - 1
+    ].filter((index, position, values) => values.indexOf(index) === position);
+
+    let pieceIds = [];
+    let cellIndices = [];
+    let region = null;
 
     switch (hintType) {
       case 'position': {
-        const hintPiece = availablePieces[Math.floor(Math.random() * availablePieces.length)];
-        hintInfo = {
-          type: 'position',
-          pieceId: hintPiece.id,
-          correctPosition: hintPiece.correctPosition
-        };
+        const piece = randomPiece(availablePieces);
+        pieceIds = [piece.id];
+        cellIndices = [piece.correctPosition];
         break;
       }
       case 'edge': {
-        const edgePieces = availablePieces.filter((p) => {
-          const edges = p.edges || {};
-          const edgeCount = [edges.top, edges.right, edges.bottom, edges.left].filter(Boolean).length;
-          // Edge hints should exclude corner pieces (which have 2 edges).
-          return p.isEdge && edgeCount === 1;
-        });
-        hintInfo = {
-          type: 'edge',
-          edgePieceIds: edgePieces.map(p => p.id)
-        };
+        const pieces = availablePieces.filter(piece => piece.isEdge && edgeCount(piece) === 1);
+        if (pieces.length === 0) {
+          return { success: false, message: 'No edge pieces are currently in your rack' };
+        }
+        pieceIds = pieces.map(piece => piece.id);
+        cellIndices = boardEdgeCells;
         break;
       }
       case 'corner': {
-        const cornerPieces = availablePieces.filter(p => {
-          const edges = p.edges || {};
-          return (edges.top && edges.left) || (edges.top && edges.right) ||
-            (edges.bottom && edges.left) || (edges.bottom && edges.right);
-        });
-        hintInfo = {
-          type: 'corner',
-          cornerPieceIds: cornerPieces.map(p => p.id)
-        };
+        const pieces = availablePieces.filter(piece => edgeCount(piece) >= 2);
+        if (pieces.length === 0) {
+          return { success: false, message: 'No corner pieces are currently in your rack' };
+        }
+        pieceIds = pieces.map(piece => piece.id);
+        cellIndices = cornerCells;
         break;
       }
       case 'region': {
-        const hintPiece = availablePieces[Math.floor(Math.random() * availablePieces.length)];
-        const correctRow = Math.floor(hintPiece.correctPosition / this.cols);
-        const correctCol = hintPiece.correctPosition % this.cols;
-        hintInfo = {
-          type: 'region',
-          pieceId: hintPiece.id,
-          region: {
-            rowStart: Math.max(0, correctRow - 1),
-            rowEnd: Math.min(this.rows - 1, correctRow + 1),
-            colStart: Math.max(0, correctCol - 1),
-            colEnd: Math.min(this.cols - 1, correctCol + 1)
-          }
+        const piece = randomPiece(availablePieces);
+        const correctRow = Math.floor(piece.correctPosition / this.cols);
+        const correctCol = piece.correctPosition % this.cols;
+        region = {
+          rowStart: Math.max(0, correctRow - 1),
+          rowEnd: Math.min(this.rows - 1, correctRow + 1),
+          colStart: Math.max(0, correctCol - 1),
+          colEnd: Math.min(this.cols - 1, correctCol + 1)
         };
+        pieceIds = [piece.id];
+        for (let row = region.rowStart; row <= region.rowEnd; row++) {
+          for (let col = region.colStart; col <= region.colEnd; col++) {
+            cellIndices.push(row * this.cols + col);
+          }
+        }
         break;
       }
       default:
         return { success: false, message: 'Unknown hint type' };
     }
 
+    // Charge only after an actionable hint has been created.
+    const cost = HINT_CONFIG.COSTS[hintType];
+    score.score += cost;
+    score.hintsUsed += 1;
+    // Hint costs are public actions, so show the deduction immediately without
+    // exposing any still-concealed placement score.
+    if (this.revealedScores[player]) {
+      this.revealedScores[player].score += cost;
+    }
+
+    const duration = HINT_CONFIG.DURATION_MS || 5000;
+    const createdAt = Date.now();
+    const hint = {
+      id: `${player}-hint-${createdAt}-${++this.hintSequence}`,
+      type: hintType,
+      player,
+      pieceIds,
+      cellIndices,
+      region,
+      cost,
+      duration,
+      createdAt,
+      expiresAt: createdAt + duration
+    };
+
     return {
       success: true,
       cost,
       hintsUsed: score.hintsUsed,
-      hint: hintInfo
+      hint
     };
   }
 
@@ -1117,6 +1172,7 @@ export class GameLogic {
       turnsRemaining: { ...this.turnsRemaining },
       checksRemaining: { ...this.checksRemaining },
       nextCheckRevealProgress: this.nextCheckRevealProgress,
+      lastGameplayEvent: this.lastGameplayEvent ? { ...this.lastGameplayEvent } : null,
       // Nexus mode state
       piecePlacedBy: { ...this.piecePlacedBy },
       pieceMarks: { ...this.pieceMarks },
@@ -1137,6 +1193,7 @@ export class GameLogic {
       scores: this.scores,
       turns_remaining: this.turnsRemaining,
       checks_remaining: this.checksRemaining,
+      last_gameplay_event: this.lastGameplayEvent,
       // NOTE: gameplay_mode is only set during initializeGameState, not on updates
       // NOTE: 'pieces' exists but we don't update it after initialization
       // NOTE: 'awaiting_decision' is set separately in makeMove/respondToCheck
@@ -1248,6 +1305,7 @@ export class GameLogic {
     this.gameState = data.game_state || data.gameState || 'active';
     this.pendingCheck = data.pending_check || data.pendingCheck || null;
     this.moveHistory = data.move_history || data.moveHistory || [];
+    this.lastGameplayEvent = data.last_gameplay_event || data.lastGameplayEvent || null;
 
     // Import mode data
     const importedMode = data.gameplay_mode || data.mode;

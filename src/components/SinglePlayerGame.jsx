@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
-import { Trophy, Clock, Target, Zap, ArrowLeft } from 'lucide-react';
+import { Trophy, Clock, Target, Zap } from 'lucide-react';
 import { GameLogic } from '../lib/gameLogic';
-import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
+import { ACCESSIBILITY_DEFAULTS, HINT_CONFIG } from '../lib/gameConfig';
 import HintsPanel from './HintsPanel';
 import GameSettingsPanel from './GameSettingsPanel';
+import GameControls from './GameControls';
 
 const PhaserGame = lazy(() => import('./PhaserGame'));
 
@@ -41,10 +42,21 @@ const SinglePlayerGame = ({
   const [selectedPiece, setSelectedPiece] = useState(null);
   const [gameSettings, setGameSettings] = useState(settings);
   const [activeHint, setActiveHint] = useState(null);
+  const [gameplayEffect, setGameplayEffect] = useState(null);
+  const [hintBusy, setHintBusy] = useState(false);
+  const [hintError, setHintError] = useState('');
 
   const timerRef = useRef(null);
   const feedbackTimeoutRef = useRef(null);
-  const lastScoreRef = useRef(null);
+  const hintTimeoutRef = useRef(null);
+  const gameplayEventSequenceRef = useRef(0);
+  const completionPendingRef = useRef(false);
+  const completionTimeoutRef = useRef(null);
+  const lastVisibleScoreRef = useRef(0);
+
+  useEffect(() => {
+    window.localStorage.setItem('jigsawverse-settings', JSON.stringify(gameSettings));
+  }, [gameSettings]);
 
   // Timer countdown
   useEffect(() => {
@@ -71,42 +83,81 @@ const SinglePlayerGame = ({
     if (gameStatus !== 'playing') return;
 
     const allPlaced = gameState.grid.every(cell => cell !== null);
-    if (allPlaced) {
-      setGameStatus('completed');
+    if (allPlaced && !completionPendingRef.current) {
+      completionPendingRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
 
-      // Award time bonus
+      setGameplayEffect({
+        id: `single-game-completed-${Date.now()}-${++gameplayEventSequenceRef.current}`,
+        type: 'game_completed',
+        timestamp: Date.now()
+      });
+
+      // Award time bonus, then leave enough time for the final board effect.
       const timeBonus = timeRemaining;
       setScore(prev => prev + timeBonus);
+      completionTimeoutRef.current = setTimeout(
+        () => setGameStatus('completed'),
+        gameSettings.reducedMotion ? 50 : 650
+      );
     }
-  }, [gameState.grid, gameStatus, timeRemaining]);
+  }, [gameSettings.reducedMotion, gameState.grid, gameStatus, timeRemaining]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+      if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+      if (completionTimeoutRef.current) clearTimeout(completionTimeoutRef.current);
     };
+  }, []);
+
+  const emitGameplayEffect = useCallback((type, payload = {}) => {
+    setGameplayEffect({
+      id: `single-${type}-${Date.now()}-${++gameplayEventSequenceRef.current}`,
+      type,
+      timestamp: Date.now(),
+      ...payload
+    });
   }, []);
 
   const handlePiecePlacement = useCallback((pieceId, gridIndex) => {
     if (gameStatus !== 'playing') return;
 
     const result = gameLogic.placePiece('playerA', pieceId, gridIndex);
-    if (!result.success) return;
+    if (!result.success) {
+      emitGameplayEffect('placement_rejected', { gridIndex, pieceId });
+      return;
+    }
+
+    emitGameplayEffect('piece_placed', {
+      actor: 'playerA',
+      gridIndex,
+      pieceId
+    });
 
     setTotalAttempts(prev => prev + 1);
-    lastScoreRef.current = { gridIndex, ...result.scoreResult };
     const milestone = gameLogic.reconcileSinglePlayerMilestone();
 
     setTotalPlacements(gameLogic.scores.playerA.totalPlacements);
 
     if (milestone.reached) {
-      setScore(gameLogic.scores.playerA.score);
+      const revealedScore = gameLogic.revealedScores.playerA.score;
+      const scoreDelta = revealedScore - lastVisibleScoreRef.current;
+      lastVisibleScoreRef.current = revealedScore;
+      setScore(revealedScore);
       setStreak(gameLogic.scores.playerA.streak);
       setBestStreak(prev => Math.max(prev, gameLogic.scores.playerA.streak));
       setCorrectPlacements(gameLogic.scores.playerA.correctPlacements);
       setAccuracy(gameLogic.scores.playerA.accuracy);
+      emitGameplayEffect('milestone_reveal', {
+        points: scoreDelta,
+        anchorCell: gridIndex,
+        correctCells: milestone.correctCells,
+        removedCells: milestone.removedCells,
+        streak: gameLogic.scores.playerA.streak
+      });
 
       setLastResult({
         correct: true,
@@ -126,14 +177,31 @@ const SinglePlayerGame = ({
 
     setGameState(gameLogic.getGameState());
     setSelectedPiece(null);
-  }, [gameLogic, gameStatus]);
+  }, [emitGameplayEffect, gameLogic, gameStatus]);
 
-  const handleUseHint = (hintType) => {
-    const result = gameLogic.useHint('playerA', hintType);
-    if (result.success) {
-      setScore(gameLogic.scores.playerA.score);
+  const handleUseHint = async (hintType) => {
+    if (hintBusy) return;
+    setHintBusy(true);
+    setHintError('');
+    try {
+      const result = gameLogic.useHint('playerA', hintType);
+      if (!result.success) {
+        setHintError(result.message);
+        return;
+      }
+
+      setScore(gameLogic.revealedScores.playerA.score);
+      lastVisibleScoreRef.current = gameLogic.revealedScores.playerA.score;
+      setGameState(gameLogic.getGameState());
       setActiveHint(result.hint);
-      setTimeout(() => setActiveHint(null), 5000);
+      emitGameplayEffect('hint_activated', { hintType, hintId: result.hint.id });
+
+      if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+      hintTimeoutRef.current = setTimeout(() => {
+        setActiveHint(current => current?.id === result.hint.id ? null : current);
+      }, result.hint.duration);
+    } finally {
+      setHintBusy(false);
     }
   };
 
@@ -196,72 +264,38 @@ const SinglePlayerGame = ({
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <button
-          onClick={onExit}
-          className="flex items-center gap-2 text-purple-300 hover:text-purple-200 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Exit</span>
-        </button>
-
-        <h2 className="text-2xl font-bold text-white">Single Player Mode</h2>
-
-        <div className="w-20"></div>
-      </div>
-
-      {/* Stats Bar — scrollable row on mobile, 5-col on desktop */}
-      <div className="flex gap-2 sm:grid sm:grid-cols-5 sm:gap-4 mb-4 sm:mb-6 overflow-x-auto hide-scrollbar pb-1 sm:pb-0">
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-2.5 sm:p-4 border border-slate-700 min-w-[100px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400" />
-            <span className="text-slate-400 text-[10px] sm:text-sm">Time</span>
-          </div>
-          <div className={`text-lg sm:text-2xl font-bold ${timeRemaining < 60 ? 'text-red-400' : 'text-white'}`}>
-            {formatTime(timeRemaining)}
-          </div>
+    <div className="game-play-shell max-w-4xl mx-auto pb-20 lg:pb-4">
+      <div className="game-compact-hud mb-3" aria-label="Game statistics">
+        <div className="game-hud-title">
+          <span>Solo</span>
+          <span>{totalPlacements}/{puzzleDimensions.totalPieces} placed</span>
         </div>
-
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-2.5 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-            <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-yellow-400" />
-            <span className="text-slate-400 text-[10px] sm:text-sm">Score</span>
-          </div>
-          <div className="text-lg sm:text-2xl font-bold text-white">{score}</div>
+        <div className="game-hud-stat">
+          <Clock className="w-4 h-4 text-blue-400" />
+          <span>Time</span>
+          <strong className={timeRemaining < 60 ? 'text-red-400' : 'text-white'}>{formatTime(timeRemaining)}</strong>
         </div>
-
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-2.5 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-            <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-400" />
-            <span className="text-slate-400 text-[10px] sm:text-sm">Streak</span>
-          </div>
-          <div className="text-lg sm:text-2xl font-bold text-white">{streak}</div>
+        <div className="game-hud-stat">
+          <Trophy className="w-4 h-4 text-yellow-400" />
+          <span>Score</span>
+          <strong>{score}</strong>
         </div>
-
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-2.5 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-            <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-400" />
-            <span className="text-slate-400 text-[10px] sm:text-sm">Accuracy</span>
-          </div>
-          <div className="text-lg sm:text-2xl font-bold text-white">{accuracy}%</div>
+        <div className="game-hud-stat">
+          <Zap className="w-4 h-4 text-orange-400" />
+          <span>Streak</span>
+          <strong>{streak}</strong>
         </div>
-
-        <div className="bg-slate-800/80 backdrop-blur-md rounded-xl p-2.5 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-            <span className="text-slate-400 text-[10px] sm:text-sm">Placed</span>
-          </div>
-          <div className="text-lg sm:text-2xl font-bold text-white">
-            {totalPlacements}/{puzzleDimensions.totalPieces}
-          </div>
+        <div className="game-hud-stat">
+          <Target className="w-4 h-4 text-green-400" />
+          <span>Accuracy</span>
+          <strong>{accuracy}%</strong>
         </div>
       </div>
 
       {/* Feedback */}
       {lastResult && (
         <div
-          className={`mb-4 p-3 rounded-xl text-center font-semibold transition-all text-sm sm:text-base ${lastResult.correct === null
+          className={`game-toast text-center font-semibold transition-all text-sm sm:text-base ${lastResult.correct === null
             ? 'bg-white/10 text-white/70 border border-white/10'
             : lastResult.correct
               ? 'bg-green-500/20 text-green-300 border border-green-500/30'
@@ -276,35 +310,8 @@ const SinglePlayerGame = ({
         </div>
       )}
 
-      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-3 sm:gap-6">
-        {/* Left Panel - Settings & Hints (hidden on mobile, shown at bottom) */}
-        <div className="hidden lg:block lg:col-span-3 space-y-4">
-          <GameSettingsPanel
-            settings={gameSettings}
-            onSettingsChange={setGameSettings}
-          />
-
-          <HintsPanel
-            onUseHint={handleUseHint}
-            hintsUsed={gameLogic.scores.playerA.hintsUsed}
-            disabled={gameStatus !== 'playing'}
-          />
-
-          {activeHint && (
-            <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-3 sm:p-4">
-              <div className="text-yellow-300 font-semibold mb-1 sm:mb-2 text-sm">Active Hint:</div>
-              <div className="text-white text-xs sm:text-sm">
-                {activeHint.type === 'position' && `Piece ${activeHint.pieceId} goes to position ${activeHint.correctPosition}`}
-                {activeHint.type === 'edge' && 'Edge pieces highlighted'}
-                {activeHint.type === 'corner' && 'Corner pieces highlighted'}
-                {activeHint.type === 'region' && `Piece ${activeHint.pieceId} is in region shown`}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Center - Phaser Game Canvas */}
-        <div className="lg:col-span-9">
+      <div>
+        <div>
           <Suspense fallback={
             <div className="w-full bg-slate-900/50 rounded-xl flex items-center justify-center" style={{ minHeight: '400px' }}>
               <div className="text-purple-300 text-lg">Loading game...</div>
@@ -319,7 +326,11 @@ const SinglePlayerGame = ({
               myPlayer="playerA"
               selectedPiece={selectedPiece}
               activeHint={activeHint}
-              onPieceSelected={(piece) => setSelectedPiece(piece)}
+              gameplayEffect={gameplayEffect}
+              onPieceSelected={(piece) => {
+                setSelectedPiece(piece);
+                emitGameplayEffect('piece_selected', { pieceId: piece?.id });
+              }}
               onPiecePlaced={(pieceId, gridIndex) => {
                 handlePiecePlacement(pieceId, gridIndex);
               }}
@@ -327,19 +338,26 @@ const SinglePlayerGame = ({
           </Suspense>
         </div>
 
-        {/* Mobile-only Settings & Hints */}
-        <div className="lg:hidden space-y-3">
-          <GameSettingsPanel
-            settings={gameSettings}
-            onSettingsChange={setGameSettings}
-          />
+      </div>
+
+      <GameControls
+        activeHint={activeHint}
+        hintsRemaining={Math.max(0, HINT_CONFIG.MAX_HINTS_PER_GAME - (gameState?.scores?.playerA?.hintsUsed || 0))}
+        onExit={onExit}
+        settingsPanel={(
+          <GameSettingsPanel settings={gameSettings} onSettingsChange={setGameSettings} />
+        )}
+        hintsPanel={(
           <HintsPanel
             onUseHint={handleUseHint}
-            hintsUsed={gameLogic.scores.playerA.hintsUsed}
+            hintsUsed={gameState?.scores?.playerA?.hintsUsed || 0}
             disabled={gameStatus !== 'playing'}
+            busy={hintBusy}
+            error={hintError}
+            activeHint={activeHint}
           />
-        </div>
-      </div>
+        )}
+      />
     </div>
   );
 };

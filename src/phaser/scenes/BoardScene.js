@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playGameSound } from '../../lib/audioManager';
 
 /**
  * BoardScene — Single Phaser scene for the entire game view.
@@ -34,6 +35,9 @@ export class BoardScene extends Phaser.Scene {
         this.rackRenderQueued = false;
         this.selectedPieceId = null;
         this.hintCells = [];
+        this.hintPieceIds = new Set();
+        this.hintTimeout = null;
+        this.lastGameplayEffectId = null;
 
         // Render layers
         this.boardContainer = null;
@@ -349,14 +353,20 @@ export class BoardScene extends Phaser.Scene {
     }
 
     updateRackSelection() {
-        this.rackSprites.forEach(({ bg, piece }) => {
+        this.rackSprites.forEach(({ container, bg, piece }) => {
             if (!bg || !piece) return;
             const isSelected = this.selectedPieceId === piece.id;
+            const isHinted = this.hintPieceIds.has(piece.id);
             bg.setStrokeStyle(
-                isSelected ? 3 : 2,
-                isSelected ? 0xfbbf24 : 0x4a3b6e,
+                isSelected ? 4 : isHinted ? 4 : 2,
+                isSelected ? 0xfbbf24 : isHinted ? 0x22d3ee : 0x4a3b6e,
                 1
             );
+            if (container) {
+                this.tweens.killTweensOf(container);
+                container.setScale(isHinted ? 1.06 : 1);
+                container.setAlpha(this.hintPieceIds.size > 0 && !isHinted ? 0.34 : 1);
+            }
         });
     }
 
@@ -401,7 +411,7 @@ export class BoardScene extends Phaser.Scene {
     }
 
     updateSettings(settings, ghostImage) {
-        this.settings = settings;
+        this.settings = settings || {};
         this.ghostImageUrl = ghostImage;
         if (ghostImage && settings?.showGhostImage) {
             this.loadGhostImage();
@@ -556,79 +566,54 @@ export class BoardScene extends Phaser.Scene {
         this.clearHintHighlights();
         if (!hint) return;
 
-        switch (hint.type) {
-            case 'position': {
-                const idx = hint.correctPosition;
-                if (this.cellSprites[idx]) {
-                    this.cellSprites[idx].setFillStyle(0xfbbf24, 0.5);
-                    this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 1);
-                    this.hintCells = [idx];
-                }
-                break;
-            }
-            case 'edge': {
-                const cells = [];
-                for (let i = 0; i < this.rows * this.cols; i++) {
-                    const r = Math.floor(i / this.cols), c = i % this.cols;
-                    if (r === 0 || r === this.rows - 1 || c === 0 || c === this.cols - 1) cells.push(i);
-                }
-                cells.forEach(idx => {
-                    if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
-                        this.cellSprites[idx].setFillStyle(0xfbbf24, 0.35);
-                        this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 0.8);
-                    }
-                });
-                this.hintCells = cells;
-                break;
-            }
-            case 'corner': {
-                const corners = [0, this.cols - 1, this.cols * (this.rows - 1), this.rows * this.cols - 1];
-                corners.forEach(idx => {
-                    if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
-                        this.cellSprites[idx].setFillStyle(0xfbbf24, 0.5);
-                        this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 1);
-                    }
-                });
-                this.hintCells = corners;
-                break;
-            }
-            case 'region': {
-                const { rowStart, rowEnd, colStart, colEnd } = hint.region || {};
-                const cells = [];
-                for (let r = rowStart; r <= rowEnd; r++) {
-                    for (let c = colStart; c <= colEnd; c++) {
-                        const idx = r * this.cols + c;
-                        if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
-                            this.cellSprites[idx].setFillStyle(0xfbbf24, 0.35);
-                            this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 0.8);
-                            cells.push(idx);
-                        }
-                    }
-                }
-                this.hintCells = cells;
-                break;
-            }
-        }
+        this.hintPieceIds = new Set(hint.pieceIds || []);
+        this.updateRackSelection();
 
-        // Pulse
-        (this.hintCells || []).forEach(idx => {
-            const cell = this.cellSprites[idx];
+        const cells = Array.isArray(hint.cellIndices) ? hint.cellIndices : [];
+        this.cellSprites.forEach((cell, index) => {
+            if (!cells.includes(index)) cell.setAlpha(0.42);
+        });
+        cells.forEach(index => {
+            const cell = this.cellSprites[index];
             if (!cell) return;
+            const isExact = hint.type === 'position';
+            cell.setFillStyle(0xfbbf24, isExact ? 0.58 : 0.3);
+            cell.setStrokeStyle(isExact ? 3 : 2, isExact ? 0xfbbf24 : 0x22d3ee, 0.95);
+        });
+        this.hintCells = cells.filter(index => !!this.cellSprites[index]);
+
+        this.hintCells.forEach(index => {
+            const cell = this.cellSprites[index];
+            this.tweens.killTweensOf(cell);
             this.tweens.add({
-                targets: cell, fillAlpha: 0.8,
-                duration: 700, yoyo: true, repeat: 3,
+                targets: cell,
+                fillAlpha: 0.78,
+                duration: this.settings?.reducedMotion ? 1 : 650,
+                yoyo: !this.settings?.reducedMotion,
+                repeat: this.settings?.reducedMotion ? 0 : 3,
                 ease: 'Sine.easeInOut'
             });
         });
 
-        this.time.delayedCall(5000, () => this.clearHintHighlights());
+        this.playSoundEffect('hint');
+        const remaining = Math.max(250, (hint.expiresAt || Date.now() + (hint.duration || 5000)) - Date.now());
+        this.hintTimeout = this.time.delayedCall(remaining, () => {
+            this.hintTimeout = null;
+            this.clearHintHighlights(false);
+        });
     }
 
-    clearHintHighlights() {
-        (this.hintCells || []).forEach(idx => {
-            const cell = this.cellSprites[idx];
+    clearHintHighlights(cancelTimer = true) {
+        if (cancelTimer && this.hintTimeout) {
+            this.hintTimeout.remove(false);
+            this.hintTimeout = null;
+        }
+
+        (this.hintCells || []).forEach(index => {
+            const cell = this.cellSprites[index];
             if (!cell) return;
-            const piece = this.gameState?.grid?.[idx];
+            this.tweens.killTweensOf(cell);
+            const piece = this.gameState?.grid?.[index];
             if (piece) {
                 cell.setFillStyle(0x2d1f5e, 0.3);
                 cell.setStrokeStyle(1, 0x6c5ce7, 0.6);
@@ -637,12 +622,82 @@ export class BoardScene extends Phaser.Scene {
                 cell.setStrokeStyle(1, 0x4a3b6e, 0.5);
             }
         });
+
         this.hintCells = [];
+        this.hintPieceIds = new Set();
+        this.cellSprites.forEach(cell => cell?.setAlpha(1));
+        this.updateRackSelection();
+    }
+
+    playSoundEffect(kind) {
+        playGameSound(kind, this.settings);
+    }
+
+    playGameplayEffect(event) {
+        if (!event?.id || event.id === this.lastGameplayEffectId) return;
+        this.lastGameplayEffectId = event.id;
+
+        switch (event.type) {
+            case 'piece_selected':
+                this.playSoundEffect('select');
+                break;
+            case 'piece_placed':
+                this.pulseCell(event.gridIndex);
+                this.playSoundEffect('place');
+                break;
+            case 'milestone_reveal':
+                (event.correctCells || []).forEach(index => this.playCorrectGlow(index));
+                (event.removedCells || []).forEach(index => this.playEjectAnimation(index));
+                if (typeof event.points === 'number' && event.points !== 0) {
+                    this.playScorePopup(event.anchorCell ?? 0, event.points, event.breakdown);
+                }
+                if (event.streak >= 3) this.playStreakEffect(event.streak);
+                this.playSoundEffect((event.removedCells || []).length ? 'failure' : 'success');
+                break;
+            case 'check_concealed':
+                this.pulseCell(event.gridIndex);
+                this.playSoundEffect('place');
+                break;
+            case 'placement_rejected':
+                this.playShakeAnimation(event.gridIndex);
+                this.playSoundEffect('reject');
+                break;
+            case 'hint_activated':
+                // updateHint owns the visual pulse and sound.
+                break;
+            case 'check_resolved':
+                if (event.outcome === 'successful_check' || event.outcome === 'opponent_passed_incorrect') {
+                    this.playEjectAnimation(event.gridIndex);
+                    this.playSoundEffect('failure');
+                } else {
+                    this.playCorrectGlow(event.gridIndex);
+                    this.playSoundEffect('success');
+                }
+                break;
+            case 'rack_refilled':
+                this.playRefillAnimation();
+                this.playSoundEffect('refill');
+                break;
+            case 'streak_increased':
+                this.playStreakEffect(event.streak);
+                this.playSoundEffect('success');
+                break;
+            case 'game_completed':
+                this.cameras.main.flash(this.settings?.reducedMotion ? 1 : 500, 251, 191, 36, false);
+                this.playSoundEffect('complete');
+                break;
+            default:
+                break;
+        }
     }
 
     // ========== ANIMATIONS ==========
 
     playSnapAnimation(target) {
+        if (this.settings?.reducedMotion) {
+            target.setAlpha(1);
+            return;
+        }
         const targetScaleX = target.scaleX;
         const targetScaleY = target.scaleY;
         target.setScale(targetScaleX * 0.3, targetScaleY * 0.3);
@@ -709,7 +764,15 @@ export class BoardScene extends Phaser.Scene {
 
     playShakeAnimation(gridIndex) {
         const sprite = this.pieceSprites[gridIndex];
-        if (!sprite) return;
+        if (!sprite) {
+            this.pulseCell(gridIndex);
+            return;
+        }
+        if (this.settings?.reducedMotion) {
+            sprite.setTint(0xf87171);
+            this.time.delayedCall(180, () => sprite.clearTint());
+            return;
+        }
         this.tweens.add({
             targets: sprite,
             x: sprite.x - 4,
@@ -720,8 +783,21 @@ export class BoardScene extends Phaser.Scene {
 
     playEjectAnimation(gridIndex, onComplete) {
         const sprite = this.pieceSprites[gridIndex];
-        if (!sprite) { onComplete?.(); return; }
+        if (!sprite) {
+            this.pulseCell(gridIndex);
+            onComplete?.();
+            return;
+        }
         sprite.setTint(0xff4444);
+        if (this.settings?.reducedMotion) {
+            sprite.setAlpha(0);
+            this.time.delayedCall(100, () => {
+                sprite.destroy();
+                delete this.pieceSprites[gridIndex];
+                onComplete?.();
+            });
+            return;
+        }
         this.tweens.add({
             targets: sprite,
             scaleX: 0, scaleY: 0, alpha: 0, angle: 180,
@@ -749,11 +825,25 @@ export class BoardScene extends Phaser.Scene {
     pulseCell(gridIndex) {
         const cell = this.cellSprites[gridIndex];
         if (!cell) return;
+        this.tweens.killTweensOf(cell);
+        const restore = () => {
+            const piece = this.gameState?.grid?.[gridIndex];
+            cell.setFillStyle(piece ? 0x2d1f5e : 0x1a1130, piece ? 0.3 : 0.6);
+            cell.setStrokeStyle(1, piece ? 0x6c5ce7 : 0x4a3b6e, piece ? 0.6 : 0.5);
+        };
+        if (this.settings?.reducedMotion) {
+            cell.setStrokeStyle(2, 0xfbbf24, 0.9);
+            this.time.delayedCall(160, restore);
+            return;
+        }
         this.tweens.add({
-            targets: cell, fillAlpha: 0.9,
-            duration: 400, yoyo: true, repeat: 2,
+            targets: cell,
+            fillAlpha: 0.9,
+            duration: 400,
+            yoyo: true,
+            repeat: 2,
             ease: 'Sine.easeInOut',
-            onComplete: () => cell.setFillStyle(0x1a1130, 0.6)
+            onComplete: restore
         });
     }
 
@@ -768,16 +858,17 @@ export class BoardScene extends Phaser.Scene {
         const hexColor = Phaser.Display.Color.GetColor(color.r, color.g, color.b);
         Object.values(this.pieceSprites).forEach(sprite => {
             sprite.setTint(hexColor);
-            this.time.delayedCall(300, () => sprite.clearTint());
+            this.time.delayedCall(this.settings?.reducedMotion ? 120 : 300, () => sprite.clearTint());
         });
     }
 
     playTimerUrgency(secondsLeft) {
         if (secondsLeft > 30) return;
-        this.cameras.main.flash(200, 255, 50, 50, false);
+        this.cameras.main.flash(this.settings?.reducedMotion ? 1 : 200, 255, 50, 50, false);
     }
 
     playRefillAnimation() {
+        if (this.settings?.reducedMotion) return;
         this.rackSprites.forEach(({ container }, i) => {
             if (!container) return;
             const targetX = container.x;
