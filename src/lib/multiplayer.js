@@ -487,7 +487,7 @@ export class MultiplayerGameHost {
     const pending = this.gameLogic.pendingCheck;
     const result = this.gameLogic.handleOpponentCheck('playerA', decision);
     if (result.success) {
-      this.gameLogic.recordGameplayEvent('check_resolved', {
+      this.gameLogic.recordGameplayEvent(result.correctnessRevealed ? 'check_resolved' : 'check_concealed', {
         actor: 'playerA',
         gridIndex: pending?.gridIndex,
         pieceId: pending?.pieceId,
@@ -920,7 +920,7 @@ export class MultiplayerGameGuest {
     const pending = this.gameLogic.pendingCheck;
     const result = this.gameLogic.handleOpponentCheck('playerB', decision);
     if (result.success) {
-      this.gameLogic.recordGameplayEvent('check_resolved', {
+      this.gameLogic.recordGameplayEvent(result.correctnessRevealed ? 'check_resolved' : 'check_concealed', {
         actor: 'playerB',
         gridIndex: pending?.gridIndex,
         pieceId: pending?.pieceId,

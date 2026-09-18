@@ -76,9 +76,27 @@ describe('GameLogic placement pipeline', () => {
     logic.placePiece('playerA', piece.id, 0);
     const milestone = logic.reconcileSinglePlayerMilestone();
 
-    expect(milestone).toEqual({ reached: true, removedCount: 1 });
+    expect(milestone).toMatchObject({ reached: true, removedCount: 1, removedCells: [0] });
     expect(logic.grid[0]).toBeNull();
     expect(logic.piecePool).toContainEqual(piece);
+    expect(logic.revealedScores.playerA.score).toBe(logic.scores.playerA.score);
+  });
+
+  it('keeps placement scoring concealed until a milestone is reconciled', () => {
+    const logic = new GameLogic(
+      { rows: 1, cols: 10, totalPieces: 10 },
+      createPieces(10),
+      'SINGLE_PLAYER'
+    );
+    logic.initializeSinglePlayer();
+    const first = logic.playerARack.find(piece => piece.correctPosition === 0);
+
+    logic.placePiece('playerA', first.id, 0);
+
+    expect(logic.scores.playerA.score).toBeGreaterThan(0);
+    expect(logic.revealedScores.playerA.score).toBe(0);
+    expect(logic.reconcileSinglePlayerMilestone().reached).toBe(false);
+    expect(logic.revealedScores.playerA.score).toBe(0);
   });
 });
 
@@ -194,5 +212,23 @@ describe('GameLogic hint engine', () => {
       message: 'Maximum hints used for this game'
     });
     expect(logic.scores.playerA.hintsUsed).toBe(5);
+  });
+
+  it('shows a hint cost without revealing concealed placement points', () => {
+    const logic = new GameLogic(
+      { rows: 1, cols: 10, totalPieces: 10 },
+      createGridPieces(1, 10),
+      'SINGLE_PLAYER'
+    );
+    logic.initializeSinglePlayer();
+    const correctPiece = logic.playerARack.find(piece => piece.correctPosition === 0);
+    logic.placePiece('playerA', correctPiece.id, 0);
+    const hiddenPlacementScore = logic.scores.playerA.score;
+
+    const result = logic.useHint('playerA', 'position');
+
+    expect(result.success).toBe(true);
+    expect(logic.scores.playerA.score).toBe(hiddenPlacementScore + result.cost);
+    expect(logic.revealedScores.playerA.score).toBe(result.cost);
   });
 });

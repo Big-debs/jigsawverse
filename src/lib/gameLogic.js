@@ -445,14 +445,19 @@ export class GameLogic {
     const filledCells = this.grid.filter(cell => cell !== null && cell !== undefined).length;
     const progress = this.totalPieces > 0 ? filledCells / this.totalPieces : 0;
     if (progress < this.nextCheckRevealProgress) {
-      return { reached: false, removedCount: 0 };
+      return { reached: false, removedCount: 0, removedCells: [], correctCells: [] };
     }
 
     const returnedPieces = [];
+    const removedCells = [];
+    const correctCells = [];
     this.grid.forEach((piece, index) => {
       if (piece && piece.correctPosition !== index) {
         this.grid[index] = null;
         returnedPieces.push(piece);
+        removedCells.push(index);
+      } else if (piece) {
+        correctCells.push(index);
       }
     });
     this.piecePool = [...returnedPieces, ...this.piecePool];
@@ -460,7 +465,8 @@ export class GameLogic {
     const bucket = Math.floor(progress / 0.2);
     this.nextCheckRevealProgress = Math.min((bucket + 1) * 0.2, 1);
 
-    return { reached: true, removedCount: returnedPieces.length };
+    this.syncRevealedScores();
+    return { reached: true, removedCount: returnedPieces.length, removedCells, correctCells };
   }
 
   shouldRevealCheckAtCurrentProgress() {
@@ -1092,6 +1098,11 @@ export class GameLogic {
     const cost = HINT_CONFIG.COSTS[hintType];
     score.score += cost;
     score.hintsUsed += 1;
+    // Hint costs are public actions, so show the deduction immediately without
+    // exposing any still-concealed placement score.
+    if (this.revealedScores[player]) {
+      this.revealedScores[player].score += cost;
+    }
 
     const duration = HINT_CONFIG.DURATION_MS || 5000;
     const createdAt = Date.now();

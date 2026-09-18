@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
-import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Eye, Upload, Image as ImageIcon } from 'lucide-react';
+import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Upload, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import { authService } from '../services/auth.service';
 import { gameService } from '../services/game.service';
@@ -8,9 +8,10 @@ import ModeSelectScreen from './ModeSelectScreen';
 import GameSettingsPanel from './GameSettingsPanel';
 import MoveHistoryPanel from './MoveHistoryPanel';
 import HintsPanel from './HintsPanel';
+import GameControls from './GameControls';
 import SinglePlayerGame from './SinglePlayerGame';
 import ImageLibrary from './ImageLibrary';
-import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
+import { ACCESSIBILITY_DEFAULTS, HINT_CONFIG } from '../lib/gameConfig';
 import { isModeMultiplayer } from '../lib/gameModes';
 
 const PhaserGame = lazy(() => import('./PhaserGame'));
@@ -1200,7 +1201,10 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         let message = '';
         let resultType = '';
 
-        if (myDelta > 0) {
+        if (newState.lastGameplayEvent?.type === 'check_concealed') {
+          message = 'Opponent responded. Correctness and scoring remain hidden until the reveal milestone.';
+          resultType = 'concealed';
+        } else if (myDelta > 0) {
           // I gained points - opponent checked and was wrong (failed_check)
           message = `Opponent checked - you gained ${myDelta} points! Piece was correct.`;
           resultType = 'failed_check';
@@ -1464,16 +1468,16 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         const opponentDelta = opponentNewScore - prevScores.opponentScore;
 
         // Create friendly messages based on the result
-        if (result.result === 'successful_check') {
+        if (!result.correctnessRevealed) {
+          friendlyMessage = decision === 'check'
+            ? 'Check recorded. Correctness stays hidden until the next 20% reveal.'
+            : 'Pass recorded. Correctness stays hidden until the next 20% reveal.';
+        } else if (result.result === 'successful_check') {
           // Checker caught incorrect piece
           friendlyMessage = `You gained ${myDelta} points for catching an incorrect piece!`;
         } else if (result.result === 'failed_check') {
           // Placer's piece was correct
           friendlyMessage = `Opponent gained ${opponentDelta} points for a correct piece.`;
-        } else if (result.result === 'concealed_check') {
-          friendlyMessage = 'You checked. Correctness stays hidden until the next 20% milestone.';
-        } else if (result.result === 'concealed_pass') {
-          friendlyMessage = 'You passed. Correctness stays hidden until the next 20% milestone.';
         } else if (result.result === 'opponent_passed_correct') {
           // Opponent passed, piece was correct
           friendlyMessage = 'Opponent passed — piece was correct. Turn moves to opponent.';
@@ -1485,13 +1489,47 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
       setLastAction({
         type: decision,
-        result: result.result,
+        result: result.correctnessRevealed ? result.result : 'concealed',
         message: friendlyMessage
       });
       setAwaitingDecision(null);
     } catch (err) {
       console.error('Check error:', err);
       setError('Failed to respond: ' + err.message);
+    }
+  };
+
+  const handleUseHint = async (hintType) => {
+    if (!multiplayerRef.current?.gameLogic || hintBusy) return;
+    setHintBusy(true);
+    setHintError('');
+    try {
+      const result = await multiplayerRef.current.useHint(hintType);
+      if (!result.success) {
+        setHintError(result.message);
+        return;
+      }
+
+      setActiveHint(result.hint);
+      emitGameplayEffect('hint_activated', {
+        actor: myPlayer,
+        hintType,
+        hintId: result.hint.id
+      });
+      setLastAction({
+        type: 'hint',
+        message: `Hint used. ${Math.abs(result.cost)} points deducted; ${result.hintsUsed}/5 used.`
+      });
+      setGameState(multiplayerRef.current.gameLogic.getGameState());
+
+      if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+      hintTimeoutRef.current = setTimeout(() => {
+        setActiveHint(current => current?.id === result.hint.id ? null : current);
+      }, result.hint.duration);
+    } catch (err) {
+      setHintError('Failed to use hint: ' + err.message);
+    } finally {
+      setHintBusy(false);
     }
   };
 
@@ -1535,7 +1573,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="game-play-shell max-w-4xl mx-auto pb-20 lg:pb-4">
       {/* Game Header — compact on mobile */}
       <div className="bg-white/5 backdrop-blur-md rounded-xl p-2.5 sm:p-4 mb-3 sm:mb-6">
         <div className="flex items-center justify-between">
@@ -1570,15 +1608,16 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
           </div>
         </div>
         {/* Mobile-only compact stats row */}
-        <div className="flex justify-between mt-1.5 sm:hidden text-[10px] text-purple-400 px-1">
+        <div className="flex justify-between mt-1.5 text-[10px] sm:text-xs text-purple-400 px-1">
           <span>🔥 {myStreak} streak</span>
           <span>🎯 {myAccuracy}% accuracy</span>
+          <span>◆ {grid.filter(p => p !== null).length}/{grid.length} placed</span>
         </div>
       </div>
 
       {/* Last Action Feedback */}
       {lastAction && (
-        <div className={`mb-4 p-3 rounded-xl text-center ${lastAction.result === 'correct_placement' || lastAction.result === 'successful_check'
+        <div className={`game-toast text-center ${lastAction.result === 'correct_placement' || lastAction.result === 'successful_check'
           ? 'bg-green-500/20 text-green-300'
           : lastAction.result === 'failed_check'
             ? 'bg-red-500/20 text-red-300'
@@ -1590,7 +1629,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
       {/* Check/Pass Decision UI (hidden in Nexus mode) */}
       {awaitingDecision && !isNexusMode && (
-        <div className="mb-3 sm:mb-6 bg-yellow-500/20 rounded-xl p-4 sm:p-6 border border-yellow-500/30">
+        <div className="game-decision-sheet bg-yellow-500/20 rounded-xl p-4 sm:p-6 border border-yellow-500/30">
           <h3 className="text-base sm:text-xl font-bold text-white mb-3 sm:mb-4 text-center">
             Opponent placed a piece! What do you want to do?
           </h3>
@@ -1611,9 +1650,9 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
         </div>
       )}
 
-      <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3 sm:gap-6">
+      <div>
         {/* Phaser Game Board + Rack */}
-        <div className="lg:col-span-2">
+        <div>
           <Suspense fallback={
             <div className="w-full bg-slate-900/50 rounded-xl flex items-center justify-center" style={{ minHeight: '400px' }}>
               <div className="text-purple-300 text-lg">Loading game...</div>
@@ -1641,125 +1680,36 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
           </Suspense>
         </div>
 
-        {/* Sidebar: Stats + Actions */}
-        <div className="space-y-4">
+      </div>
 
-          {/* Game Stats */}
-          <div className="bg-white/5 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-white/10">
-            <h3 className="text-white font-semibold mb-2 sm:mb-4 text-sm sm:text-base">Game Stats</h3>
-            <div className="grid grid-cols-3 lg:grid-cols-1 gap-1 sm:gap-2 text-xs sm:text-sm">
-              <div className="flex justify-between">
-                <span className="text-purple-300">Placed</span>
-                <span className="text-white">{grid.filter(p => p !== null).length}/{grid.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-purple-300">Remaining</span>
-                <span className="text-white">{gameState?.piecePoolCount || 0}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-purple-300">Streak</span>
-                <span className="text-white">{myStreak}</span>
-              </div>
-            </div>
+      {isNexusMode && !gameState?.nexusResolved && (
+        <button
+          onClick={handleResolveEndGame}
+          className="fixed right-3 bottom-24 z-40 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-full shadow-xl text-sm"
+        >
+          🔮 Reveal & Score
+        </button>
+      )}
 
-            {/* Nexus Mode: Resolve End Game button */}
-            {isNexusMode && !gameState?.nexusResolved && (
-              <button
-                onClick={handleResolveEndGame}
-                className="w-full mt-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all text-sm"
-              >
-                🔮 Reveal & Score
-              </button>
-            )}
-            {isNexusMode && gameState?.nexusResolved && (
-              <div className="w-full mt-2 px-4 py-2.5 bg-green-500/20 border border-green-500/30 text-green-300 font-bold rounded-xl text-sm text-center">
-                ✅ Game Resolved!
-              </div>
-            )}
-          </div>
-
-          {/* Puzzle Thumbnail — hidden on mobile to save space */}
-          {(gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
-            <div className="hidden sm:block bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
-              <h3 className="text-white font-semibold mb-3">Reference</h3>
-              <img
-                src={gameData?.imagePreview || multiplayerRef?.current?.imageUrl}
-                alt="Puzzle"
-                className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => setShowPreview(true)}
-              />
-              <p className="text-purple-300 text-xs mt-2 text-center">Click to enlarge</p>
-            </div>
-          )}
-
-          {/* Preview + Exit Buttons — compact row on mobile */}
-          <div className="flex gap-2 sm:flex-col sm:gap-4">
-            {(gameData?.imagePreview || multiplayerRef?.current?.imageUrl) && (
-              <button
-                onClick={() => setShowPreview(true)}
-                className="flex-1 sm:w-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded-xl py-2.5 sm:py-3 font-medium transition-colors flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base touch-target"
-              >
-                <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
-                Preview
-              </button>
-            )}
-            <button
-              onClick={onExit}
-              className="flex-1 sm:w-full bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl py-2.5 sm:py-3 font-medium transition-colors text-sm sm:text-base touch-target"
-            >
-              Exit Game
-            </button>
-          </div>
-
-          {/* Game Settings Panel */}
-          <GameSettingsPanel
-            settings={gameSettings || ACCESSIBILITY_DEFAULTS}
-            onSettingsChange={onSettingsChange}
-          />
-
-          {/* Hints Panel */}
+      <GameControls
+        activeHint={activeHint}
+        hintsRemaining={Math.max(0, HINT_CONFIG.MAX_HINTS_PER_GAME - (gameState?.scores?.[myPlayer]?.hintsUsed || 0))}
+        onPreview={(gameData?.imagePreview || multiplayerRef?.current?.imageUrl) ? () => setShowPreview(true) : null}
+        onExit={onExit}
+        settingsPanel={(
+          <GameSettingsPanel settings={gameSettings || ACCESSIBILITY_DEFAULTS} onSettingsChange={onSettingsChange} />
+        )}
+        hintsPanel={(
           <HintsPanel
-            onUseHint={async (hintType) => {
-              if (!multiplayerRef.current?.gameLogic || hintBusy) return;
-              setHintBusy(true);
-              setHintError('');
-              try {
-                const result = await multiplayerRef.current.useHint(hintType);
-                if (!result.success) {
-                  setHintError(result.message);
-                  return;
-                }
-
-                setActiveHint(result.hint);
-                emitGameplayEffect('hint_activated', {
-                  actor: myPlayer,
-                  hintType,
-                  hintId: result.hint.id
-                });
-                setLastAction({
-                  type: 'hint',
-                  message: `Hint used. ${Math.abs(result.cost)} points deducted; ${result.hintsUsed}/5 used.`
-                });
-                setGameState(multiplayerRef.current.gameLogic.getGameState());
-
-                if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
-                hintTimeoutRef.current = setTimeout(() => {
-                  setActiveHint(current => current?.id === result.hint.id ? null : current);
-                }, result.hint.duration);
-              } catch (err) {
-                setHintError('Failed to use hint: ' + err.message);
-              } finally {
-                setHintBusy(false);
-              }
-            }}
+            onUseHint={handleUseHint}
             hintsUsed={gameState?.scores?.[myPlayer]?.hintsUsed || 0}
             disabled={!isMyTurn || !!awaitingDecision}
             busy={hintBusy}
             error={hintError}
             activeHint={activeHint}
           />
-        </div>
-      </div>
+        )}
+      />
 
       {/* Move History Panel - Shown when enabled */}
       {gameSettings?.showMoveHistory && (

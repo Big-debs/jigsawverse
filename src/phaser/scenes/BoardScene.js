@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playGameSound } from '../../lib/audioManager';
 
 /**
  * BoardScene — Single Phaser scene for the entire game view.
@@ -37,7 +38,6 @@ export class BoardScene extends Phaser.Scene {
         this.hintPieceIds = new Set();
         this.hintTimeout = null;
         this.lastGameplayEffectId = null;
-        this.audioContext = null;
 
         // Render layers
         this.boardContainer = null;
@@ -65,7 +65,6 @@ export class BoardScene extends Phaser.Scene {
         this.createGrid();
         this.createRackBar();
         this.loadGhostImage();
-        this.setupAudioUnlock();
         this.events.emit('create');
 
         this.scale.on('resize', () => {
@@ -366,6 +365,7 @@ export class BoardScene extends Phaser.Scene {
             if (container) {
                 this.tweens.killTweensOf(container);
                 container.setScale(isHinted ? 1.06 : 1);
+                container.setAlpha(this.hintPieceIds.size > 0 && !isHinted ? 0.34 : 1);
             }
         });
     }
@@ -570,6 +570,9 @@ export class BoardScene extends Phaser.Scene {
         this.updateRackSelection();
 
         const cells = Array.isArray(hint.cellIndices) ? hint.cellIndices : [];
+        this.cellSprites.forEach((cell, index) => {
+            if (!cells.includes(index)) cell.setAlpha(0.42);
+        });
         cells.forEach(index => {
             const cell = this.cellSprites[index];
             if (!cell) return;
@@ -622,52 +625,12 @@ export class BoardScene extends Phaser.Scene {
 
         this.hintCells = [];
         this.hintPieceIds = new Set();
+        this.cellSprites.forEach(cell => cell?.setAlpha(1));
         this.updateRackSelection();
     }
 
-    setupAudioUnlock() {
-        this.input.on('pointerdown', () => {
-            if (!this.settings?.soundEnabled) return;
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContextClass) return;
-            if (!this.audioContext) this.audioContext = new AudioContextClass();
-            if (this.audioContext.state === 'suspended') {
-                this.audioContext.resume().catch(() => {});
-            }
-        });
-    }
-
     playSoundEffect(kind) {
-        if (!this.settings?.soundEnabled || !this.audioContext) return;
-        if (this.audioContext.state === 'suspended') {
-            this.audioContext.resume().catch(() => {});
-            return;
-        }
-
-        const sounds = {
-            select: [330, 0.045, 'sine'],
-            place: [180, 0.07, 'triangle'],
-            reject: [95, 0.12, 'square'],
-            hint: [660, 0.12, 'sine'],
-            success: [520, 0.16, 'sine'],
-            failure: [120, 0.18, 'sawtooth'],
-            refill: [260, 0.06, 'triangle'],
-            complete: [784, 0.28, 'sine']
-        };
-        const [frequency, duration, wave] = sounds[kind] || sounds.place;
-        const volume = Math.max(0, Math.min(1, this.settings?.soundVolume ?? 0.7));
-        const now = this.audioContext.currentTime;
-        const oscillator = this.audioContext.createOscillator();
-        const gain = this.audioContext.createGain();
-        oscillator.type = wave;
-        oscillator.frequency.setValueAtTime(frequency, now);
-        gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume * 0.12), now + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-        oscillator.connect(gain);
-        gain.connect(this.audioContext.destination);
-        oscillator.start(now);
-        oscillator.stop(now + duration + 0.02);
+        playGameSound(kind, this.settings);
     }
 
     playGameplayEffect(event) {
@@ -680,10 +643,19 @@ export class BoardScene extends Phaser.Scene {
                 break;
             case 'piece_placed':
                 this.pulseCell(event.gridIndex);
+                this.playSoundEffect('place');
+                break;
+            case 'milestone_reveal':
+                (event.correctCells || []).forEach(index => this.playCorrectGlow(index));
+                (event.removedCells || []).forEach(index => this.playEjectAnimation(index));
                 if (typeof event.points === 'number' && event.points !== 0) {
-                    this.playScorePopup(event.gridIndex, event.points, event.breakdown);
+                    this.playScorePopup(event.anchorCell ?? 0, event.points, event.breakdown);
                 }
                 if (event.streak >= 3) this.playStreakEffect(event.streak);
+                this.playSoundEffect((event.removedCells || []).length ? 'failure' : 'success');
+                break;
+            case 'check_concealed':
+                this.pulseCell(event.gridIndex);
                 this.playSoundEffect('place');
                 break;
             case 'placement_rejected':

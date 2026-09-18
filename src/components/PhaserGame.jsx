@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import { BoardScene } from '../phaser/scenes/BoardScene';
+import { installGameAudioUnlock } from '../lib/audioManager';
 
 /**
  * PhaserGame — React wrapper for the Phaser.Game instance.
@@ -56,6 +57,8 @@ const PhaserGame = ({
     useEffect(() => { onPiecePlacedRef.current = onPiecePlaced; }, [onPiecePlaced]);
     useEffect(() => { onPieceMarkedRef.current = onPieceMarked; }, [onPieceMarked]);
     useEffect(() => { onPieceSelectedRef.current = onPieceSelected; }, [onPieceSelected]);
+
+    useEffect(() => installGameAudioUnlock(), []);
 
     // ========== Initialize Phaser — runs once ==========
     useEffect(() => {
@@ -209,8 +212,8 @@ const PhaserGame = ({
     return (
         <div
             ref={containerRef}
-            className="w-full max-w-[760px] mx-auto rounded-xl overflow-hidden border border-white/10"
-            style={{ minHeight: '500px', aspectRatio: '5/8' }}
+            className="game-canvas w-full max-w-[760px] mx-auto rounded-xl overflow-hidden border border-white/10"
+            style={{ aspectRatio: '5 / 7.35' }}
         />
     );
 };

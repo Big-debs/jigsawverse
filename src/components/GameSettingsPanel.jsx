@@ -1,11 +1,29 @@
+import { useState } from 'react';
 import { Eye, EyeOff, Grid3x3, Sparkles, History, Volume2, Gauge } from 'lucide-react';
+import { playGameSound, unlockGameAudio } from '../lib/audioManager';
 
 const GameSettingsPanel = ({ settings, onSettingsChange }) => {
-  const toggleSetting = (key) => {
+  const [audioStatus, setAudioStatus] = useState('');
+  const toggleSetting = async (key) => {
+    if (key === 'soundEnabled' && !settings.soundEnabled) {
+      await unlockGameAudio();
+      playGameSound('success', { ...settings, soundEnabled: true });
+    }
     onSettingsChange({
       ...settings,
       [key]: !settings[key]
     });
+  };
+
+  const testSound = async () => {
+    setAudioStatus('');
+    const unlocked = await unlockGameAudio();
+    if (!unlocked) {
+      setAudioStatus('Sound is still blocked. Check silent mode and tap again.');
+      return;
+    }
+    await playGameSound('success', { ...settings, soundEnabled: true });
+    setAudioStatus('Test sound played');
   };
 
   const settingOptions = [
@@ -114,6 +132,17 @@ const GameSettingsPanel = ({ settings, onSettingsChange }) => {
           })}
           className="w-full disabled:opacity-40"
         />
+        <button
+          type="button"
+          onClick={testSound}
+          className="mt-3 w-full py-2.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 font-medium flex items-center justify-center gap-2 touch-target"
+        >
+          <Volume2 className="w-4 h-4" />
+          Test sound
+        </button>
+        {audioStatus && (
+          <p className="mt-2 text-xs text-center text-purple-300" role="status">{audioStatus}</p>
+        )}
       </div>
     </div>
   );
