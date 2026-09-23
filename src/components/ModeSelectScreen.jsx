@@ -22,6 +22,33 @@ const ModeSelectScreen = ({ onModeSelect, onBack, multiplayerOnly = true }) => {
         <div className="w-12 sm:w-20"></div> {/* Spacer for centering */}
       </div>
 
+      {/* Experimental / Lab modes */}
+      <div className="mb-3 sm:mb-6">
+        <button
+          type="button"
+          onClick={() => {
+            const url = new URL(window.location.href);
+            url.searchParams.set('mode', 'planar-cube');
+            window.location.assign(url.toString());
+          }}
+          className="w-full relative group rounded-2xl p-4 sm:p-6 text-left transition-all transform bg-gradient-to-br from-amber-700 via-yellow-700 to-stone-800 hover:from-amber-600 hover:via-yellow-600 hover:to-stone-700 hover:scale-[1.01] shadow-2xl border border-amber-400/30"
+        >
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 bg-black/30 text-amber-200 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold tracking-wide">
+            LAB PROTOTYPE
+          </div>
+          <div className="text-3xl sm:text-5xl mb-2 sm:mb-4">✥</div>
+          <h3 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Planar Cube</h3>
+          <p className="text-xs sm:text-sm mb-3 sm:mb-4 text-amber-100 max-w-2xl">
+            Six connected 3×3 faces flattened into a playable cube net. Swipe rows and columns to test the new spatial puzzle engine.
+          </p>
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium bg-white/15 text-white">18 Moves</span>
+            <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium bg-white/15 text-white">Solo Prototype</span>
+            <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-medium bg-white/15 text-white">Swipe Controls</span>
+          </div>
+        </button>
+      </div>
+
       {/* Mode Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
         {allModes.map((mode) => {
