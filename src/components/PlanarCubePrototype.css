@@ -449,3 +449,147 @@
     grid-template-columns: 64px 1fr;
   }
 }
+
+
+.planar-cube__tutorial {
+  width: min(1440px, 100%);
+  margin: 18px auto 0;
+  padding: 18px;
+  border: 1px solid rgba(212, 169, 59, 0.28);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(212, 169, 59, 0.08), rgba(255, 255, 255, 0.025));
+}
+
+.planar-cube__tutorial-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.planar-cube__tutorial-head h2 {
+  margin: 4px 0 6px;
+  font-size: 1.4rem;
+}
+
+.planar-cube__tutorial-head p:last-child {
+  max-width: 760px;
+  color: #a1a1aa;
+  line-height: 1.5;
+}
+
+.planar-cube__tutorial-nav {
+  display: flex;
+  gap: 6px;
+}
+
+.planar-cube__tutorial-nav button {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  color: #d4d4d8;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.planar-cube__tutorial-nav button.is-active {
+  background: #d4a93b;
+  color: #111318;
+  border-color: #d4a93b;
+}
+
+.planar-cube__objective {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.planar-cube__objective span {
+  color: #d4a93b;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.planar-cube__objective strong {
+  flex: 1;
+}
+
+.planar-cube__objective button,
+.planar-cube__success button {
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #f4f4f5;
+  padding: 8px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.planar-cube__hint-card,
+.planar-cube__success {
+  margin-top: 10px;
+  padding: 11px 13px;
+  border-radius: 10px;
+}
+
+.planar-cube__hint-card {
+  background: rgba(59,130,246,.10);
+  border: 1px solid rgba(59,130,246,.25);
+  color: #bfdbfe;
+}
+
+.planar-cube__success {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: rgba(34,197,94,.10);
+  border: 1px solid rgba(34,197,94,.25);
+  color: #bbf7d0;
+}
+
+.cube-sticker--target {
+  outline: 2px solid rgba(255,255,255,.62);
+  outline-offset: -3px;
+}
+
+.cube-sticker--protected::after {
+  content: '◆';
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  color: #fde68a;
+  font-size: .55rem;
+  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+}
+
+@media (max-width: 760px) {
+  .planar-cube__tutorial-head {
+    flex-direction: column;
+  }
+
+  .planar-cube__tutorial-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .planar-cube__objective {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .planar-cube__objective strong {
+    flex-basis: 100%;
+  }
+
+  .planar-cube__success {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
