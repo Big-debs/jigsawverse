@@ -1,9 +1,16 @@
 import { Lightbulb, MapPin, Square, CornerDownRight, Map } from 'lucide-react';
 import { HINT_CONFIG } from '../lib/gameConfig';
 
-const HintsPanel = ({ onUseHint, hintsUsed = 0, disabled = false }) => {
+const HintsPanel = ({
+  onUseHint,
+  hintsUsed = 0,
+  disabled = false,
+  busy = false,
+  error = '',
+  activeHint = null
+}) => {
   const maxHints = HINT_CONFIG.MAX_HINTS_PER_GAME;
-  const hintsRemaining = maxHints - hintsUsed;
+  const hintsRemaining = Math.max(0, maxHints - hintsUsed);
 
   const hintTypes = [
     {
@@ -37,7 +44,7 @@ const HintsPanel = ({ onUseHint, hintsUsed = 0, disabled = false }) => {
   ];
 
   const handleUseHint = (hintType) => {
-    if (disabled || hintsRemaining <= 0) return;
+    if (disabled || busy || hintsRemaining <= 0) return;
     onUseHint(hintType);
   };
 
@@ -60,7 +67,7 @@ const HintsPanel = ({ onUseHint, hintsUsed = 0, disabled = false }) => {
       <div className="space-y-2">
         {hintTypes.map((hint) => {
           const Icon = hint.icon;
-          const isDisabled = disabled || hintsRemaining <= 0;
+          const isDisabled = disabled || busy || hintsRemaining <= 0;
 
           return (
             <button
@@ -100,6 +107,26 @@ const HintsPanel = ({ onUseHint, hintsUsed = 0, disabled = false }) => {
           );
         })}
       </div>
+
+      {busy && (
+        <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+          <p className="text-xs text-yellow-300 text-center">Preparing hint…</p>
+        </div>
+      )}
+
+      {activeHint && !busy && (
+        <div className="mt-3 p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+          <p className="text-xs text-cyan-300 text-center">
+            {activeHint.type.charAt(0).toUpperCase() + activeHint.type.slice(1)} hint active on the board
+          </p>
+        </div>
+      )}
+
+      {error && !busy && (
+        <div className="mt-3 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <p className="text-xs text-red-300 text-center">{error}</p>
+        </div>
+      )}
 
       {/* Warning Message */}
       {hintsRemaining === 0 && (

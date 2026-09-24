@@ -26,6 +26,7 @@ const PhaserGame = ({
     selectedPiece,
     onPieceSelected,
     activeHint = null,
+    gameplayEffect = null,
 }) => {
     const containerRef = useRef(null);
     const gameRef = useRef(null);
@@ -39,9 +40,13 @@ const PhaserGame = ({
     const settingsRef = useRef(settings);
     const ghostImageRef = useRef(ghostImage);
     const activeHintRef = useRef(activeHint);
+    const gameplayEffectRef = useRef(gameplayEffect);
     const onPiecePlacedRef = useRef(onPiecePlaced);
     const onPieceMarkedRef = useRef(onPieceMarked);
     const onPieceSelectedRef = useRef(onPieceSelected);
+    const boardColumns = gridDimensions?.cols || 5;
+    const boardRows = gridDimensions?.rows || 5;
+    const canvasAspectRatio = `${boardColumns} / ${boardRows + 2.35}`;
 
     // Keep refs in sync with props
     useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
@@ -50,6 +55,7 @@ const PhaserGame = ({
     useEffect(() => { settingsRef.current = settings; }, [settings]);
     useEffect(() => { ghostImageRef.current = ghostImage; }, [ghostImage]);
     useEffect(() => { activeHintRef.current = activeHint; }, [activeHint]);
+    useEffect(() => { gameplayEffectRef.current = gameplayEffect; }, [gameplayEffect]);
     useEffect(() => { onPiecePlacedRef.current = onPiecePlaced; }, [onPiecePlaced]);
     useEffect(() => { onPieceMarkedRef.current = onPieceMarked; }, [onPieceMarked]);
     useEffect(() => { onPieceSelectedRef.current = onPieceSelected; }, [onPieceSelected]);
@@ -78,8 +84,7 @@ const PhaserGame = ({
                 antialias: true,
                 pixelArt: false,
                 roundPixels: false
-            },
-            audio: { noAudio: true }
+            }
         };
 
         const game = new Phaser.Game(config);
@@ -131,6 +136,7 @@ const PhaserGame = ({
             if (myRackRef.current) scene.updateRack(myRackRef.current);
             if (selectedPieceRef.current) scene.setSelectedPiece(selectedPieceRef.current);
             if (activeHintRef.current) scene.updateHint?.(activeHintRef.current);
+            if (gameplayEffectRef.current) scene.playGameplayEffect?.(gameplayEffectRef.current);
 
             sceneReadyRef.current = true;
         };
@@ -198,11 +204,16 @@ const PhaserGame = ({
         sceneRef.current?.updateHint?.(activeHint);
     }, [activeHint]);
 
+    useEffect(() => {
+        if (!sceneReadyRef.current || !gameplayEffect) return;
+        sceneRef.current?.playGameplayEffect?.(gameplayEffect);
+    }, [gameplayEffect]);
+
     return (
         <div
             ref={containerRef}
-            className="w-full max-w-[760px] mx-auto rounded-xl overflow-hidden border border-white/10"
-            style={{ minHeight: '500px', aspectRatio: '5/8' }}
+            className="game-canvas w-full max-w-[760px] mx-auto rounded-xl overflow-hidden border border-white/10"
+            style={{ aspectRatio: canvasAspectRatio }}
         />
     );
 };

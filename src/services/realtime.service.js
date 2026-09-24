@@ -4,25 +4,14 @@
 
 import { supabase } from '../config/supabase';
 
-const GAMEPLAY_MODE_SCHEMA_CACHE_ERROR = "Could not find the 'gameplay_mode' column of 'game_state' in the schema cache";
-
-function isGameplayModeSchemaCacheError(error) {
-  return !!error?.message && error.message.includes(GAMEPLAY_MODE_SCHEMA_CACHE_ERROR);
-}
-
-function withoutGameplayMode(payload) {
-  if (!payload || typeof payload !== 'object' || !('gameplay_mode' in payload)) {
-    return payload;
-  }
-
-  const fallbackPayload = { ...payload };
-  delete fallbackPayload.gameplay_mode;
-  return fallbackPayload;
+function getMissingSchemaColumn(error) {
+  const match = error?.message?.match(/Could not find the '([^']+)' column of 'game_state'/);
+  return match?.[1] || null;
 }
 
 export const realtimeService = {
   // Initialize game state
-  async initializeGameState(gameId, pieces, gridSize, gameplayMode = 'CLASSIC') {
+  async initializeGameState(gameId, pieces, gridSize, gameplayMode = 'CLASSIC', initialState = null) {
     // Store only piece metadata, not the full imageData
     // imageData is NOT stored - it's reconstructed client-side
     const piecesMetadata = pieces.map(p => ({
@@ -40,31 +29,45 @@ export const realtimeService = {
       emptyGrid.push(null);
     }
 
+    const rackCapacity = Math.max(2, Math.round(Math.sqrt(gridSize)) * 2);
+    const playerARack = initialState?.playerARack || pieces.slice(0, rackCapacity);
+    const playerBRack = initialState?.playerBRack || pieces.slice(rackCapacity, rackCapacity * 2);
+    const piecePool = initialState?.piecePool || pieces.slice(rackCapacity * 2);
     const initialPayload = {
       game_id: gameId,
       grid: emptyGrid,  // Explicit null array
-      player_a_rack: pieces.slice(0, 10).map(p => p.id),
-      player_b_rack: pieces.slice(10, 20).map(p => p.id),
-      piece_pool: pieces.slice(20).map(p => p.id),
+      player_a_rack: playerARack.map(p => p.id),
+      player_b_rack: playerBRack.map(p => p.id),
+      piece_pool: piecePool.map(p => p.id),
       pieces: piecesMetadata,  // Smaller payload without imageData
       current_turn: 'playerA',
       timer_remaining: 600,
-      gameplay_mode: gameplayMode
+      gameplay_mode: gameplayMode,
+      scores: initialState?.scores || {},
+      revealed_scores: initialState?.revealedScores || {},
+      turns_remaining: initialState?.turnsRemaining || {},
+      checks_remaining: initialState?.checksRemaining || {},
+      piece_placed_by: {},
+      piece_marks: {},
+      nexus_resolved: false,
+      piece_owners: initialState?.pieceOwners || {}
     };
 
-    let { data, error } = await supabase
-      .from('game_state')
-      .insert(initialPayload)
-      .select()
-      .single();
-
-    if (isGameplayModeSchemaCacheError(error)) {
-      console.warn('[realtimeService] gameplay_mode missing from schema cache, retrying create game state without gameplay_mode column.');
+    let payload = initialPayload;
+    let data;
+    let error;
+    for (let attempt = 0; attempt < 8; attempt++) {
       ({ data, error } = await supabase
         .from('game_state')
-        .insert(withoutGameplayMode(initialPayload))
+        .insert(payload)
         .select()
         .single());
+      if (!error) break;
+      const missingColumn = getMissingSchemaColumn(error);
+      if (!missingColumn || !(missingColumn in payload)) break;
+      console.warn(`[realtimeService] ${missingColumn} missing from schema cache; retrying without it.`);
+      payload = { ...payload };
+      delete payload[missingColumn];
     }
 
     if (error) throw error;
@@ -85,21 +88,22 @@ export const realtimeService = {
 
   // Update game state
   async updateGameState(gameId, updates) {
-    let { data, error } = await supabase
-      .from('game_state')
-      .update(updates)
-      .eq('game_id', gameId)
-      .select()
-      .single();
-
-    if (isGameplayModeSchemaCacheError(error) && updates && 'gameplay_mode' in updates) {
-      console.warn('[realtimeService] gameplay_mode missing from schema cache, retrying update without gameplay_mode column.');
+    let payload = updates;
+    let data;
+    let error;
+    for (let attempt = 0; attempt < 8; attempt++) {
       ({ data, error } = await supabase
         .from('game_state')
-        .update(withoutGameplayMode(updates))
+        .update(payload)
         .eq('game_id', gameId)
         .select()
         .single());
+      if (!error) break;
+      const missingColumn = getMissingSchemaColumn(error);
+      if (!missingColumn || !payload || !(missingColumn in payload)) break;
+      console.warn(`[realtimeService] ${missingColumn} missing from schema cache; retrying without it.`);
+      payload = { ...payload };
+      delete payload[missingColumn];
     }
 
     if (error) throw error;
