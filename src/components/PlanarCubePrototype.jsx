@@ -12,6 +12,13 @@ import {
   isSolved,
   validateState,
 } from '../lib/planarCubeEngine';
+import {
+  PLANAR_CUBE_TUTORIALS,
+  buildTutorialState,
+  canonicalHint,
+  isProtectedCell,
+  isTargetCell,
+} from '../lib/planarCubeTutorials';
 import './PlanarCubePrototype.css';
 
 const FACE_LAYOUT = {
@@ -58,7 +65,7 @@ function moveFromSwipe(face, row, col, dx, dy) {
   return null;
 }
 
-function FaceGrid({ face, state, onMove }) {
+function FaceGrid({ face, state, onMove, tutorial }) {
   const pointerStart = useRef(null);
   const grid = useMemo(() => getFaceGrid(state, face), [state, face]);
   const meta = FACE_META[face];
@@ -108,7 +115,7 @@ function FaceGrid({ face, state, onMove }) {
           line.map((sticker, col) => (
             <button
               type="button"
-              className="cube-sticker"
+              className={`cube-sticker ${isTargetCell(tutorial, face, row, col) ? 'cube-sticker--target' : ''} ${isProtectedCell(tutorial, face, row, col) ? 'cube-sticker--protected' : ''}`}
               key={sticker?.id ?? `${face}-${row}-${col}`}
               onPointerDown={(event) => handlePointerDown(event, row, col)}
               onPointerUp={handlePointerUp}
@@ -200,14 +207,20 @@ function MoveControls({ onMove }) {
 
 export default function PlanarCubePrototype() {
   const solved = useMemo(() => createSolvedState(), []);
-  const [state, setState] = useState(solved);
-  const [startState, setStartState] = useState(solved);
+  const [tutorialIndex, setTutorialIndex] = useState(0);
+  const tutorial = PLANAR_CUBE_TUTORIALS[tutorialIndex];
+  const initialTutorialState = useMemo(() => buildTutorialState(tutorial), [tutorial]);
+  const [state, setState] = useState(initialTutorialState);
+  const [startState, setStartState] = useState(initialTutorialState);
   const [history, setHistory] = useState([]);
   const [seed, setSeed] = useState(null);
-  const [status, setStatus] = useState('Solved state — scramble when ready.');
+  const [status, setStatus] = useState(tutorial.objective);
+  const [showHint, setShowHint] = useState(false);
 
   const validation = useMemo(() => validateState(state), [state]);
   const solvedNow = useMemo(() => isSolved(state), [state]);
+  const tutorialSolved = useMemo(() => tutorial.goal(state), [state, tutorial]);
+  const protectedOkay = tutorial.protectedGoal ? tutorial.protectedGoal(state) : true;
 
   const runMove = (move) => {
     setState((current) => applyMove(current, move));
@@ -225,7 +238,20 @@ export default function PlanarCubePrototype() {
   const restart = () => {
     setState(startState);
     setHistory([]);
-    setStatus(seed ? `Restarted scramble #${seed}.` : 'Returned to solved state.');
+    setShowHint(false);
+    setStatus(seed ? `Restarted scramble #${seed}.` : tutorial.objective);
+  };
+
+  const loadTutorial = (index) => {
+    const next = PLANAR_CUBE_TUTORIALS[index];
+    const nextState = buildTutorialState(next);
+    setTutorialIndex(index);
+    setState(nextState);
+    setStartState(nextState);
+    setHistory([]);
+    setSeed(null);
+    setShowHint(false);
+    setStatus(next.objective);
   };
 
   const scramble = () => {
@@ -241,12 +267,17 @@ export default function PlanarCubePrototype() {
   };
 
   useEffect(() => {
-    if (history.length > 0 && solvedNow) {
-      setStatus(`Solved in ${history.length} move${history.length === 1 ? '' : 's'}.`);
-    } else if (!solvedNow && history.length > 0) {
+    if (!protectedOkay) {
+      setStatus('Protected strip disturbed — restore it or restart.');
+      return;
+    }
+
+    if (history.length > 0 && tutorialSolved) {
+      setStatus(`Tutorial complete in ${history.length} move${history.length === 1 ? '' : 's'}.`);
+    } else if (history.length > 0) {
       setStatus(`Last move: ${formatMove(history[history.length - 1])}`);
     }
-  }, [history, solvedNow]);
+  }, [history, tutorialSolved, protectedOkay]);
 
   return (
     <main className="planar-cube">
@@ -267,7 +298,7 @@ export default function PlanarCubePrototype() {
           </div>
           <div>
             <span>State</span>
-            <strong>{solvedNow ? 'SOLVED' : 'ACTIVE'}</strong>
+            <strong>{tutorialSolved ? 'LEVEL ✓' : solvedNow ? 'SOLVED' : 'ACTIVE'}</strong>
           </div>
           <div>
             <span>Engine</span>
@@ -275,6 +306,51 @@ export default function PlanarCubePrototype() {
           </div>
         </div>
       </header>
+
+      <section className="planar-cube__tutorial">
+        <div className="planar-cube__tutorial-head">
+          <div>
+            <p className="planar-cube__eyebrow">GUIDED LEARNING</p>
+            <h2>Level {tutorial.number}: {tutorial.title}</h2>
+            <p>{tutorial.lesson}</p>
+          </div>
+          <div className="planar-cube__tutorial-nav">
+            {PLANAR_CUBE_TUTORIALS.map((level, index) => (
+              <button
+                type="button"
+                key={level.id}
+                className={index === tutorialIndex ? 'is-active' : ''}
+                onClick={() => loadTutorial(index)}
+                aria-label={`Open tutorial level ${level.number}`}
+              >
+                {level.number}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="planar-cube__objective">
+          <span>{tutorial.kicker}</span>
+          <strong>{tutorial.objective}</strong>
+          <button type="button" onClick={() => setShowHint((value) => !value)}>
+            {showHint ? 'Hide hint' : 'Show hint'}
+          </button>
+        </div>
+        {showHint && (
+          <div className="planar-cube__hint-card">{canonicalHint(tutorial, history)}</div>
+        )}
+        {tutorialSolved && (
+          <div className="planar-cube__success">
+            <strong>Level complete.</strong>
+            {tutorialIndex < PLANAR_CUBE_TUTORIALS.length - 1 ? (
+              <button type="button" onClick={() => loadTutorial(tutorialIndex + 1)}>
+                Next level →
+              </button>
+            ) : (
+              <span>You have completed the five-step foundation.</span>
+            )}
+          </div>
+        )}
+      </section>
 
       <section className="planar-cube__toolbar">
         <div className="planar-cube__actions">
@@ -301,7 +377,7 @@ export default function PlanarCubePrototype() {
       <section className="planar-cube__workspace">
         <div className="planar-cube__net" aria-label="Unfolded six-face cube">
           {['U', 'L', 'F', 'R', 'B', 'D'].map((face) => (
-            <FaceGrid key={face} face={face} state={state} onMove={runMove} />
+            <FaceGrid key={face} face={face} state={state} onMove={runMove} tutorial={tutorial} />
           ))}
         </div>
 
