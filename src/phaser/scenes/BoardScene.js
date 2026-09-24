@@ -33,11 +33,16 @@ export class BoardScene extends Phaser.Scene {
         this.rackSignature = '';
         this.pendingTextureKeys = new Set();
         this.rackRenderQueued = false;
+        this.boardRenderQueued = false;
         this.selectedPieceId = null;
         this.hintCells = [];
         this.hintPieceIds = new Set();
+        this.hintBadges = [];
         this.hintTimeout = null;
+        this.activeHint = null;
         this.lastGameplayEffectId = null;
+        this.animatedPlacements = new Set();
+        this.resizeTimer = null;
 
         // Render layers
         this.boardContainer = null;
@@ -51,6 +56,8 @@ export class BoardScene extends Phaser.Scene {
     init(data) {
         this.rows = data.gridDimensions?.rows || 5;
         this.cols = data.gridDimensions?.cols || 5;
+        this.rackColumns = this.cols;
+        this.rackCapacity = this.rackColumns * this.rackRows;
         this.isNexusMode = data.isNexusMode || false;
         this.myPlayer = data.myPlayer || 'playerA';
         this.settings = data.settings || {};
@@ -68,7 +75,12 @@ export class BoardScene extends Phaser.Scene {
         this.events.emit('create');
 
         this.scale.on('resize', () => {
-            this.rebuildAll();
+            if (this.resizeTimer) clearTimeout(this.resizeTimer);
+            this.resizeTimer = setTimeout(() => {
+                this.resizeTimer = null;
+                const nextCellSize = this.calculateCellSize(this.scale.width, this.scale.height);
+                if (nextCellSize !== this.cellSize) this.rebuildAll();
+            }, 180);
         });
     }
 
@@ -80,19 +92,11 @@ export class BoardScene extends Phaser.Scene {
 
         if (w < 10 || h < 10) return; // Canvas not ready yet
 
-        // The board and rack share one tile scale. The rack is a fixed
-        // 5 × 2 continuation of the board rather than a miniature strip.
+        // The board and rack share one tile scale. The rack is always a
+        // two-row continuation with the same number of columns as the board.
         const margin = 8;
         const separatorGap = 12;
-        const layoutColumns = Math.max(this.cols, this.rackColumns);
-        const layoutRows = this.rows + this.rackRows;
-        const availableW = w - margin * 2;
-        const availableH = h - margin * 2 - separatorGap - this.rackPadding * 2;
-
-        this.cellSize = Math.max(1, Math.floor(Math.min(
-            availableW / layoutColumns,
-            availableH / layoutRows
-        )));
+        this.cellSize = this.calculateCellSize(w, h);
 
         const boardWidth = this.cellSize * this.cols;
         const boardHeight = this.cellSize * this.rows;
@@ -108,6 +112,19 @@ export class BoardScene extends Phaser.Scene {
         this.rackAreaH = rackHeight;
     }
 
+    calculateCellSize(width, height) {
+        const margin = 8;
+        const separatorGap = 12;
+        const layoutColumns = Math.max(this.cols, this.rackColumns);
+        const layoutRows = this.rows + this.rackRows;
+        const availableW = width - margin * 2;
+        const availableH = height - margin * 2 - separatorGap - this.rackPadding * 2;
+        return Math.max(1, Math.floor(Math.min(
+            availableW / layoutColumns,
+            availableH / layoutRows
+        )));
+    }
+
     rebuildAll() {
         // Destroy everything and recreate
         this.children.removeAll(true);
@@ -117,6 +134,7 @@ export class BoardScene extends Phaser.Scene {
         this.ghostSprite = null;
         this.rackSprites = [];
         this.rackSlotSprites = [];
+        this.hintBadges = [];
         this.boardContainer = null;
         this.rackContainer = null;
 
@@ -133,6 +151,7 @@ export class BoardScene extends Phaser.Scene {
         if (this.rackPieces.length > 0) {
             this.renderRack();
         }
+        if (this.activeHint) this.updateHint(this.activeHint, { playSound: false });
     }
 
     createRenderLayers() {
@@ -236,6 +255,15 @@ export class BoardScene extends Phaser.Scene {
         this.time.delayedCall(0, () => {
             this.rackRenderQueued = false;
             this.renderRack();
+        });
+    }
+
+    queueBoardRender() {
+        if (this.boardRenderQueued) return;
+        this.boardRenderQueued = true;
+        this.time.delayedCall(0, () => {
+            this.boardRenderQueued = false;
+            if (this.gameState) this.renderPieces(this.gameState);
         });
     }
 
@@ -467,7 +495,7 @@ export class BoardScene extends Phaser.Scene {
             if (piece.imageData) {
                 const textureKey = `piece_${piece.id}`;
                 if (!this.textures.exists(textureKey)) {
-                    this.loadTexture(textureKey, piece.imageData, () => this.renderPieces(this.gameState));
+                    this.loadTexture(textureKey, piece.imageData, () => this.queueBoardRender());
                 } else {
                     this.createPieceSprite(textureKey, piece, index, x, y);
                 }
@@ -478,7 +506,7 @@ export class BoardScene extends Phaser.Scene {
                 rect.setData('gridIndex', index);
                 rect.setDepth(1);
                 this.pieceSprites[index] = rect;
-                this.playSnapAnimation(rect);
+                this.animatePlacementOnce(rect, piece, index);
             }
 
             // Dim the cell
@@ -522,7 +550,17 @@ export class BoardScene extends Phaser.Scene {
         }
 
         this.pieceSprites[index] = sprite;
-        this.playSnapAnimation(sprite);
+        this.animatePlacementOnce(sprite, piece, index);
+    }
+
+    animatePlacementOnce(target, piece, index) {
+        const placementKey = `${piece.id}:${index}`;
+        if (this.animatedPlacements.has(placementKey)) {
+            target.setAlpha(1);
+            return;
+        }
+        this.animatedPlacements.add(placementKey);
+        this.playSnapAnimation(target);
     }
 
     // ========== MARKS ==========
@@ -562,12 +600,28 @@ export class BoardScene extends Phaser.Scene {
 
     // ========== HINT HIGHLIGHTING ==========
 
-    updateHint(hint) {
+    updateHint(hint, { playSound = true } = {}) {
         this.clearHintHighlights();
+        this.activeHint = hint || null;
         if (!hint) return;
 
         this.hintPieceIds = new Set(hint.pieceIds || []);
         this.updateRackSelection();
+
+        this.rackSprites.forEach(({ container, piece }) => {
+            if (!container || !this.hintPieceIds.has(piece?.id)) return;
+            const badge = this.add.container(-this.cellSize / 2 + 10, -this.cellSize / 2 + 10);
+            const circle = this.add.circle(0, 0, Math.max(8, this.cellSize * 0.12), 0x22d3ee, 1);
+            const label = this.add.text(0, 0, '1', {
+                fontSize: `${Math.max(10, this.cellSize * 0.18)}px`,
+                color: '#082f49',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            badge.add([circle, label]);
+            badge.setDepth(20);
+            container.add(badge);
+            this.hintBadges.push(badge);
+        });
 
         const cells = Array.isArray(hint.cellIndices) ? hint.cellIndices : [];
         this.cellSprites.forEach((cell, index) => {
@@ -583,6 +637,30 @@ export class BoardScene extends Phaser.Scene {
         this.hintCells = cells.filter(index => !!this.cellSprites[index]);
 
         this.hintCells.forEach(index => {
+            const row = Math.floor(index / this.cols);
+            const col = index % this.cols;
+            const x = this.boardOffsetX + col * this.cellSize + 10;
+            const y = this.boardOffsetY + row * this.cellSize + 10;
+            const isExact = index === hint.targetCellIndex;
+            const badge = this.add.container(x, y);
+            const circle = this.add.circle(
+                0, 0,
+                Math.max(8, this.cellSize * 0.12),
+                isExact ? 0xfbbf24 : 0x22d3ee,
+                1
+            );
+            const label = this.add.text(0, 0, '1', {
+                fontSize: `${Math.max(10, this.cellSize * 0.18)}px`,
+                color: '#082f49',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            badge.add([circle, label]);
+            badge.setDepth(20);
+            this.boardContainer?.add(badge);
+            this.hintBadges.push(badge);
+        });
+
+        this.hintCells.forEach(index => {
             const cell = this.cellSprites[index];
             this.tweens.killTweensOf(cell);
             this.tweens.add({
@@ -595,7 +673,7 @@ export class BoardScene extends Phaser.Scene {
             });
         });
 
-        this.playSoundEffect('hint');
+        if (playSound) this.playSoundEffect('hint');
         const remaining = Math.max(250, (hint.expiresAt || Date.now() + (hint.duration || 5000)) - Date.now());
         this.hintTimeout = this.time.delayedCall(remaining, () => {
             this.hintTimeout = null;
@@ -604,6 +682,7 @@ export class BoardScene extends Phaser.Scene {
     }
 
     clearHintHighlights(cancelTimer = true) {
+        this.activeHint = null;
         if (cancelTimer && this.hintTimeout) {
             this.hintTimeout.remove(false);
             this.hintTimeout = null;
@@ -625,6 +704,8 @@ export class BoardScene extends Phaser.Scene {
 
         this.hintCells = [];
         this.hintPieceIds = new Set();
+        this.hintBadges.forEach(badge => badge?.destroy());
+        this.hintBadges = [];
         this.cellSprites.forEach(cell => cell?.setAlpha(1));
         this.updateRackSelection();
     }

@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import { BoardScene } from '../phaser/scenes/BoardScene';
-import { installGameAudioUnlock } from '../lib/audioManager';
 
 /**
  * PhaserGame — React wrapper for the Phaser.Game instance.
@@ -45,6 +44,9 @@ const PhaserGame = ({
     const onPiecePlacedRef = useRef(onPiecePlaced);
     const onPieceMarkedRef = useRef(onPieceMarked);
     const onPieceSelectedRef = useRef(onPieceSelected);
+    const boardColumns = gridDimensions?.cols || 5;
+    const boardRows = gridDimensions?.rows || 5;
+    const canvasAspectRatio = `${boardColumns} / ${boardRows + 2.35}`;
 
     // Keep refs in sync with props
     useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
@@ -57,8 +59,6 @@ const PhaserGame = ({
     useEffect(() => { onPiecePlacedRef.current = onPiecePlaced; }, [onPiecePlaced]);
     useEffect(() => { onPieceMarkedRef.current = onPieceMarked; }, [onPieceMarked]);
     useEffect(() => { onPieceSelectedRef.current = onPieceSelected; }, [onPieceSelected]);
-
-    useEffect(() => installGameAudioUnlock(), []);
 
     // ========== Initialize Phaser — runs once ==========
     useEffect(() => {
@@ -213,7 +213,7 @@ const PhaserGame = ({
         <div
             ref={containerRef}
             className="game-canvas w-full max-w-[760px] mx-auto rounded-xl overflow-hidden border border-white/10"
-            style={{ aspectRatio: '5 / 7.35' }}
+            style={{ aspectRatio: canvasAspectRatio }}
         />
     );
 };

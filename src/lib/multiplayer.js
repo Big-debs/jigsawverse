@@ -147,7 +147,8 @@ export class MultiplayerGameHost {
         game.id,
         pieces,
         gridDimensions.totalPieces,
-        settings.mode || 'CLASSIC'
+        settings.mode || 'CLASSIC',
+        this.gameLogic
       );
 
       console.log('Step 6: Setting up realtime channel (broadcast)...');
@@ -308,6 +309,7 @@ export class MultiplayerGameHost {
       playerARack: gl.playerARack.map(p => p ? p.id : null),
       playerBRack: gl.playerBRack.map(p => p ? p.id : null),
       piecePool: gl.piecePool.map(p => p.id),
+      pieceOwners: gl.pieceOwners,
       currentTurn: gl.currentTurn,
       scores: gl.scores,
       revealedScores: gl.revealedScores,
@@ -436,19 +438,10 @@ export class MultiplayerGameHost {
     // DB writes in background — don't block the UI
     Promise.all([
       realtimeService.updateGameState(this.gameId, {
-        grid: this.gameLogic.grid.map(p => p ? {
-          id: p.id,
-          correctPosition: p.correctPosition
-        } : null),
-        player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
-        player_b_rack: this.gameLogic.playerBRack.map(p => p ? p.id : null),
-        piece_pool: this.gameLogic.piecePool.map(p => p.id),
+        ...this.gameLogic.exportForDatabase(),
         // In Nexus: don't broadcast turn or awaiting_decision — truly simultaneous
         current_turn: isNexus ? null : this.gameLogic.currentTurn,
-        pending_check: isNexus ? null : this.gameLogic.pendingCheck,
         awaiting_decision: isNexus ? null : (result.awaitingCheck ? 'opponent_check' : null),
-        move_history: this.gameLogic.moveHistory,
-        timer_remaining: this.gameLogic.timerRemaining
       }),
       gameService.updateGame(this.gameId, {
         player_a_score: this.gameLogic.scores.playerA.score,
@@ -793,6 +786,7 @@ export class MultiplayerGameGuest {
       playerARack: gl.playerARack.map(p => p ? p.id : null),
       playerBRack: gl.playerBRack.map(p => p ? p.id : null),
       piecePool: gl.piecePool.map(p => p.id),
+      pieceOwners: gl.pieceOwners,
       currentTurn: gl.currentTurn,
       scores: gl.scores,
       revealedScores: gl.revealedScores,
@@ -869,19 +863,10 @@ export class MultiplayerGameGuest {
     // DB writes in background — don't block the UI
     Promise.all([
       realtimeService.updateGameState(this.gameId, {
-        grid: this.gameLogic.grid.map(p => p ? {
-          id: p.id,
-          correctPosition: p.correctPosition
-        } : null),
-        player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
-        player_b_rack: this.gameLogic.playerBRack.map(p => p ? p.id : null),
-        piece_pool: this.gameLogic.piecePool.map(p => p.id),
+        ...this.gameLogic.exportForDatabase(),
         // In Nexus: don't broadcast turn or awaiting_decision
         current_turn: isNexus ? null : this.gameLogic.currentTurn,
-        pending_check: isNexus ? null : this.gameLogic.pendingCheck,
         awaiting_decision: isNexus ? null : (result.awaitingCheck ? 'opponent_check' : null),
-        move_history: this.gameLogic.moveHistory,
-        timer_remaining: this.gameLogic.timerRemaining
       }),
       gameService.updateGame(this.gameId, {
         player_b_score: this.gameLogic.scores.playerB.score,

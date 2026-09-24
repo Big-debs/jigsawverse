@@ -153,9 +153,12 @@ export class GameLogic {
     this.pieces = pieces;
     this.grid = Array(this.totalPieces).fill(null);
     this.piecePool = [...pieces];
+    this.pieceOwners = {};
     this.playerARack = [];
     this.playerBRack = [];
-    this.rackCapacity = 10;
+    // Two rack rows, always matching the board width. A 5×5 board therefore
+    // holds 10 rack tiles, while a 10×10 board holds 20.
+    this.rackCapacity = Math.max(2, this.cols * 2);
     this.currentTurn = 'playerA';
     this.scores = {
       playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 },
@@ -198,13 +201,42 @@ export class GameLogic {
   initialize() {
     // Shuffle the piece pool to randomize distribution
     this.piecePool = this.shufflePieces();
+    this.piecePool.forEach((piece, index) => {
+      this.pieceOwners[piece.id] = index % 2 === 0 ? 'playerA' : 'playerB';
+    });
     this.fillRack('playerA');
     this.fillRack('playerB');
     this.gameState = 'active';
   }
 
+  validateTileLocations() {
+    const locations = new Map();
+    const add = (piece, location) => {
+      if (!piece) return;
+      const existing = locations.get(piece.id) || [];
+      existing.push(location);
+      locations.set(piece.id, existing);
+    };
+
+    this.grid.forEach((piece, index) => add(piece, `grid:${index}`));
+    this.playerARack.forEach((piece, index) => add(piece, `playerA:${index}`));
+    this.playerBRack.forEach((piece, index) => add(piece, `playerB:${index}`));
+    this.piecePool.forEach((piece, index) => add(piece, `pool:${index}`));
+
+    const duplicates = [];
+    const missing = [];
+    this.pieces.forEach(piece => {
+      const pieceLocations = locations.get(piece.id) || [];
+      if (pieceLocations.length === 0) missing.push(piece.id);
+      if (pieceLocations.length > 1) duplicates.push({ pieceId: piece.id, locations: pieceLocations });
+    });
+
+    return { valid: duplicates.length === 0 && missing.length === 0, duplicates, missing };
+  }
+
   initializeSinglePlayer() {
     this.piecePool = this.shufflePieces();
+    this.piecePool.forEach(piece => { this.pieceOwners[piece.id] = 'playerA'; });
     this.playerARack = [];
     this.playerBRack = [];
     this.fillRack('playerA');
@@ -231,9 +263,14 @@ export class GameLogic {
     // Create new rack with actual pieces first
     const newRack = [...actualPieces];
 
-    // Add pieces from pool
+    // Add only pieces assigned to this player. This prevents simultaneous
+    // multiplayer refills from handing the same tile to both racks.
     for (let i = 0; i < needed && this.piecePool.length > 0; i++) {
-      const piece = this.piecePool.shift();
+      const poolIndex = this.piecePool.findIndex(piece => (
+        this.mode === 'SINGLE_PLAYER' || this.pieceOwners[piece.id] === player
+      ));
+      if (poolIndex === -1) break;
+      const [piece] = this.piecePool.splice(poolIndex, 1);
       if (piece) {
         newRack.push(piece);
       }
@@ -266,6 +303,7 @@ export class GameLogic {
       }
     }
 
+    this.pieceOwners[completePiece.id] = player;
     const returnedToRack = rack.filter(Boolean).length < this.rackCapacity;
     if (returnedToRack) {
       rack.push(completePiece);
@@ -701,7 +739,7 @@ export class GameLogic {
       const piece = this.grid[i];
       if (!piece) continue;
 
-      const placedBy = this.piecePlacedBy[i] || 'playerA';
+      const placedBy = this.getPlacementOwner(i, piece.id);
       const isCorrect = piece.correctPosition === i;
       const mark = this.pieceMarks[i];
 
@@ -747,12 +785,27 @@ export class GameLogic {
     this.syncRevealedScores();
     this.gameState = 'finished';
 
+    const winner = this.scores.playerA.score > this.scores.playerB.score
+      ? 'playerA'
+      : this.scores.playerB.score > this.scores.playerA.score ? 'playerB' : 'tie';
+
     return {
       success: true,
       results,
-      finalScores: { ...this.scores },
-      winner: this.getWinner()
+      finalScores: {
+        playerA: { ...this.scores.playerA },
+        playerB: { ...this.scores.playerB }
+      },
+      winner
     };
+  }
+
+  getPlacementOwner(gridIndex, pieceId) {
+    if (this.piecePlacedBy[gridIndex]) return this.piecePlacedBy[gridIndex];
+    const matchingMove = [...this.moveHistory].reverse().find(move => (
+      move.gridIndex === gridIndex && move.pieceId === pieceId
+    ));
+    return matchingMove?.player || 'playerA';
   }
 
   updateScore(player, points, isCorrectPlacement) {
@@ -970,6 +1023,13 @@ export class GameLogic {
   }
 
   getWinner() {
+    if (this.mode === 'NEXUS' && this.nexusResolved) {
+      const nexusScoreA = this.scores.playerA.score;
+      const nexusScoreB = this.scores.playerB.score;
+      if (nexusScoreA > nexusScoreB) return 'playerA';
+      if (nexusScoreB > nexusScoreA) return 'playerB';
+      return 'tie';
+    }
     if (!this.isGameComplete()) return null;
 
     const scoreA = this.scores.playerA.score;
@@ -1024,6 +1084,7 @@ export class GameLogic {
     }
 
     const randomPiece = (pieces) => pieces[Math.floor(Math.random() * pieces.length)];
+    const actionablePieces = availablePieces.filter(piece => !this.grid[piece.correctPosition]);
     const edgeCount = (piece) => {
       const edges = piece.edges || {};
       return [edges.top, edges.right, edges.bottom, edges.left].filter(Boolean).length;
@@ -1046,34 +1107,45 @@ export class GameLogic {
     let pieceIds = [];
     let cellIndices = [];
     let region = null;
+    let targetCellIndex = null;
+
+    if (actionablePieces.length === 0) {
+      return {
+        success: false,
+        message: 'Every hinted destination is currently occupied. Wait for the next reveal to clear incorrect tiles.'
+      };
+    }
 
     switch (hintType) {
       case 'position': {
-        const piece = randomPiece(availablePieces);
+        const piece = randomPiece(actionablePieces);
         pieceIds = [piece.id];
         cellIndices = [piece.correctPosition];
+        targetCellIndex = piece.correctPosition;
         break;
       }
       case 'edge': {
-        const pieces = availablePieces.filter(piece => piece.isEdge && edgeCount(piece) === 1);
+        const pieces = actionablePieces.filter(piece => piece.isEdge && edgeCount(piece) === 1);
         if (pieces.length === 0) {
           return { success: false, message: 'No edge pieces are currently in your rack' };
         }
-        pieceIds = pieces.map(piece => piece.id);
-        cellIndices = boardEdgeCells;
+        const piece = randomPiece(pieces);
+        pieceIds = [piece.id];
+        cellIndices = boardEdgeCells.filter(index => !this.grid[index]);
         break;
       }
       case 'corner': {
-        const pieces = availablePieces.filter(piece => edgeCount(piece) >= 2);
+        const pieces = actionablePieces.filter(piece => edgeCount(piece) >= 2);
         if (pieces.length === 0) {
           return { success: false, message: 'No corner pieces are currently in your rack' };
         }
-        pieceIds = pieces.map(piece => piece.id);
-        cellIndices = cornerCells;
+        const piece = randomPiece(pieces);
+        pieceIds = [piece.id];
+        cellIndices = cornerCells.filter(index => !this.grid[index]);
         break;
       }
       case 'region': {
-        const piece = randomPiece(availablePieces);
+        const piece = randomPiece(actionablePieces);
         const correctRow = Math.floor(piece.correctPosition / this.cols);
         const correctCol = piece.correctPosition % this.cols;
         region = {
@@ -1113,6 +1185,7 @@ export class GameLogic {
       pieceIds,
       cellIndices,
       region,
+      targetCellIndex,
       cost,
       duration,
       createdAt,
@@ -1173,6 +1246,7 @@ export class GameLogic {
       checksRemaining: { ...this.checksRemaining },
       nextCheckRevealProgress: this.nextCheckRevealProgress,
       lastGameplayEvent: this.lastGameplayEvent ? { ...this.lastGameplayEvent } : null,
+      pieceOwners: { ...this.pieceOwners },
       // Nexus mode state
       piecePlacedBy: { ...this.piecePlacedBy },
       pieceMarks: { ...this.pieceMarks },
@@ -1194,6 +1268,11 @@ export class GameLogic {
       turns_remaining: this.turnsRemaining,
       checks_remaining: this.checksRemaining,
       last_gameplay_event: this.lastGameplayEvent,
+      revealed_scores: this.revealedScores,
+      piece_placed_by: this.piecePlacedBy,
+      piece_marks: this.pieceMarks,
+      nexus_resolved: this.nexusResolved,
+      piece_owners: this.pieceOwners,
       // NOTE: gameplay_mode is only set during initializeGameState, not on updates
       // NOTE: 'pieces' exists but we don't update it after initialization
       // NOTE: 'awaiting_decision' is set separately in makeMove/respondToCheck
@@ -1277,6 +1356,22 @@ export class GameLogic {
       ? piecePoolData.map(item => getPieceFromIdOrObject(item)).filter(Boolean)
       : [];
 
+    this.pieceOwners = { ...(data.pieceOwners || data.piece_owners || {}) };
+    this.playerARack.forEach(piece => { if (piece) this.pieceOwners[piece.id] = 'playerA'; });
+    this.playerBRack.forEach(piece => { if (piece) this.pieceOwners[piece.id] = 'playerB'; });
+    if (Object.keys(this.pieceOwners).length < this.pieces.length) {
+      const counts = {
+        playerA: Object.values(this.pieceOwners).filter(owner => owner === 'playerA').length,
+        playerB: Object.values(this.pieceOwners).filter(owner => owner === 'playerB').length
+      };
+      this.piecePool.forEach(piece => {
+        if (this.pieceOwners[piece.id]) return;
+        const owner = counts.playerA <= counts.playerB ? 'playerA' : 'playerB';
+        this.pieceOwners[piece.id] = owner;
+        counts[owner]++;
+      });
+    }
+
     console.log('Piece pool import:', {
       piecePoolDataLength: piecePoolData.length,
       reconstructedPoolLength: this.piecePool.length,
@@ -1322,7 +1417,15 @@ export class GameLogic {
     }
 
     // Import Nexus mode state
-    this.piecePlacedBy = data.piecePlacedBy || data.piece_placed_by || {};
+    this.piecePlacedBy = { ...(data.piecePlacedBy || data.piece_placed_by || {}) };
+    this.grid.forEach((piece, gridIndex) => {
+      if (piece && !this.piecePlacedBy[gridIndex]) {
+        this.piecePlacedBy[gridIndex] = this.getPlacementOwner(gridIndex, piece.id);
+      }
+      if (piece && !this.pieceOwners[piece.id]) {
+        this.pieceOwners[piece.id] = this.piecePlacedBy[gridIndex];
+      }
+    });
     this.pieceMarks = data.pieceMarks || data.piece_marks || {};
     this.nexusResolved = data.nexusResolved || data.nexus_resolved || false;
 

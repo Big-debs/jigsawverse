@@ -13,6 +13,7 @@ import SinglePlayerGame from './SinglePlayerGame';
 import ImageLibrary from './ImageLibrary';
 import { ACCESSIBILITY_DEFAULTS, HINT_CONFIG } from '../lib/gameConfig';
 import { isModeMultiplayer } from '../lib/gameModes';
+import { installGameAudioUnlock } from '../lib/audioManager';
 
 const PhaserGame = lazy(() => import('./PhaserGame'));
 
@@ -228,6 +229,8 @@ const JigsawVerseApp = () => {
   useEffect(() => {
     window.localStorage.setItem('jigsawverse-settings', JSON.stringify(gameSettings));
   }, [gameSettings]);
+
+  useEffect(() => installGameAudioUnlock(), []);
 
   // Setup connection manager callbacks
   useEffect(() => {
@@ -1248,7 +1251,10 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
       setLoading(false);
 
       // Check for game completion after the shared final-board effect.
-      if (newState.isComplete && !gameEndScheduledRef.current) {
+      const readyForGameEnd = newState.mode === 'NEXUS'
+        ? newState.nexusResolved
+        : newState.isComplete;
+      if (readyForGameEnd && !gameEndScheduledRef.current) {
         gameEndScheduledRef.current = true;
         const completionEvent = {
           id: `multi-game-completed-${Date.now()}-${++gameplayEventSequenceRef.current}`,
@@ -1375,6 +1381,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
     try {
       const result = await multiplayerRef.current.makeMove(pieceToPlace.id, gridIndex);
+      setGameState(multiplayerRef.current.gameLogic.getGameState());
       const placementEvent = multiplayerRef.current.gameLogic?.lastGameplayEvent;
       if (placementEvent) {
         lastGameplayEffectIdRef.current = placementEvent.id;
@@ -1434,11 +1441,24 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
     try {
       const result = await multiplayerRef.current.resolveEndGame();
       if (result.success) {
+        const resolvedState = multiplayerRef.current.gameLogic.getGameState();
+        setGameState(resolvedState);
         setLastAction({
           type: 'resolve',
           message: `Game resolved! Winner: ${result.winner || 'Tie'}`,
           results: result.results
         });
+        if (!gameEndScheduledRef.current) {
+          gameEndScheduledRef.current = true;
+          emitGameplayEffect('game_completed');
+          const outcome = result.winner === myPlayer
+            ? 'you'
+            : result.winner === opponentPlayer ? 'opponent' : 'tie';
+          gameEndTimeoutRef.current = setTimeout(
+            () => onGameEnd(outcome),
+            gameSettings.reducedMotion ? 50 : 650
+          );
+        }
       }
     } catch (err) {
       setError('Failed to resolve game: ' + err.message);
@@ -1511,6 +1531,11 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
       }
 
       setActiveHint(result.hint);
+      const hintedPiece = (myPlayer === 'playerA'
+        ? multiplayerRef.current.gameLogic.playerARack
+        : multiplayerRef.current.gameLogic.playerBRack
+      ).find(piece => result.hint.pieceIds.includes(piece?.id));
+      if (hintedPiece) setSelectedPiece(hintedPiece);
       emitGameplayEffect('hint_activated', {
         actor: myPlayer,
         hintType,
@@ -1682,7 +1707,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
       </div>
 
-      {isNexusMode && !gameState?.nexusResolved && (
+      {isHost && isNexusMode && !gameState?.nexusResolved && (
         <button
           onClick={handleResolveEndGame}
           className="fixed right-3 bottom-24 z-40 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-full shadow-xl text-sm"
@@ -1759,6 +1784,12 @@ const GameOverScreen = ({ winner, gameData, onPlayAgain }) => {
   const isWinner = winner === 'you';
   const isTie = winner === 'tie';
   const isTimeout = winner === 'timeout';
+  const finalScoreA = gameData?.finalScores?.playerA?.score
+    ?? gameData?.game?.player_a_score
+    ?? 0;
+  const finalScoreB = gameData?.finalScores?.playerB?.score
+    ?? gameData?.game?.player_b_score
+    ?? 0;
 
   return (
     <div className="max-w-2xl mx-auto text-center">
@@ -1783,18 +1814,18 @@ const GameOverScreen = ({ winner, gameData, onPlayAgain }) => {
                 : 'Better luck next time!'}
         </p>
 
-        {gameData?.game && (
+        {(gameData?.game || gameData?.finalScores) && (
           <div className="bg-white/5 rounded-xl p-4 mb-6">
             <h3 className="text-white font-semibold mb-3 text-sm sm:text-base">Final Scores</h3>
             <div className="flex justify-around">
               <div>
-                <p className="text-purple-300 text-xs sm:text-sm">{gameData.game.player_a_name || 'Player A'}</p>
-                <p className="text-xl sm:text-2xl font-bold text-white">{gameData.game.player_a_score || 0}</p>
+                <p className="text-purple-300 text-xs sm:text-sm">{gameData?.game?.player_a_name || 'Player A'}</p>
+                <p className="text-xl sm:text-2xl font-bold text-white">{finalScoreA}</p>
               </div>
               <div className="text-purple-400 self-center text-sm sm:text-base">VS</div>
               <div>
-                <p className="text-purple-300 text-xs sm:text-sm">{gameData.game.player_b_name || 'Player B'}</p>
-                <p className="text-xl sm:text-2xl font-bold text-white">{gameData.game.player_b_score || 0}</p>
+                <p className="text-purple-300 text-xs sm:text-sm">{gameData?.game?.player_b_name || 'Player B'}</p>
+                <p className="text-xl sm:text-2xl font-bold text-white">{finalScoreB}</p>
               </div>
             </div>
           </div>

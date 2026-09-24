@@ -194,6 +194,8 @@ const SinglePlayerGame = ({
       lastVisibleScoreRef.current = gameLogic.revealedScores.playerA.score;
       setGameState(gameLogic.getGameState());
       setActiveHint(result.hint);
+      const hintedPiece = gameLogic.playerARack.find(piece => result.hint.pieceIds.includes(piece?.id));
+      if (hintedPiece) setSelectedPiece(hintedPiece);
       emitGameplayEffect('hint_activated', { hintType, hintId: result.hint.id });
 
       if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);

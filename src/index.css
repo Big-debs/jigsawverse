@@ -204,7 +204,7 @@ body {
 }
 
 .game-canvas {
-  min-height: min(700px, calc(100dvh - 150px));
+  min-height: 0;
 }
 
 /* Touch-friendly: minimum 44px tap targets on mobile */
@@ -239,7 +239,7 @@ body {
   }
 
   .game-canvas {
-    min-height: min(640px, calc(100dvh - 118px));
+    min-height: 0;
     border-radius: 10px;
   }
 

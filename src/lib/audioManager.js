@@ -6,26 +6,29 @@ const getAudioContextClass = () => {
   return window.AudioContext || window.webkitAudioContext || null;
 };
 
-export const unlockGameAudio = async () => {
+export const unlockGameAudio = () => {
   const AudioContextClass = getAudioContextClass();
-  if (!AudioContextClass) return false;
+  if (!AudioContextClass) return Promise.resolve(false);
 
   try {
     if (!audioContext || audioContext.state === 'closed') {
       audioContext = new AudioContextClass();
     }
-    if (audioContext.state === 'suspended') await audioContext.resume();
-
-    // A silent buffer in the initiating gesture makes iOS/WebKit commit the
-    // audio session before Phaser tries to play a later gameplay sound.
+    // Both resume() and the source start must happen synchronously inside the
+    // original user gesture. Awaiting resume first loses that gesture on iOS.
+    const resumePromise = audioContext.state !== 'running'
+      ? audioContext.resume()
+      : Promise.resolve();
     const buffer = audioContext.createBuffer(1, 1, audioContext.sampleRate);
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
     source.connect(audioContext.destination);
     source.start(0);
-    return audioContext.state === 'running';
+    return Promise.resolve(resumePromise)
+      .then(() => audioContext.state === 'running')
+      .catch(() => false);
   } catch {
-    return false;
+    return Promise.resolve(false);
   }
 };
 
@@ -88,4 +91,3 @@ export const playGameSound = async (kind, settings = {}) => {
   oscillator.stop(now + duration + 0.03);
   return true;
 };
-
