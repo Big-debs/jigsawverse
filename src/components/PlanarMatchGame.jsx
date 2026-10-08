@@ -32,13 +32,38 @@ const TILE_META = Object.fromEntries(TILE_KINDS.map((tile) => [tile.id, tile]));
 
 const wait = (duration) => new Promise((resolve) => window.setTimeout(resolve, duration));
 
-function captureTileRects(container) {
+function lineTileIds(board, move) {
+  return Array.from({ length: DEFAULT_BOARD_SIZE }, (_, offset) => {
+    const index = move.axis === 'row'
+      ? move.index * DEFAULT_BOARD_SIZE + offset
+      : offset * DEFAULT_BOARD_SIZE + move.index;
+    return board[index].id;
+  });
+}
+
+function wrappingTileId(board, move) {
+  const edge = move.direction > 0 ? DEFAULT_BOARD_SIZE - 1 : 0;
+  const index = move.axis === 'row'
+    ? move.index * DEFAULT_BOARD_SIZE + edge
+    : edge * DEFAULT_BOARD_SIZE + move.index;
+  return board[index].id;
+}
+
+function captureTileRects(container, tileIds) {
   if (!container) return new Map();
+  const wanted = new Set(tileIds);
   return new Map(
-    Array.from(container.querySelectorAll('[data-tile-id]')).map((element) => {
+    Array.from(container.querySelectorAll('[data-tile-id]'))
+      .filter((element) => wanted.has(element.dataset.tileId))
+      .map((element) => {
       const rect = element.getBoundingClientRect();
-      return [element.dataset.tileId, { left: rect.left, top: rect.top }];
-    }),
+      return [element.dataset.tileId, {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      }];
+      }),
   );
 }
 
@@ -47,7 +72,15 @@ function createGame(seed = Date.now() >>> 0) {
   return { ...generated, score: 0, movesLeft: STARTING_MOVES };
 }
 
-function DirectionButton({ label, onClick, disabled, children }) {
+function DirectionButton({
+  label,
+  onClick,
+  onPointerDown,
+  onPointerUp,
+  onPointerCancel,
+  disabled,
+  children,
+}) {
   return (
     <button
       type="button"
@@ -55,6 +88,9 @@ function DirectionButton({ label, onClick, disabled, children }) {
       aria-label={label}
       title={label}
       onClick={onClick}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
       disabled={disabled}
     >
       {children}
@@ -67,7 +103,8 @@ export default function PlanarMatchGame({ onExit }) {
   if (!gameRef.current) gameRef.current = createGame();
 
   const boardRef = useRef(null);
-  const pointerRef = useRef(null);
+  const railGestureRef = useRef(null);
+  const suppressClickRef = useRef(false);
   const runIdRef = useRef(0);
   const [board, setBoard] = useState(gameRef.current.board);
   const [score, setScore] = useState(0);
@@ -153,16 +190,38 @@ export default function PlanarMatchGame({ onExit }) {
     const animations = [];
 
     if (!reduceMotion) {
+      const styles = window.getComputedStyle(boardRef.current);
+      const columnGap = Number.parseFloat(styles.columnGap) || 0;
+      const rowGap = Number.parseFloat(styles.rowGap) || 0;
+
       boardRef.current.querySelectorAll('[data-tile-id]').forEach((element) => {
         const source = movement.sourceRects.get(element.dataset.tileId);
         if (!source || typeof element.animate !== 'function') return;
         const destination = element.getBoundingClientRect();
-        animations.push(element.animate(
-          [
-            { transform: `translate(${source.left - destination.left}px, ${source.top - destination.top}px)`, zIndex: 3 },
+        const translateX = source.left - destination.left;
+        const translateY = source.top - destination.top;
+        const isWrappingTile = element.dataset.tileId === movement.wrappingTileId;
+        const keyframes = isWrappingTile
+          ? movement.move.axis === 'row'
+            ? [
+              { transform: `translate(${translateX}px, ${translateY}px)`, offset: 0, zIndex: 4 },
+              { transform: `translate(${translateX + movement.move.direction * (destination.width + columnGap)}px, ${translateY}px)`, offset: 0.48, zIndex: 4 },
+              { transform: `translate(${-movement.move.direction * (destination.width + columnGap)}px, 0)`, offset: 0.52, zIndex: 4 },
+              { transform: 'translate(0, 0)', offset: 1, zIndex: 4 },
+            ]
+            : [
+              { transform: `translate(${translateX}px, ${translateY}px)`, offset: 0, zIndex: 4 },
+              { transform: `translate(${translateX}px, ${translateY + movement.move.direction * (destination.height + rowGap)}px)`, offset: 0.48, zIndex: 4 },
+              { transform: `translate(0, ${-movement.move.direction * (destination.height + rowGap)}px)`, offset: 0.52, zIndex: 4 },
+              { transform: 'translate(0, 0)', offset: 1, zIndex: 4 },
+            ]
+          : [
+            { transform: `translate(${translateX}px, ${translateY}px)`, zIndex: 3 },
             { transform: 'translate(0, 0)', zIndex: 3 },
-          ],
-          { duration: SHIFT_DURATION, easing: 'cubic-bezier(.22,.8,.22,1)' },
+          ];
+        animations.push(element.animate(
+          keyframes,
+          { duration: SHIFT_DURATION, easing: isWrappingTile ? 'linear' : 'cubic-bezier(.22,.8,.22,1)' },
         ));
       });
     }
@@ -193,7 +252,8 @@ export default function PlanarMatchGame({ onExit }) {
 
     const runId = runIdRef.current + 1;
     runIdRef.current = runId;
-    const sourceRects = captureTileRects(boardRef.current);
+    const movedTileIds = lineTileIds(board, move);
+    const sourceRects = captureTileRects(boardRef.current, movedTileIds);
     const shiftedBoard = shiftLine(board, move, DEFAULT_BOARD_SIZE);
     const remainingMoves = movesLeft - 1;
 
@@ -206,6 +266,9 @@ export default function PlanarMatchGame({ onExit }) {
     setMovement({
       runId,
       board: shiftedBoard,
+      move,
+      movedTileIds,
+      wrappingTileId: wrappingTileId(board, move),
       sourceRects,
       remainingMoves,
     });
@@ -237,44 +300,47 @@ export default function PlanarMatchGame({ onExit }) {
     setStatus(move ? `Try ${moveLabel(move).toLowerCase()}.` : 'No scoring move found.');
   };
 
-  const handlePointerDown = (event, index) => {
+  const handleRailPointerDown = (event, axis, index) => {
     if (busy || gameResult) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    pointerRef.current = {
+    railGestureRef.current = {
       x: event.clientX,
       y: event.clientY,
-      row: Math.floor(index / DEFAULT_BOARD_SIZE),
-      column: index % DEFAULT_BOARD_SIZE,
+      axis,
+      index,
     };
   };
 
-  const handlePointerUp = (event) => {
-    const start = pointerRef.current;
-    pointerRef.current = null;
+  const handleRailPointerUp = (event) => {
+    const start = railGestureRef.current;
+    railGestureRef.current = null;
     if (!start) return;
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return;
 
-    if (Math.abs(dx) > Math.abs(dy)) {
-      performMove({ axis: 'row', index: start.row, direction: dx > 0 ? 1 : -1 });
-    } else {
-      performMove({ axis: 'column', index: start.column, direction: dy > 0 ? 1 : -1 });
+    suppressClickRef.current = true;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+
+    if (start.axis === 'row' && Math.abs(dx) >= Math.abs(dy)) {
+      performMove({ axis: 'row', index: start.index, direction: dx > 0 ? 1 : -1 });
+    } else if (start.axis === 'column' && Math.abs(dy) >= Math.abs(dx)) {
+      performMove({ axis: 'column', index: start.index, direction: dy > 0 ? 1 : -1 });
     }
   };
 
-  const handleKeyDown = (event, index) => {
-    const row = Math.floor(index / DEFAULT_BOARD_SIZE);
-    const column = index % DEFAULT_BOARD_SIZE;
-    const movesByKey = {
-      ArrowLeft: { axis: 'row', index: row, direction: -1 },
-      ArrowRight: { axis: 'row', index: row, direction: 1 },
-      ArrowUp: { axis: 'column', index: column, direction: -1 },
-      ArrowDown: { axis: 'column', index: column, direction: 1 },
-    };
-    if (!movesByKey[event.key]) return;
-    event.preventDefault();
-    performMove(movesByKey[event.key]);
+  const handleRailPointerCancel = () => {
+    railGestureRef.current = null;
+  };
+
+  const handleDirectionClick = (move) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    performMove(move);
   };
 
   const hintedIndices = useMemo(() => {
@@ -321,9 +387,12 @@ export default function PlanarMatchGame({ onExit }) {
             {Array.from({ length: DEFAULT_BOARD_SIZE }, (_, column) => (
               <DirectionButton
                 key={`up-${column}`}
-                label={`Shift column ${column + 1} up`}
+                label={`Column ${column + 1} rail: shift up`}
                 disabled={busy || Boolean(gameResult)}
-                onClick={() => performMove({ axis: 'column', index: column, direction: -1 })}
+                onClick={() => handleDirectionClick({ axis: 'column', index: column, direction: -1 })}
+                onPointerDown={(event) => handleRailPointerDown(event, 'column', column)}
+                onPointerUp={handleRailPointerUp}
+                onPointerCancel={handleRailPointerCancel}
               >
                 <ArrowUp size={16} />
               </DirectionButton>
@@ -336,9 +405,12 @@ export default function PlanarMatchGame({ onExit }) {
               {Array.from({ length: DEFAULT_BOARD_SIZE }, (_, row) => (
                 <DirectionButton
                   key={`left-${row}`}
-                  label={`Shift row ${row + 1} left`}
+                  label={`Row ${row + 1} rail: shift left`}
                   disabled={busy || Boolean(gameResult)}
-                  onClick={() => performMove({ axis: 'row', index: row, direction: -1 })}
+                  onClick={() => handleDirectionClick({ axis: 'row', index: row, direction: -1 })}
+                  onPointerDown={(event) => handleRailPointerDown(event, 'row', row)}
+                  onPointerUp={handleRailPointerUp}
+                  onPointerCancel={handleRailPointerCancel}
                 >
                   <ArrowLeft size={16} />
                 </DirectionButton>
@@ -354,20 +426,16 @@ export default function PlanarMatchGame({ onExit }) {
               {board.map((tile, index) => {
                 const meta = TILE_META[tile.kind];
                 return (
-                  <button
-                    type="button"
+                  <div
                     key={tile.id}
                     data-tile-id={tile.id}
                     className={`planar-match__tile ${matched.has(index) ? 'is-matched' : ''} ${newTileIds.has(tile.id) ? 'is-new' : ''} ${hintedIndices.has(index) ? 'is-hinted' : ''}`}
                     style={{ '--tile-color': meta.color }}
+                    role="img"
                     aria-label={`${meta.label}, row ${Math.floor(index / DEFAULT_BOARD_SIZE) + 1}, column ${(index % DEFAULT_BOARD_SIZE) + 1}`}
-                    onPointerDown={(event) => handlePointerDown(event, index)}
-                    onPointerUp={handlePointerUp}
-                    onKeyDown={(event) => handleKeyDown(event, index)}
-                    disabled={busy || Boolean(gameResult)}
                   >
                     <span aria-hidden="true">{meta.glyph}</span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -376,9 +444,12 @@ export default function PlanarMatchGame({ onExit }) {
               {Array.from({ length: DEFAULT_BOARD_SIZE }, (_, row) => (
                 <DirectionButton
                   key={`right-${row}`}
-                  label={`Shift row ${row + 1} right`}
+                  label={`Row ${row + 1} rail: shift right`}
                   disabled={busy || Boolean(gameResult)}
-                  onClick={() => performMove({ axis: 'row', index: row, direction: 1 })}
+                  onClick={() => handleDirectionClick({ axis: 'row', index: row, direction: 1 })}
+                  onPointerDown={(event) => handleRailPointerDown(event, 'row', row)}
+                  onPointerUp={handleRailPointerUp}
+                  onPointerCancel={handleRailPointerCancel}
                 >
                   <ArrowRight size={16} />
                 </DirectionButton>
@@ -391,9 +462,12 @@ export default function PlanarMatchGame({ onExit }) {
             {Array.from({ length: DEFAULT_BOARD_SIZE }, (_, column) => (
               <DirectionButton
                 key={`down-${column}`}
-                label={`Shift column ${column + 1} down`}
+                label={`Column ${column + 1} rail: shift down`}
                 disabled={busy || Boolean(gameResult)}
-                onClick={() => performMove({ axis: 'column', index: column, direction: 1 })}
+                onClick={() => handleDirectionClick({ axis: 'column', index: column, direction: 1 })}
+                onPointerDown={(event) => handleRailPointerDown(event, 'column', column)}
+                onPointerUp={handleRailPointerUp}
+                onPointerCancel={handleRailPointerCancel}
               >
                 <ArrowDown size={16} />
               </DirectionButton>
@@ -412,7 +486,7 @@ export default function PlanarMatchGame({ onExit }) {
           <p className="planar-match__kicker">HOW THIS VERSION PLAYS</p>
           <h3>Shift, cross, chain.</h3>
           <ol>
-            <li><strong>Shift</strong><span>Swipe a tile or use the arrows to rotate its entire row or column.</span></li>
+            <li><strong>Shift</strong><span>Drag an outer row or column rail, or tap its arrow. Tiles are never moved individually.</span></li>
             <li><strong>Cross</strong><span>Build three or more identical symbols horizontally or vertically—even across an edge.</span></li>
             <li><strong>Chain</strong><span>Cleared spaces collapse downward. New symbols can trigger multiplied cascades.</span></li>
           </ol>
