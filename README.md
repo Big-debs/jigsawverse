@@ -8,6 +8,7 @@ A real-time multiplayer jigsaw puzzle game with strategic gameplay.
 - 👥 **Real-Time Multiplayer**: Challenge friends in synchronized gameplay
 - 🏆 **Competitive Scoring**: Strategic check/pass system with streak bonuses
 - 📱 **Responsive Design**: Play on any device
+- ✨ **Planar Match Prototype**: Shift complete wrapping rows and columns to create matches and cascading chains
 
 ## Tech Stack
 
@@ -96,6 +97,7 @@ The game consists of:
 - **ImageProcessor**: Slices images into puzzle pieces
 - **GameLogic**: Core game mechanics including scoring and turn management
 - **Multiplayer**: Host/Guest game management with real-time synchronization
+- **Planar Match Engine**: Independent 6×6 shift-and-match rules with wrapped edges, collapse/refill cascades, hints, scoring, and move limits
 
 ## License
 
