@@ -209,6 +209,18 @@
   cursor: grabbing;
 }
 
+.planar-match__direction.is-gesture-active {
+  color: #fff;
+  background: #6d5bd0;
+  border-color: rgba(255, 255, 255, 0.9);
+  transform: scale(1.06);
+}
+
+.planar-match__direction.is-gesture-ready {
+  background: #188a63;
+  box-shadow: 0 0 0 4px rgba(24, 138, 99, 0.2);
+}
+
 .planar-match__direction:hover:not(:disabled) {
   transform: scale(1.08);
   color: #fff;
@@ -251,9 +263,19 @@
   box-shadow: inset 0 -8px 16px rgba(59, 42, 24, 0.15), 0 3px 0 rgba(0, 0, 0, 0.2);
   cursor: default;
   pointer-events: none;
-  transition: opacity 180ms ease, filter 180ms ease, box-shadow 180ms ease;
+  transition: opacity 180ms ease, filter 180ms ease, box-shadow 180ms ease, transform 70ms linear;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.planar-match__tile.is-gesture-line {
+  z-index: 3;
+  filter: brightness(1.08) saturate(1.05);
+  transform: translate(var(--gesture-x), var(--gesture-y));
+}
+
+.planar-match__tile.is-gesture-ready {
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.72), 0 4px 0 rgba(0, 0, 0, 0.22);
 }
 
 .planar-match__tile > span {
@@ -290,6 +312,59 @@
   background: rgba(255, 252, 242, 0.68);
   border: 1px solid var(--line);
   border-radius: 0.8rem;
+}
+
+.planar-match__coach {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 690px;
+  margin: 0.8rem auto 0;
+  padding: 0.75rem 0.85rem;
+  color: #fffaf0;
+  background: #322b55;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 0.9rem;
+  box-shadow: 0 12px 30px rgba(43, 34, 81, 0.2);
+}
+
+.planar-match__coach > span {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: #2d264b;
+  font-weight: 900;
+  background: #f7b955;
+  border-radius: 50%;
+}
+
+.planar-match__coach strong,
+.planar-match__coach p {
+  display: block;
+  margin: 0;
+}
+
+.planar-match__coach p {
+  margin-top: 0.12rem;
+  color: rgba(255, 250, 240, 0.72);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.planar-match__coach button {
+  min-height: 36px;
+  padding: 0.45rem 0.65rem;
+  color: #fffaf0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.55rem;
+  cursor: pointer;
+}
+
+.planar-match__coach.coach-step-2 {
+  background: #166b50;
 }
 
 .planar-match__status strong {
@@ -486,6 +561,16 @@
   .planar-match__status {
     margin-inline: 30px;
     font-size: 0.78rem;
+  }
+
+  .planar-match__coach {
+    margin-inline: 30px;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .planar-match__coach button {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .planar-match__guide {

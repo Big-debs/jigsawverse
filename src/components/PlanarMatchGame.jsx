@@ -20,6 +20,7 @@ import {
   scoringMoves,
   shiftLine,
 } from '../lib/planarMatchEngine';
+import { evaluateRailGesture } from '../lib/planarMatchInteraction';
 import './PlanarMatchGame.css';
 
 const STARTING_MOVES = 18;
@@ -77,18 +78,22 @@ function DirectionButton({
   onClick,
   onPointerDown,
   onPointerUp,
+  onPointerMove,
   onPointerCancel,
+  active,
+  ready,
   disabled,
   children,
 }) {
   return (
     <button
       type="button"
-      className="planar-match__direction"
+      className={`planar-match__direction ${active ? 'is-gesture-active' : ''} ${ready ? 'is-gesture-ready' : ''}`}
       aria-label={label}
       title={label}
       onClick={onClick}
       onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
       disabled={disabled}
@@ -113,11 +118,14 @@ export default function PlanarMatchGame({ onExit }) {
   const [matchedIndices, setMatchedIndices] = useState(new Set());
   const [newTileIds, setNewTileIds] = useState(new Set());
   const [movement, setMovement] = useState(null);
+  const [railPreview, setRailPreview] = useState(null);
   const [busy, setBusy] = useState(false);
   const [hintMove, setHintMove] = useState(null);
   const [status, setStatus] = useState('Shift a complete row or column to make a match.');
   const [lastGain, setLastGain] = useState(0);
   const [gameResult, setGameResult] = useState(null);
+  const [coachStep, setCoachStep] = useState(0);
+  const [coachDismissed, setCoachDismissed] = useState(false);
 
   const progress = Math.min(100, Math.round((score / TARGET_SCORE) * 100));
   const matched = matchedIndices;
@@ -157,6 +165,7 @@ export default function PlanarMatchGame({ onExit }) {
       if (!matches.indices.length) break;
 
       setMatchedIndices(new Set(matches.indices));
+      setCoachStep((current) => Math.max(current, 2));
       setStatus(cascade === 1 ? 'Match found.' : `Cascade ×${cascade}!`);
       await wait(CLEAR_DURATION);
       if (runIdRef.current !== runId) return;
@@ -258,6 +267,8 @@ export default function PlanarMatchGame({ onExit }) {
     const remainingMoves = movesLeft - 1;
 
     setBusy(true);
+    setRailPreview(null);
+    setCoachStep((current) => Math.max(current, 1));
     setHintMove(null);
     setLastGain(0);
     setMovesLeft(remainingMoves);
@@ -285,10 +296,13 @@ export default function PlanarMatchGame({ onExit }) {
     setMatchedIndices(new Set());
     setNewTileIds(new Set());
     setMovement(null);
+    setRailPreview(null);
     setBusy(false);
     setHintMove(null);
     setLastGain(0);
     setGameResult(null);
+    setCoachStep(0);
+    setCoachDismissed(false);
     setStatus('New lattice ready. Shift a complete row or column.');
   }, []);
 
@@ -308,31 +322,77 @@ export default function PlanarMatchGame({ onExit }) {
       y: event.clientY,
       axis,
       index,
+      threshold: Math.max(24, (boardRef.current?.getBoundingClientRect().width ?? 360) / DEFAULT_BOARD_SIZE * 0.42),
     };
+    setRailPreview({ axis, index, delta: 0, ready: false });
+    setStatus(`Drag ${axis === 'row' ? 'sideways' : 'vertically'}; release when the rail glows.`);
+  };
+
+  const handleRailPointerMove = (event) => {
+    const start = railGestureRef.current;
+    if (!start) return;
+
+    const gesture = evaluateRailGesture({
+      axis: start.axis,
+      startX: start.x,
+      startY: start.y,
+      currentX: event.clientX,
+      currentY: event.clientY,
+      threshold: start.threshold,
+    });
+    const direction = gesture.direction > 0
+      ? (start.axis === 'row' ? 'right' : 'down')
+      : (start.axis === 'row' ? 'left' : 'up');
+
+    setRailPreview({
+      axis: start.axis,
+      index: start.index,
+      delta: gesture.aligned ? gesture.previewDelta : 0,
+      ready: gesture.ready,
+    });
+    setStatus(
+      gesture.aligned
+        ? gesture.ready
+          ? `Release to shift ${start.axis} ${start.index + 1} ${direction}.`
+          : `Keep dragging ${direction} to engage the rail.`
+        : `Follow the ${start.axis === 'row' ? 'horizontal' : 'vertical'} rail to shift it.`,
+    );
   };
 
   const handleRailPointerUp = (event) => {
     const start = railGestureRef.current;
     railGestureRef.current = null;
     if (!start) return;
-    const dx = event.clientX - start.x;
-    const dy = event.clientY - start.y;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return;
+    const gesture = evaluateRailGesture({
+      axis: start.axis,
+      startX: start.x,
+      startY: start.y,
+      currentX: event.clientX,
+      currentY: event.clientY,
+      threshold: start.threshold,
+    });
+
+    setRailPreview(null);
+    if (!gesture.moved) return;
 
     suppressClickRef.current = true;
     window.setTimeout(() => {
       suppressClickRef.current = false;
     }, 0);
 
-    if (start.axis === 'row' && Math.abs(dx) >= Math.abs(dy)) {
-      performMove({ axis: 'row', index: start.index, direction: dx > 0 ? 1 : -1 });
-    } else if (start.axis === 'column' && Math.abs(dy) >= Math.abs(dx)) {
-      performMove({ axis: 'column', index: start.index, direction: dy > 0 ? 1 : -1 });
+    if (gesture.ready) {
+      window.requestAnimationFrame(() => {
+        performMove({ axis: start.axis, index: start.index, direction: gesture.direction });
+      });
+    } else {
+      setStatus(gesture.aligned ? 'Shift cancelled. Drag past the glow point to move the line.' : 'Shift cancelled. Follow the rail direction.');
     }
   };
 
   const handleRailPointerCancel = () => {
     railGestureRef.current = null;
+    setRailPreview(null);
+    setStatus('Shift cancelled. Choose a row or column.');
   };
 
   const handleDirectionClick = (move) => {
@@ -351,6 +411,23 @@ export default function PlanarMatchGame({ onExit }) {
         : offset * DEFAULT_BOARD_SIZE + hintMove.index,
     ));
   }, [hintMove]);
+
+  const previewIndices = useMemo(() => {
+    if (!railPreview) return new Set();
+    return new Set(Array.from({ length: DEFAULT_BOARD_SIZE }, (_, offset) =>
+      railPreview.axis === 'row'
+        ? railPreview.index * DEFAULT_BOARD_SIZE + offset
+        : offset * DEFAULT_BOARD_SIZE + railPreview.index,
+    ));
+  }, [railPreview]);
+
+  const railIsActive = (axis, index) => railPreview?.axis === axis && railPreview.index === index;
+
+  const coachCopy = [
+    ['Drag an outer rail', 'Pull sideways for a row or vertically for a column. The whole line moves together.'],
+    ['Build a line of three', 'Shift complete lines until three identical symbols meet—even across an outer edge.'],
+    ['Now build a chain', 'Cleared symbols fall and may trigger another match for a larger score.'],
+  ][coachStep];
 
   return (
     <div className="planar-match">
@@ -391,8 +468,11 @@ export default function PlanarMatchGame({ onExit }) {
                 disabled={busy || Boolean(gameResult)}
                 onClick={() => handleDirectionClick({ axis: 'column', index: column, direction: -1 })}
                 onPointerDown={(event) => handleRailPointerDown(event, 'column', column)}
+                onPointerMove={handleRailPointerMove}
                 onPointerUp={handleRailPointerUp}
                 onPointerCancel={handleRailPointerCancel}
+                active={railIsActive('column', column)}
+                ready={railIsActive('column', column) && railPreview.ready}
               >
                 <ArrowUp size={16} />
               </DirectionButton>
@@ -409,8 +489,11 @@ export default function PlanarMatchGame({ onExit }) {
                   disabled={busy || Boolean(gameResult)}
                   onClick={() => handleDirectionClick({ axis: 'row', index: row, direction: -1 })}
                   onPointerDown={(event) => handleRailPointerDown(event, 'row', row)}
+                  onPointerMove={handleRailPointerMove}
                   onPointerUp={handleRailPointerUp}
                   onPointerCancel={handleRailPointerCancel}
+                  active={railIsActive('row', row)}
+                  ready={railIsActive('row', row) && railPreview.ready}
                 >
                   <ArrowLeft size={16} />
                 </DirectionButton>
@@ -429,8 +512,12 @@ export default function PlanarMatchGame({ onExit }) {
                   <div
                     key={tile.id}
                     data-tile-id={tile.id}
-                    className={`planar-match__tile ${matched.has(index) ? 'is-matched' : ''} ${newTileIds.has(tile.id) ? 'is-new' : ''} ${hintedIndices.has(index) ? 'is-hinted' : ''}`}
-                    style={{ '--tile-color': meta.color }}
+                    className={`planar-match__tile ${matched.has(index) ? 'is-matched' : ''} ${newTileIds.has(tile.id) ? 'is-new' : ''} ${hintedIndices.has(index) ? 'is-hinted' : ''} ${previewIndices.has(index) ? 'is-gesture-line' : ''} ${previewIndices.has(index) && railPreview?.ready ? 'is-gesture-ready' : ''}`}
+                    style={{
+                      '--tile-color': meta.color,
+                      '--gesture-x': railPreview?.axis === 'row' && previewIndices.has(index) ? `${railPreview.delta}px` : '0px',
+                      '--gesture-y': railPreview?.axis === 'column' && previewIndices.has(index) ? `${railPreview.delta}px` : '0px',
+                    }}
                     role="img"
                     aria-label={`${meta.label}, row ${Math.floor(index / DEFAULT_BOARD_SIZE) + 1}, column ${(index % DEFAULT_BOARD_SIZE) + 1}`}
                   >
@@ -448,8 +535,11 @@ export default function PlanarMatchGame({ onExit }) {
                   disabled={busy || Boolean(gameResult)}
                   onClick={() => handleDirectionClick({ axis: 'row', index: row, direction: 1 })}
                   onPointerDown={(event) => handleRailPointerDown(event, 'row', row)}
+                  onPointerMove={handleRailPointerMove}
                   onPointerUp={handleRailPointerUp}
                   onPointerCancel={handleRailPointerCancel}
+                  active={railIsActive('row', row)}
+                  ready={railIsActive('row', row) && railPreview.ready}
                 >
                   <ArrowRight size={16} />
                 </DirectionButton>
@@ -466,14 +556,30 @@ export default function PlanarMatchGame({ onExit }) {
                 disabled={busy || Boolean(gameResult)}
                 onClick={() => handleDirectionClick({ axis: 'column', index: column, direction: 1 })}
                 onPointerDown={(event) => handleRailPointerDown(event, 'column', column)}
+                onPointerMove={handleRailPointerMove}
                 onPointerUp={handleRailPointerUp}
                 onPointerCancel={handleRailPointerCancel}
+                active={railIsActive('column', column)}
+                ready={railIsActive('column', column) && railPreview.ready}
               >
                 <ArrowDown size={16} />
               </DirectionButton>
             ))}
             <span />
           </div>
+
+          {!coachDismissed && (
+            <div className={`planar-match__coach coach-step-${coachStep}`}>
+              <span>{coachStep + 1}</span>
+              <div>
+                <strong>{coachCopy[0]}</strong>
+                <p>{coachCopy[1]}</p>
+              </div>
+              <button type="button" onClick={() => setCoachDismissed(true)}>
+                {coachStep === 2 ? 'Got it' : 'Skip'}
+              </button>
+            </div>
+          )}
 
           <div className="planar-match__status" aria-live="polite">
             {busy ? <RefreshCw size={17} className="planar-match__spin" /> : <Sparkles size={17} />}
