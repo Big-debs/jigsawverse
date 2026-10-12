@@ -7,6 +7,8 @@
 
 CREATE TABLE public.authoritative_matches (
   game_id UUID PRIMARY KEY REFERENCES public.games(id) ON DELETE CASCADE,
+  player_a_id UUID NOT NULL REFERENCES public.profiles(id),
+  player_b_id UUID NOT NULL REFERENCES public.profiles(id),
   schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version > 0),
   protocol_version INTEGER NOT NULL DEFAULT 2 CHECK (protocol_version > 0),
   ruleset_version INTEGER NOT NULL DEFAULT 1 CHECK (ruleset_version > 0),
@@ -153,6 +155,8 @@ BEGIN
 
   INSERT INTO public.authoritative_matches (
     game_id,
+    player_a_id,
+    player_b_id,
     schema_version,
     protocol_version,
     ruleset_version,
@@ -163,6 +167,8 @@ BEGIN
     ends_at
   ) VALUES (
     p_game_id,
+    v_player_a_id,
+    v_player_b_id,
     p_schema_version,
     p_protocol_version,
     p_ruleset_version,
@@ -202,19 +208,9 @@ AS $$
 DECLARE
   v_match public.authoritative_matches%ROWTYPE;
   v_existing public.match_commands%ROWTYPE;
-  v_is_participant BOOLEAN;
+  v_actor_role TEXT;
   v_error_code TEXT;
 BEGIN
-  SELECT EXISTS (
-    SELECT 1 FROM public.games
-    WHERE id = p_game_id
-      AND p_actor_id IN (COALESCE(player_a_id, host_id), player_b_id)
-  ) INTO v_is_participant;
-
-  IF NOT v_is_participant THEN
-    RETURN jsonb_build_object('status', 'rejected', 'errorCode', 'unauthorized_actor');
-  END IF;
-
   SELECT * INTO v_match
   FROM public.authoritative_matches
   WHERE game_id = p_game_id
@@ -222,6 +218,16 @@ BEGIN
 
   IF NOT FOUND THEN
     RETURN jsonb_build_object('status', 'rejected', 'errorCode', 'match_not_found');
+  END IF;
+
+  v_actor_role := CASE
+    WHEN p_actor_id = v_match.player_a_id THEN 'playerA'
+    WHEN p_actor_id = v_match.player_b_id THEN 'playerB'
+    ELSE NULL
+  END;
+
+  IF v_actor_role IS NULL THEN
+    RETURN jsonb_build_object('status', 'rejected', 'errorCode', 'unauthorized_actor');
   END IF;
 
   -- The match row lock serializes duplicate command IDs before this second
@@ -238,11 +244,30 @@ BEGIN
       RETURN jsonb_build_object('status', 'rejected', 'errorCode', 'command_id_conflict');
     END IF;
 
+    IF v_existing.status = 'accepted' THEN
+      RETURN v_existing.result;
+    ELSIF v_existing.status = 'rejected' THEN
+      RETURN jsonb_build_object('status', 'rejected', 'errorCode', v_existing.error_code);
+    ELSIF v_existing.status = 'pending' AND v_match.revision <> p_expected_revision THEN
+      UPDATE public.match_commands
+      SET status = 'rejected', error_code = 'revision_conflict', completed_at = NOW()
+      WHERE game_id = p_game_id AND command_id = p_command_id;
+      RETURN jsonb_build_object(
+        'status', 'rejected',
+        'errorCode', 'revision_conflict',
+        'currentRevision', v_match.revision
+      );
+    END IF;
+
     RETURN jsonb_build_object(
-      'status', v_existing.status,
-      'revision', v_existing.committed_revision,
-      'result', v_existing.result,
-      'errorCode', v_existing.error_code
+      'status', 'pending',
+      'revision', v_match.revision,
+      'schemaVersion', v_match.schema_version,
+      'protocolVersion', v_match.protocol_version,
+      'rulesetVersion', v_match.ruleset_version,
+      'actorRole', v_actor_role,
+      'canonicalState', v_match.canonical_state,
+      'endsAt', v_match.ends_at
     );
   END IF;
 
@@ -297,6 +322,7 @@ BEGIN
     'schemaVersion', v_match.schema_version,
     'protocolVersion', v_match.protocol_version,
     'rulesetVersion', v_match.ruleset_version,
+    'actorRole', v_actor_role,
     'canonicalState', v_match.canonical_state,
     'endsAt', v_match.ends_at
   );
@@ -388,14 +414,8 @@ BEGIN
     RAISE EXCEPTION 'State version does not match the pinned match version';
   END IF;
 
-  SELECT COALESCE(player_a_id, host_id), player_b_id
-  INTO v_player_a_id, v_player_b_id
-  FROM public.games
-  WHERE id = p_game_id;
-
-  IF v_player_a_id IS NULL OR v_player_b_id IS NULL THEN
-    RAISE EXCEPTION 'Ranked match requires two assigned players';
-  END IF;
+  v_player_a_id := v_match.player_a_id;
+  v_player_b_id := v_match.player_b_id;
 
   v_next_status := COALESCE(p_new_canonical_state #>> '{match,status}', v_match.status);
   IF v_next_status NOT IN ('setup', 'active', 'finished', 'cancelled') THEN
@@ -451,6 +471,59 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.reject_authoritative_match_command_v2(
+  p_game_id UUID,
+  p_command_id UUID,
+  p_actor_id UUID,
+  p_expected_revision BIGINT,
+  p_error_code TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_command public.match_commands%ROWTYPE;
+BEGIN
+  SELECT * INTO v_command
+  FROM public.match_commands
+  WHERE game_id = p_game_id AND command_id = p_command_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('status', 'rejected', 'errorCode', 'command_not_started');
+  END IF;
+
+  IF v_command.actor_id <> p_actor_id OR v_command.expected_revision <> p_expected_revision THEN
+    RETURN jsonb_build_object('status', 'rejected', 'errorCode', 'command_id_conflict');
+  END IF;
+
+  IF v_command.status = 'accepted' THEN
+    RETURN v_command.result;
+  ELSIF v_command.status = 'rejected' THEN
+    RETURN jsonb_build_object('status', 'rejected', 'errorCode', v_command.error_code);
+  END IF;
+
+  UPDATE public.match_commands
+  SET status = 'rejected',
+      error_code = CASE
+        WHEN p_error_code IN ('rule_rejected', 'invalid_canonical_state') THEN p_error_code
+        ELSE 'evaluation_failed'
+      END,
+      completed_at = NOW()
+  WHERE game_id = p_game_id AND command_id = p_command_id;
+
+  RETURN jsonb_build_object(
+    'status', 'rejected',
+    'errorCode', CASE
+      WHEN p_error_code IN ('rule_rejected', 'invalid_canonical_state') THEN p_error_code
+      ELSE 'evaluation_failed'
+    END
+  );
+END;
+$$;
+
 REVOKE ALL ON FUNCTION public.initialize_authoritative_match_v2(
   UUID, JSONB, JSONB, JSONB, TIMESTAMPTZ, TIMESTAMPTZ, INTEGER, INTEGER, INTEGER
 ) FROM PUBLIC, anon, authenticated;
@@ -459,6 +532,9 @@ REVOKE ALL ON FUNCTION public.begin_authoritative_match_command_v2(
 ) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.commit_authoritative_match_command_v2(
   UUID, UUID, UUID, BIGINT, JSONB, JSONB, JSONB, JSONB
+) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.reject_authoritative_match_command_v2(
+  UUID, UUID, UUID, BIGINT, TEXT
 ) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.initialize_authoritative_match_v2(
@@ -469,4 +545,7 @@ GRANT EXECUTE ON FUNCTION public.begin_authoritative_match_command_v2(
 ) TO service_role;
 GRANT EXECUTE ON FUNCTION public.commit_authoritative_match_command_v2(
   UUID, UUID, UUID, BIGINT, JSONB, JSONB, JSONB, JSONB
+) TO service_role;
+GRANT EXECUTE ON FUNCTION public.reject_authoritative_match_command_v2(
+  UUID, UUID, UUID, BIGINT, TEXT
 ) TO service_role;

@@ -22,13 +22,14 @@ The canonical state contains protected solution mappings, true scores, both rack
 - Service-role-only initialization and two-step begin/commit RPCs with row locking, deadline checks and compare-and-swap revision enforcement.
 - Provider-neutral client session reconciliation with snapshot/subscribe/confirm startup, monotonic revisions, gap recovery and same-command-ID retry.
 - Trusted deterministic command evaluation with strict payload allow-lists, canonical piece invariants and independently generated per-viewer projections.
+- Authenticated Edge Function orchestration that derives the actor from Supabase Auth and performs resumable begin/evaluate/commit or safe rejection.
 
 ## Remaining Sprint 1 work
 
 1. Confirm the production deployment SHA and inventory live Supabase schema, RLS, RPC and Realtime policies.
 2. Specify ruleset-by-ruleset protected fields for pending checks, hints, marks, milestones, results, spectators, logs and telemetry.
 3. Validate the additive migration and rollback procedure against an isolated Supabase staging project.
-4. Implement the server-only worker adapter, deriving the actor from verified authentication before calling the service-role-only transaction RPCs and trusted evaluator.
+4. Deploy and verify the server-only worker in an isolated Supabase staging project, including interruption recovery and secret handling.
 5. Implement the authenticated Supabase transport and publish only committed projections to authorized private topics.
 6. Shadow-compare legacy and authoritative outcomes in staging before revoking direct competitive writes.
 

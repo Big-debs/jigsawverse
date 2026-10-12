@@ -29,7 +29,8 @@ describe('authoritative multiplayer v2 migration', () => {
     for (const name of [
       'initialize_authoritative_match_v2',
       'begin_authoritative_match_command_v2',
-      'commit_authoritative_match_command_v2'
+      'commit_authoritative_match_command_v2',
+      'reject_authoritative_match_command_v2'
     ]) {
       expect(migration).toContain(`CREATE OR REPLACE FUNCTION public.${name}`);
       expect(migration).toMatch(new RegExp(`REVOKE ALL ON FUNCTION public\\.${name}\\([\\s\\S]*?FROM PUBLIC, anon, authenticated`));
@@ -43,6 +44,7 @@ describe('authoritative multiplayer v2 migration', () => {
     expect(migration).toContain("v_error_code := 'deadline_expired'");
     expect(migration).toContain("v_error_code := 'stale_revision'");
     expect(migration).toContain('INSERT INTO public.match_outbox');
+    expect(migration).toContain("'actorRole', v_actor_role");
+    expect(migration).toContain("v_existing.status = 'pending'");
   });
 });
-
