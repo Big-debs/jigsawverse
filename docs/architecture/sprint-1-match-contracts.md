@@ -20,6 +20,7 @@ The canonical state contains protected solution mappings, true scores, both rack
 - Contract tests that fail if protected answer or score fields enter player projections.
 - Additive service-only tables for canonical matches, command idempotency and an outbox, plus authenticated read-only per-player projections.
 - Service-role-only initialization and two-step begin/commit RPCs with row locking, deadline checks and compare-and-swap revision enforcement.
+- Provider-neutral client session reconciliation with snapshot/subscribe/confirm startup, monotonic revisions, gap recovery and same-command-ID retry.
 
 ## Remaining Sprint 1 work
 
@@ -27,7 +28,7 @@ The canonical state contains protected solution mappings, true scores, both rack
 2. Specify ruleset-by-ruleset protected fields for pending checks, hints, marks, milestones, results, spectators, logs and telemetry.
 3. Validate the additive migration and rollback procedure against an isolated Supabase staging project.
 4. Implement the trusted command evaluator/worker, deriving the actor from verified authentication before calling the service-role-only transaction RPCs.
-5. Publish only committed projections and implement snapshot-subscribe-revision recovery.
+5. Implement the authenticated Supabase transport and publish only committed projections to authorized private topics.
 6. Shadow-compare legacy and authoritative outcomes in staging before revoking direct competitive writes.
 
 The existing multiplayer implementation remains the active legacy path during this work. Ranked exposure must remain disabled until the authority, secrecy, reconnect and concurrency exit gates pass.
