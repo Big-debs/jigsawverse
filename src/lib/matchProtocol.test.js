@@ -3,6 +3,7 @@ import { GameLogic } from './gameLogic.js';
 import {
   MATCH_COMMAND_TYPES,
   MATCH_PROTOCOL_VERSION,
+  VIEWER_PROJECTION_ALLOW_LIST,
   assertMatchCommand,
   createCanonicalMatchState,
   createMatchCommand,
@@ -141,6 +142,7 @@ describe('canonical match state and projections', () => {
     expect(projection.piecePoolCount).toBe(1);
     expect(projection.board[3]).toEqual({ pieceId: 0 });
     expect(projection.revealedScores.playerA.score).toBe(5);
+    expect(projection.hintsUsed).toBe(0);
     expect(projection).not.toHaveProperty('scores');
     expect(projection).not.toHaveProperty('pieceCatalog');
     expect(projection).not.toHaveProperty('piecePool');
@@ -153,6 +155,119 @@ describe('canonical match state and projections', () => {
     expect(serialized).not.toContain('correctPosition');
     expect(serialized).not.toContain('25');
     expect(serialized).not.toContain('999');
+  });
+
+  it('emits exactly the reviewed projection shape', () => {
+    const canonical = createCanonicalMatchState(createLogic(), {
+      gameId: GAME_ID,
+      revision: 4,
+      result: { status: 'finished', winner: 'playerA', finalizedAt: '2026-10-12T10:10:00Z' }
+    });
+    canonical.pendingDecision = {
+      player: 'playerA',
+      pieceId: 0,
+      gridIndex: 3,
+      correct: true,
+      timestamp: 12345,
+      revealCorrectness: false,
+      scoreResult: { points: 999 }
+    };
+    const projection = createViewerProjection(canonical, 'playerB');
+
+    expect(Object.keys(projection).sort()).toEqual([...VIEWER_PROJECTION_ALLOW_LIST.topLevel].sort());
+    expect(Object.keys(projection.match).sort()).toEqual([...VIEWER_PROJECTION_ALLOW_LIST.match].sort());
+    expect(Object.keys(projection.board[3]).sort()).toEqual([...VIEWER_PROJECTION_ALLOW_LIST.boardCell].sort());
+    expect(Object.keys(projection.revealedScores).sort()).toEqual([...VIEWER_PROJECTION_ALLOW_LIST.revealedScores].sort());
+    expect(Object.keys(projection.revealedScores.playerA).sort()).toEqual([...VIEWER_PROJECTION_ALLOW_LIST.revealedScore].sort());
+    expect(Object.keys(projection.turnsRemaining).sort()).toEqual([...VIEWER_PROJECTION_ALLOW_LIST.remainingCounters].sort());
+    expect(Object.keys(projection.checksRemaining).sort()).toEqual([...VIEWER_PROJECTION_ALLOW_LIST.remainingCounters].sort());
+    expect(Object.keys(projection.pendingDecision).sort()).toEqual([...VIEWER_PROJECTION_ALLOW_LIST.pendingDecision].sort());
+    expect(Object.keys(projection.nexus).sort()).toEqual([...VIEWER_PROJECTION_ALLOW_LIST.nexus].sort());
+    expect(Object.keys(projection.result).sort()).toEqual([...VIEWER_PROJECTION_ALLOW_LIST.result].sort());
+    expect(projection.pendingDecision).not.toHaveProperty('correct');
+    expect(projection.pendingDecision).not.toHaveProperty('timestamp');
+    expect(projection.pendingDecision).not.toHaveProperty('scoreResult');
+  });
+
+  it('does not leak tainted protected values through any projection path', () => {
+    const canonical = createCanonicalMatchState(createLogic(), { gameId: GAME_ID, revision: 4 });
+    canonical.board[3].correctPosition = 'SECRET_BOARD_ANSWER';
+    canonical.pieceCatalog = [{ pieceId: 0, correctPosition: 'SECRET_CATALOGUE_ANSWER' }];
+    canonical.piecePool = ['SECRET_POOL_ID'];
+    canonical.scores.playerA.score = 'SECRET_TRUE_SCORE';
+    canonical.scores.playerB.score = 'SECRET_OPPONENT_SCORE';
+    canonical.moveHistory = [{ correct: 'SECRET_MOVE_CORRECTNESS' }];
+    canonical.pendingDecision = {
+      player: 'playerB',
+      pieceId: 2,
+      gridIndex: 1,
+      correct: 'SECRET_PENDING_CORRECTNESS',
+      revealCorrectness: false
+    };
+    canonical.result = {
+      status: 'finished',
+      winner: 'playerA',
+      finalizedAt: '2026-10-12T10:10:00Z',
+      scores: 'SECRET_RESULT_SCORES'
+    };
+    canonical.match.internalAnswer = 'SECRET_MATCH_EXTENSION';
+    canonical.revealedScores.playerA.internalScore = 'SECRET_REVEALED_EXTENSION';
+    canonical.revealedScores.playerA.score = 'SECRET_REVEALED_SCORE_VALUE';
+    canonical.turnsRemaining.internalCounter = 'SECRET_TURN_EXTENSION';
+    canonical.checksRemaining.internalCounter = 'SECRET_CHECK_EXTENSION';
+    canonical.nexus.piecePlacedBy.internal = 'SECRET_OWNER_EXTENSION';
+
+    for (const viewer of ['playerA', 'playerB']) {
+      const viewerCanonical = JSON.parse(JSON.stringify(canonical));
+      const opponent = viewer === 'playerA' ? 'playerB' : 'playerA';
+      viewerCanonical.racks[opponent] = ['SECRET_FOREIGN_RACK'];
+      const serialized = JSON.stringify(createViewerProjection(viewerCanonical, viewer));
+      for (const secret of [
+        'SECRET_BOARD_ANSWER',
+        'SECRET_CATALOGUE_ANSWER',
+        'SECRET_FOREIGN_RACK',
+        'SECRET_POOL_ID',
+        'SECRET_TRUE_SCORE',
+        'SECRET_OPPONENT_SCORE',
+        'SECRET_MOVE_CORRECTNESS',
+        'SECRET_PENDING_CORRECTNESS',
+        'SECRET_RESULT_SCORES',
+        'SECRET_MATCH_EXTENSION',
+        'SECRET_REVEALED_EXTENSION',
+        'SECRET_REVEALED_SCORE_VALUE',
+        'SECRET_TURN_EXTENSION',
+        'SECRET_CHECK_EXTENSION',
+        'SECRET_OWNER_EXTENSION'
+      ]) {
+        expect(serialized).not.toContain(secret);
+      }
+    }
+  });
+
+  it('keeps Nexus marks private to their marker until resolution', () => {
+    const canonical = createCanonicalMatchState(createLogic(), { gameId: GAME_ID, revision: 4 });
+    canonical.nexus.pieceMarks = {
+      1: { marker: 'playerA', type: 'confident', internalNote: 'SECRET_A' },
+      2: { marker: 'playerB', type: 'suspect', internalNote: 'SECRET_B' }
+    };
+
+    const beforeResolution = createViewerProjection(canonical, 'playerA');
+    expect(beforeResolution.nexus.pieceMarks).toEqual({
+      1: { marker: 'playerA', type: 'confident' }
+    });
+    expect(Object.keys(beforeResolution.nexus.pieceMarks[1]).sort())
+      .toEqual([...VIEWER_PROJECTION_ALLOW_LIST.nexusMark].sort());
+    expect(createViewerProjection(canonical, 'playerB').nexus.pieceMarks).toEqual({
+      2: { marker: 'playerB', type: 'suspect' }
+    });
+
+    canonical.nexus.resolved = true;
+    const afterResolution = createViewerProjection(canonical, 'playerA');
+    expect(afterResolution.nexus.pieceMarks).toEqual({
+      1: { marker: 'playerA', type: 'confident' },
+      2: { marker: 'playerB', type: 'suspect' }
+    });
+    expect(JSON.stringify(afterResolution)).not.toContain('internalNote');
   });
 
   it('rejects projections for an unauthorised viewer role', () => {

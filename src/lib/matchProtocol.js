@@ -2,6 +2,38 @@ export const MATCH_STATE_SCHEMA_VERSION = 1;
 export const MATCH_PROTOCOL_VERSION = 2;
 export const ASSEMBLE_RULESET_VERSION = 1;
 
+const deepFreeze = (value) => {
+  Object.values(value).forEach((nested) => {
+    if (nested && typeof nested === 'object' && !Object.isFrozen(nested)) deepFreeze(nested);
+  });
+  return Object.freeze(value);
+};
+
+/**
+ * Executable allow-list for every object emitted by createViewerProjection().
+ * Adding a field requires an intentional protocol change and secrecy review.
+ */
+export const VIEWER_PROJECTION_ALLOW_LIST = deepFreeze({
+  topLevel: [
+    'schemaVersion', 'protocolVersion', 'rulesetVersion', 'revision', 'match',
+    'board', 'rack', 'opponentRackCount', 'piecePoolCount', 'currentTurn',
+    'revealedScores', 'hintsUsed', 'turnsRemaining', 'checksRemaining',
+    'nextCheckRevealProgress', 'pendingDecision', 'nexus', 'result'
+  ],
+  match: [
+    'gameId', 'mode', 'status', 'rows', 'cols', 'totalPieces', 'rackCapacity',
+    'startedAt', 'endsAt'
+  ],
+  boardCell: ['pieceId'],
+  revealedScores: ['playerA', 'playerB'],
+  revealedScore: ['score', 'accuracy', 'streak'],
+  remainingCounters: ['playerA', 'playerB'],
+  pendingDecision: ['player', 'pieceId', 'gridIndex', 'revealCorrectness'],
+  nexus: ['piecePlacedBy', 'pieceMarks', 'resolved'],
+  nexusMark: ['marker', 'type'],
+  result: ['status', 'winner', 'finalizedAt']
+});
+
 export const MATCH_COMMAND_TYPES = Object.freeze({
   PLACE_PIECE: 'place_piece',
   RESPOND_TO_CHECK: 'respond_to_check',
@@ -199,28 +231,96 @@ export function createViewerProjection(canonicalState, viewer) {
   }
 
   const opponent = viewer === 'playerA' ? 'playerB' : 'playerA';
+  const match = canonicalState.match;
+  const publicMatch = {
+    gameId: match.gameId,
+    mode: match.mode,
+    status: match.status,
+    rows: match.rows,
+    cols: match.cols,
+    totalPieces: match.totalPieces,
+    rackCapacity: match.rackCapacity,
+    startedAt: match.startedAt,
+    endsAt: match.endsAt
+  };
+  const publicScore = (player) => ({
+    score: serializableCounter(canonicalState.revealedScores?.[player]?.score) ?? 0,
+    accuracy: serializableCounter(canonicalState.revealedScores?.[player]?.accuracy) ?? 100,
+    streak: serializableCounter(canonicalState.revealedScores?.[player]?.streak) ?? 0
+  });
+  const publicCounter = (counter) => ({
+    playerA: serializableCounter(counter?.playerA),
+    playerB: serializableCounter(counter?.playerB)
+  });
   const publicResult = canonicalState.result ? {
-    status: canonicalState.result.status ?? canonicalState.match.status,
-    winner: canonicalState.result.winner ?? null,
-    finalizedAt: canonicalState.result.finalizedAt ?? null
+    status: ['setup', 'active', 'finished', 'cancelled'].includes(canonicalState.result.status)
+      ? canonicalState.result.status
+      : canonicalState.match.status,
+    winner: ['playerA', 'playerB', 'tie'].includes(canonicalState.result.winner)
+      ? canonicalState.result.winner
+      : null,
+    finalizedAt: typeof canonicalState.result.finalizedAt === 'string'
+      ? canonicalState.result.finalizedAt
+      : null
   } : null;
+  const pending = canonicalState.pendingDecision;
+  const pendingDecision = pending
+    && PLAYERS.has(pending.player)
+    && Number.isInteger(pending.pieceId)
+    && Number.isInteger(pending.gridIndex)
+    ? {
+        player: pending.player,
+        pieceId: pending.pieceId,
+        gridIndex: pending.gridIndex,
+        revealCorrectness: Boolean(pending.revealCorrectness)
+      }
+    : null;
+  const nexusResolved = Boolean(canonicalState.nexus?.resolved);
+  const visiblePieceOwners = Object.fromEntries(
+    Object.entries(canonicalState.nexus?.piecePlacedBy ?? {})
+      .filter(([, player]) => PLAYERS.has(player))
+  );
+  const visibleNexusMarks = Object.fromEntries(
+    Object.entries(canonicalState.nexus?.pieceMarks ?? {})
+      .filter(([, mark]) => (
+        PLAYERS.has(mark?.marker)
+        && ['suspect', 'confident'].includes(mark?.type)
+        && (nexusResolved || mark.marker === viewer)
+      ))
+      .map(([gridIndex, mark]) => [gridIndex, {
+        marker: mark.marker,
+        type: mark.type
+      }])
+  );
 
   return {
     schemaVersion: canonicalState.schemaVersion,
     protocolVersion: canonicalState.protocolVersion,
     rulesetVersion: canonicalState.rulesetVersion,
     revision: canonicalState.revision,
-    match: cloneJsonValue(canonicalState.match),
+    match: publicMatch,
     board: canonicalState.board.map((cell) => cell ? { pieceId: cell.pieceId } : null),
     rack: cloneJsonValue(canonicalState.racks[viewer]),
     opponentRackCount: canonicalState.racks[opponent].filter((id) => id !== null).length,
     piecePoolCount: canonicalState.piecePool.length,
     currentTurn: canonicalState.currentTurn,
-    revealedScores: cloneJsonValue(canonicalState.revealedScores),
-    turnsRemaining: cloneJsonValue(canonicalState.turnsRemaining),
-    checksRemaining: cloneJsonValue(canonicalState.checksRemaining),
+    revealedScores: {
+      playerA: publicScore('playerA'),
+      playerB: publicScore('playerB')
+    },
+    hintsUsed: requireNonNegativeInteger(
+      canonicalState.scores?.[viewer]?.hintsUsed ?? 0,
+      `scores.${viewer}.hintsUsed`
+    ),
+    turnsRemaining: publicCounter(canonicalState.turnsRemaining),
+    checksRemaining: publicCounter(canonicalState.checksRemaining),
     nextCheckRevealProgress: canonicalState.nextCheckRevealProgress,
-    nexus: cloneJsonValue(canonicalState.nexus),
+    pendingDecision,
+    nexus: {
+      piecePlacedBy: visiblePieceOwners,
+      pieceMarks: visibleNexusMarks,
+      resolved: nexusResolved
+    },
     result: publicResult
   };
 }

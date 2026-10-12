@@ -24,11 +24,12 @@ The canonical state contains protected solution mappings, true scores, both rack
 - Trusted deterministic command evaluation with strict payload allow-lists, canonical piece invariants and independently generated per-viewer projections.
 - Authenticated Edge Function orchestration that derives the actor from Supabase Auth and performs resumable begin/evaluate/commit or safe rejection.
 - RLS-authorized snapshot reads, private per-viewer Realtime topics and a durable retrying outbox publisher.
+- Executable projection allow-lists and a ruleset-specific secrecy matrix covering pending checks, hints, Nexus marks, milestones, results, spectators, logs and telemetry.
 
 ## Remaining Sprint 1 work
 
 1. Confirm the production deployment SHA and inventory live Supabase schema, RLS, RPC and Realtime policies.
-2. Specify ruleset-by-ruleset protected fields for pending checks, hints, marks, milestones, results, spectators, logs and telemetry.
+2. Obtain product and security/DB-owner approval of the implemented ruleset secrecy matrix and repeat its leak tests against every staging transport and log sink.
 3. Validate the additive migration and rollback procedure against an isolated Supabase staging project.
 4. Deploy and verify the server-only worker in an isolated Supabase staging project, including interruption recovery and secret handling.
 5. Deploy and schedule the authenticated projection transport/outbox publisher in staging; verify private-channel settings, recovery and backlog monitoring.

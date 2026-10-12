@@ -8,3 +8,4 @@ export {
   SupabaseAuthoritativeMatchTransport,
   authoritativeProjectionTopic
 } from './supabaseAuthoritativeMatchTransport';
+export { VIEWER_PROJECTION_ALLOW_LIST } from './matchProtocol';

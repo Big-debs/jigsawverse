@@ -43,6 +43,8 @@ Identify actual Vercel/hosting production deployment SHA; reconcile `main`, `cod
 
 Specify exact per-viewer fields and secrecy rules for all Assemble rulesets, hints, marks, reveal milestones, spectators and gameplay event logs. Test attacks via WebSocket payload, REST queries, storage, logs and telemetry. Approve before ranked deployment.
 
+Implementation evidence now exists in `sprint-1-secrecy-matrix.md` and the executable `VIEWER_PROJECTION_ALLOW_LIST`. This narrows the open gate but does not close it: named product and security/DB approvers plus staging attack tests across every transport and log sink are still required.
+
 ### G2. Physical mobile/device budget
 
 Record exact local budget Android, midrange Android, older iPhone Safari and desktop browser models; pin test OS versions. Treat frame rates, draw calls, download size, GPU memory and load time in the architecture spec as **proposed targets, not achieved measurements**. Confirm or revise after graybox.
