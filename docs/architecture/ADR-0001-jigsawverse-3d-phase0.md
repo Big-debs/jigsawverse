@@ -61,7 +61,7 @@ Determine minimum client version, additive migration sequence, authoritative-mat
 
 ## Phase 0 acceptance gate
 
-Phase 0 is **not complete** merely because the defaults above were accepted. To authorize Sprint 1, collect links to: (a) verified deployed SHA/database baseline, (b) immutable gameplay and snapshot contracts, (c) viewer-projection/secrecy policy, (d) device targets and performance-test method, (e) named approvers and asset-rights policy, (f) child-pilot measurement/consent policy, (g) staged rollout and rollback policy. Obtain explicit product and engineering sign-off.
+Phase 0 is **not complete** merely because the defaults above were accepted. To authorize Sprint 1, collect links to: (a) verified deployed SHA/database baseline, (b) an approved gameplay/snapshot contract outline with named ownership, (c) viewer-projection/secrecy policy, (d) device targets and performance-test method, (e) named approvers and asset-rights policy, (f) child-pilot measurement/consent policy, (g) staged rollout and rollback policy. Obtain explicit product and engineering sign-off. The implemented, versioned canonical state and snapshot contracts are a Sprint 1 deliverable and exit gate, not a prerequisite for starting Sprint 1.
 
 **No production gameplay code, database migration, deployment configuration or live environment is modified by this ADR.**
 
