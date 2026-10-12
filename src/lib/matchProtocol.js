@@ -49,6 +49,17 @@ function validateCommandPayload(type, payload) {
     throw new TypeError('payload must be an object');
   }
 
+  const allowedKeys = {
+    [MATCH_COMMAND_TYPES.PLACE_PIECE]: ['pieceId', 'gridIndex'],
+    [MATCH_COMMAND_TYPES.RESPOND_TO_CHECK]: ['decision'],
+    [MATCH_COMMAND_TYPES.MARK_PIECE]: ['gridIndex', 'markType'],
+    [MATCH_COMMAND_TYPES.RESOLVE_NEXUS]: []
+  }[type];
+  const unexpectedKey = Object.keys(payload).find((key) => !allowedKeys.includes(key));
+  if (unexpectedKey) {
+    throw new TypeError(`payload.${unexpectedKey} is not allowed for ${type}`);
+  }
+
   if (type === MATCH_COMMAND_TYPES.PLACE_PIECE) {
     requireNonNegativeInteger(payload.pieceId, 'payload.pieceId');
     requireNonNegativeInteger(payload.gridIndex, 'payload.gridIndex');
@@ -70,28 +81,41 @@ function validateCommandPayload(type, payload) {
   }
 }
 
+export function assertMatchCommand(command) {
+  if (!command || typeof command !== 'object' || Array.isArray(command)) {
+    throw new TypeError('command must be an object');
+  }
+  if (command.protocolVersion !== MATCH_PROTOCOL_VERSION) {
+    throw new TypeError('command uses an unsupported protocol version');
+  }
+
+  requireUuid(command.gameId, 'gameId');
+  requireUuid(command.commandId, 'commandId');
+  requireNonNegativeInteger(command.expectedRevision, 'expectedRevision');
+  if (!COMMAND_TYPES.has(command.type)) {
+    throw new TypeError(`Unsupported match command type: ${command.type}`);
+  }
+  validateCommandPayload(command.type, command.payload);
+  return command;
+}
+
 /**
  * Creates the command envelope sent by a client. Actor identity is deliberately
  * absent: trusted server code must derive it from the authenticated request.
  */
 export function createMatchCommand({ gameId, commandId, expectedRevision, type, payload = {} }) {
-  requireUuid(gameId, 'gameId');
-  requireUuid(commandId, 'commandId');
-  requireNonNegativeInteger(expectedRevision, 'expectedRevision');
-
-  if (!COMMAND_TYPES.has(type)) {
-    throw new TypeError(`Unsupported match command type: ${type}`);
-  }
-  validateCommandPayload(type, payload);
-
-  return Object.freeze({
+  const command = {
     protocolVersion: MATCH_PROTOCOL_VERSION,
     gameId,
     commandId,
     expectedRevision,
     type,
-    payload: Object.freeze({ ...payload })
-  });
+    payload: { ...payload }
+  };
+  assertMatchCommand(command);
+
+  command.payload = Object.freeze(command.payload);
+  return Object.freeze(command);
 }
 
 /**

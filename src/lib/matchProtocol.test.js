@@ -3,6 +3,7 @@ import { GameLogic } from './gameLogic.js';
 import {
   MATCH_COMMAND_TYPES,
   MATCH_PROTOCOL_VERSION,
+  assertMatchCommand,
   createCanonicalMatchState,
   createMatchCommand,
   createViewerProjection
@@ -82,6 +83,15 @@ describe('match protocol commands', () => {
       type: MATCH_COMMAND_TYPES.RESOLVE_NEXUS,
       payload: {}
     })).toThrow('commandId must be a UUID');
+
+    expect(() => assertMatchCommand({
+      protocolVersion: MATCH_PROTOCOL_VERSION,
+      gameId: GAME_ID,
+      commandId: COMMAND_ID,
+      expectedRevision: 0,
+      type: MATCH_COMMAND_TYPES.PLACE_PIECE,
+      payload: { pieceId: 0, gridIndex: 0, scores: { playerA: 999 } }
+    })).toThrow('payload.scores is not allowed');
   });
 });
 

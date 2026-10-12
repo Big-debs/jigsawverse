@@ -284,7 +284,7 @@ export class GameLogic {
     // Check if grid position is empty (check both null AND undefined)
     const currentCell = this.grid[gridIndex];
     if (currentCell !== null && currentCell !== undefined) {
-      console.log('Position occupied:', { gridIndex, currentCell });
+      console.log('Position occupied:', { gridIndex });
       return { valid: false, reason: 'Position occupied' };
     }
 
@@ -1225,12 +1225,6 @@ export class GameLogic {
       ? piecePoolData.map(item => getPieceFromIdOrObject(item)).filter(Boolean)
       : [];
 
-    console.log('Piece pool import:', {
-      piecePoolDataLength: piecePoolData.length,
-      reconstructedPoolLength: this.piecePool.length,
-      hasImageData: this.piecePool.length > 0 ? !!this.piecePool[0]?.imageData : false
-    });
-
     // Import other state
     this.currentTurn = data.current_turn || data.currentTurn || 'playerA';
     this.timerRemaining = data.timer_remaining || data.timerRemaining || 600;
@@ -1273,16 +1267,6 @@ export class GameLogic {
     this.pieceMarks = data.pieceMarks || data.piece_marks || {};
     this.nexusResolved = data.nexusResolved || data.nexus_resolved || false;
 
-    console.log('importGameState complete:', {
-      gridLength: this.grid.length,
-      gridPlaced: this.grid.filter(p => p !== null).length,
-      playerARackLength: this.playerARack.filter(p => p !== null).length,
-      playerBRackLength: this.playerBRack.filter(p => p !== null).length,
-      piecePoolLength: this.piecePool.length,
-      currentTurn: this.currentTurn,
-      pendingCheck: this.pendingCheck,
-      mode: this.mode
-    });
   }
 }
 
