@@ -47,7 +47,8 @@ export async function processRankedCommand({
   actorId,
   command,
   now = new Date(),
-  evaluate = evaluateTrustedMatchCommand
+  evaluate = evaluateTrustedMatchCommand,
+  observeEvaluation = null
 }) {
   if (!admin || typeof admin.rpc !== 'function') {
     throw new RankedCommandWorkerError('Admin database client is required');
@@ -101,12 +102,27 @@ export async function processRankedCommand({
     });
   }
 
-  return callRpc(admin, 'commit_authoritative_match_command_v2', {
+  const committed = await callRpc(admin, 'commit_authoritative_match_command_v2', {
     ...rpcIdentity,
     p_new_canonical_state: evaluation.canonicalState,
     p_player_a_projection: evaluation.projections.playerA,
     p_player_b_projection: evaluation.projections.playerB,
     p_result: evaluation.canonicalState.result
   });
-}
 
+  if (committed.status === 'accepted' && typeof observeEvaluation === 'function') {
+    try {
+      await observeEvaluation({
+        baselineState: begun.canonicalState,
+        authoritativeEvaluation: evaluation,
+        command,
+        actorRole: begun.actorRole,
+        now
+      });
+    } catch {
+      // Shadow diagnostics are staging evidence and never affect authority.
+    }
+  }
+
+  return committed;
+}

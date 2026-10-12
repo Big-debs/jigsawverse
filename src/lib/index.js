@@ -9,3 +9,9 @@ export {
   authoritativeProjectionTopic
 } from './supabaseAuthoritativeMatchTransport';
 export { VIEWER_PROJECTION_ALLOW_LIST } from './matchProtocol';
+export {
+  SHADOW_MISMATCH_CODES,
+  SHADOW_PARITY_REPORT_VERSION,
+  compareShadowMatchStates,
+  observeShadowParity
+} from './shadowParity';

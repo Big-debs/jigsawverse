@@ -25,6 +25,7 @@ The canonical state contains protected solution mappings, true scores, both rack
 - Authenticated Edge Function orchestration that derives the actor from Supabase Auth and performs resumable begin/evaluate/commit or safe rejection.
 - RLS-authorized snapshot reads, private per-viewer Realtime topics and a durable retrying outbox publisher.
 - Executable projection allow-lists and a ruleset-specific secrecy matrix covering pending checks, hints, Nexus marks, milestones, results, spectators, logs and telemetry.
+- A staging-only shadow parity harness that compares protected outcomes while emitting redacted mismatch codes and never affecting authoritative commits.
 
 ## Remaining Sprint 1 work
 
@@ -33,6 +34,6 @@ The canonical state contains protected solution mappings, true scores, both rack
 3. Validate the additive migration and rollback procedure against an isolated Supabase staging project.
 4. Deploy and verify the server-only worker in an isolated Supabase staging project, including interruption recovery and secret handling.
 5. Deploy and schedule the authenticated projection transport/outbox publisher in staging; verify private-channel settings, recovery and backlog monitoring.
-6. Shadow-compare legacy and authoritative outcomes in staging before revoking direct competitive writes.
+6. Wire the independent legacy adapter and restricted report sink, then complete the shadow parity staging matrix before revoking direct competitive writes.
 
 The existing multiplayer implementation remains the active legacy path during this work. Ranked exposure must remain disabled until the authority, secrecy, reconnect and concurrency exit gates pass.

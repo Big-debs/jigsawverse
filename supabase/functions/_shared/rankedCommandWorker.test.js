@@ -72,6 +72,42 @@ describe('ranked command worker orchestration', () => {
     }));
   });
 
+  it('observes accepted evaluations without allowing shadow failures to block commits', async () => {
+    const canonicalState = { revision: 0, marker: 'protected' };
+    const nextState = { revision: 1, result: null };
+    const admin = createAdmin({
+      begin_authoritative_match_command_v2: {
+        data: { status: 'pending', actorRole: 'playerA', canonicalState },
+        error: null
+      },
+      commit_authoritative_match_command_v2: {
+        data: { status: 'accepted', revision: 1, projection: { revision: 1 } },
+        error: null
+      }
+    });
+    const observeEvaluation = vi.fn(async () => {
+      throw new Error('shadow telemetry failed');
+    });
+
+    const result = await processRankedCommand({
+      admin,
+      actorId: ACTOR_ID,
+      command,
+      evaluate: () => ({
+        canonicalState: nextState,
+        projections: { playerA: { revision: 1 }, playerB: { revision: 1 } }
+      }),
+      observeEvaluation
+    });
+
+    expect(result.status).toBe('accepted');
+    expect(observeEvaluation).toHaveBeenCalledWith(expect.objectContaining({
+      baselineState: canonicalState,
+      command,
+      actorRole: 'playerA'
+    }));
+  });
+
   it('returns an idempotent accepted result without reevaluating', async () => {
     const accepted = { status: 'accepted', revision: 1, projection: { revision: 1 } };
     const admin = createAdmin({
