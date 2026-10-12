@@ -14,6 +14,9 @@ const createPieces = (count) => Array.from({ length: count }, (_, id) => ({
   isEdge: true
 }));
 
+const GAME_ID = '11111111-1111-4111-8111-111111111111';
+const COMMAND_ID = '22222222-2222-4222-8222-222222222222';
+
 const createLogic = () => {
   const logic = new GameLogic(
     { rows: 2, cols: 2, totalPieces: 4 },
@@ -37,8 +40,8 @@ const createLogic = () => {
 describe('match protocol commands', () => {
   it('creates an idempotent revision-checked command without client actor identity', () => {
     const command = createMatchCommand({
-      gameId: 'game-123',
-      commandId: 'command-456',
+      gameId: GAME_ID,
+      commandId: COMMAND_ID,
       expectedRevision: 7,
       type: MATCH_COMMAND_TYPES.PLACE_PIECE,
       payload: { pieceId: 0, gridIndex: 3 }
@@ -46,8 +49,8 @@ describe('match protocol commands', () => {
 
     expect(command).toEqual({
       protocolVersion: MATCH_PROTOCOL_VERSION,
-      gameId: 'game-123',
-      commandId: 'command-456',
+      gameId: GAME_ID,
+      commandId: COMMAND_ID,
       expectedRevision: 7,
       type: 'place_piece',
       payload: { pieceId: 0, gridIndex: 3 }
@@ -57,27 +60,35 @@ describe('match protocol commands', () => {
 
   it('rejects malformed commands before transport', () => {
     expect(() => createMatchCommand({
-      gameId: 'game-123',
-      commandId: 'command-456',
+      gameId: GAME_ID,
+      commandId: COMMAND_ID,
       expectedRevision: -1,
       type: MATCH_COMMAND_TYPES.PLACE_PIECE,
       payload: { pieceId: 0, gridIndex: 3 }
     })).toThrow('expectedRevision');
 
     expect(() => createMatchCommand({
-      gameId: 'game-123',
-      commandId: 'command-456',
+      gameId: GAME_ID,
+      commandId: COMMAND_ID,
       expectedRevision: 0,
       type: MATCH_COMMAND_TYPES.MARK_PIECE,
       payload: { gridIndex: 3, markType: 'correct' }
     })).toThrow('markType');
+
+    expect(() => createMatchCommand({
+      gameId: GAME_ID,
+      commandId: 'reused-human-label',
+      expectedRevision: 0,
+      type: MATCH_COMMAND_TYPES.RESOLVE_NEXUS,
+      payload: {}
+    })).toThrow('commandId must be a UUID');
   });
 });
 
 describe('canonical match state and projections', () => {
   it('captures complete protected state with explicit versions and dimensions', () => {
     const canonical = createCanonicalMatchState(createLogic(), {
-      gameId: 'game-123',
+      gameId: GAME_ID,
       revision: 4,
       startedAt: '2026-10-12T10:00:00Z',
       endsAt: '2026-10-12T10:10:00Z'
@@ -87,7 +98,7 @@ describe('canonical match state and projections', () => {
       protocolVersion: MATCH_PROTOCOL_VERSION,
       revision: 4,
       match: {
-        gameId: 'game-123',
+        gameId: GAME_ID,
         mode: 'NEXUS',
         rows: 2,
         cols: 2,
@@ -103,7 +114,7 @@ describe('canonical match state and projections', () => {
 
   it('projects only viewer-safe state and does not leak answers or true scores', () => {
     const canonical = createCanonicalMatchState(createLogic(), {
-      gameId: 'game-123',
+      gameId: GAME_ID,
       revision: 4,
       result: {
         status: 'finished',

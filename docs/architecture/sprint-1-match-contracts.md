@@ -18,13 +18,15 @@ The canonical state contains protected solution mappings, true scores, both rack
 - Complete canonical state export from `GameLogic`, including dimensions, rack capacity, scores/revealed scores, checks/turns, pending decisions, Nexus state, history and timing metadata.
 - Per-player projections that exclude correct positions, piece catalogue, true scores, foreign rack IDs, pool IDs and move history.
 - Contract tests that fail if protected answer or score fields enter player projections.
+- Additive service-only tables for canonical matches, command idempotency and an outbox, plus authenticated read-only per-player projections.
+- Service-role-only initialization and two-step begin/commit RPCs with row locking, deadline checks and compare-and-swap revision enforcement.
 
 ## Remaining Sprint 1 work
 
 1. Confirm the production deployment SHA and inventory live Supabase schema, RLS, RPC and Realtime policies.
 2. Specify ruleset-by-ruleset protected fields for pending checks, hints, marks, milestones, results, spectators, logs and telemetry.
-3. Add the additive canonical-state, revision, command ledger and outbox migration with a rehearsed rollback.
-4. Implement the service-role command transaction with verified actor derivation, row locking or compare-and-swap, deadline enforcement and unique `(game_id, command_id)` results.
+3. Validate the additive migration and rollback procedure against an isolated Supabase staging project.
+4. Implement the trusted command evaluator/worker, deriving the actor from verified authentication before calling the service-role-only transaction RPCs.
 5. Publish only committed projections and implement snapshot-subscribe-revision recovery.
 6. Shadow-compare legacy and authoritative outcomes in staging before revoking direct competitive writes.
 

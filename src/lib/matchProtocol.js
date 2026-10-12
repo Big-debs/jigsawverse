@@ -11,10 +11,19 @@ export const MATCH_COMMAND_TYPES = Object.freeze({
 
 const COMMAND_TYPES = new Set(Object.values(MATCH_COMMAND_TYPES));
 const PLAYERS = new Set(['playerA', 'playerB']);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const requireNonEmptyString = (value, name) => {
   if (typeof value !== 'string' || value.trim() === '') {
     throw new TypeError(`${name} must be a non-empty string`);
+  }
+  return value;
+};
+
+const requireUuid = (value, name) => {
+  requireNonEmptyString(value, name);
+  if (!UUID_PATTERN.test(value)) {
+    throw new TypeError(`${name} must be a UUID`);
   }
   return value;
 };
@@ -66,8 +75,8 @@ function validateCommandPayload(type, payload) {
  * absent: trusted server code must derive it from the authenticated request.
  */
 export function createMatchCommand({ gameId, commandId, expectedRevision, type, payload = {} }) {
-  requireNonEmptyString(gameId, 'gameId');
-  requireNonEmptyString(commandId, 'commandId');
+  requireUuid(gameId, 'gameId');
+  requireUuid(commandId, 'commandId');
   requireNonNegativeInteger(expectedRevision, 'expectedRevision');
 
   if (!COMMAND_TYPES.has(type)) {
@@ -98,7 +107,7 @@ export function createCanonicalMatchState(gameLogic, metadata = {}) {
   requireNonNegativeInteger(revision, 'metadata.revision');
 
   const gameId = metadata.gameId ?? null;
-  if (gameId !== null) requireNonEmptyString(gameId, 'metadata.gameId');
+  if (gameId !== null) requireUuid(gameId, 'metadata.gameId');
 
   return {
     schemaVersion: MATCH_STATE_SCHEMA_VERSION,
