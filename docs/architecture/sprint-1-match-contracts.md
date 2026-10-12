@@ -23,6 +23,7 @@ The canonical state contains protected solution mappings, true scores, both rack
 - Provider-neutral client session reconciliation with snapshot/subscribe/confirm startup, monotonic revisions, gap recovery and same-command-ID retry.
 - Trusted deterministic command evaluation with strict payload allow-lists, canonical piece invariants and independently generated per-viewer projections.
 - Authenticated Edge Function orchestration that derives the actor from Supabase Auth and performs resumable begin/evaluate/commit or safe rejection.
+- RLS-authorized snapshot reads, private per-viewer Realtime topics and a durable retrying outbox publisher.
 
 ## Remaining Sprint 1 work
 
@@ -30,7 +31,7 @@ The canonical state contains protected solution mappings, true scores, both rack
 2. Specify ruleset-by-ruleset protected fields for pending checks, hints, marks, milestones, results, spectators, logs and telemetry.
 3. Validate the additive migration and rollback procedure against an isolated Supabase staging project.
 4. Deploy and verify the server-only worker in an isolated Supabase staging project, including interruption recovery and secret handling.
-5. Implement the authenticated Supabase transport and publish only committed projections to authorized private topics.
+5. Deploy and schedule the authenticated projection transport/outbox publisher in staging; verify private-channel settings, recovery and backlog monitoring.
 6. Shadow-compare legacy and authoritative outcomes in staging before revoking direct competitive writes.
 
 The existing multiplayer implementation remains the active legacy path during this work. Ranked exposure must remain disabled until the authority, secrecy, reconnect and concurrency exit gates pass.

@@ -27,5 +27,4 @@ Commands are serialized per client session. Each command pins the current revisi
 
 ## Integration gate
 
-Do not connect this session to production until the trusted worker, private topic authorization, outbox publisher and staging recovery tests are complete. The existing multiplayer classes remain unchanged and `authoritativeMultiplayerV2` remains off.
-
+The Supabase adapter, private topic authorization and outbox publisher are implemented. Do not connect this session to production until staging deployment, publisher scheduling and recovery tests are complete. The existing multiplayer classes remain unchanged and `authoritativeMultiplayerV2` remains off.

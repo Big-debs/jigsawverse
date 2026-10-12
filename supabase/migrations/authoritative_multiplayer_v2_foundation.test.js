@@ -30,7 +30,8 @@ describe('authoritative multiplayer v2 migration', () => {
       'initialize_authoritative_match_v2',
       'begin_authoritative_match_command_v2',
       'commit_authoritative_match_command_v2',
-      'reject_authoritative_match_command_v2'
+      'reject_authoritative_match_command_v2',
+      'publish_authoritative_match_outbox_v2'
     ]) {
       expect(migration).toContain(`CREATE OR REPLACE FUNCTION public.${name}`);
       expect(migration).toMatch(new RegExp(`REVOKE ALL ON FUNCTION public\\.${name}\\([\\s\\S]*?FROM PUBLIC, anon, authenticated`));
@@ -46,5 +47,16 @@ describe('authoritative multiplayer v2 migration', () => {
     expect(migration).toContain('INSERT INTO public.match_outbox');
     expect(migration).toContain("'actorRole', v_actor_role");
     expect(migration).toContain("v_existing.status = 'pending'");
+    expect(migration).toContain('FOR UPDATE SKIP LOCKED');
+    expect(migration).toContain('PERFORM realtime.send(');
+    expect(migration).toContain("'match_projection'");
+  });
+
+  it('authorizes only private per-viewer projection topics', () => {
+    expect(migration).toContain('ON realtime.messages FOR SELECT');
+    expect(migration).toContain("realtime.messages.extension = 'broadcast'");
+    expect(migration).toContain('realtime.messages.topic = realtime.topic()');
+    expect(migration).toContain("projection.viewer_id = auth.uid()");
+    expect(migration).toContain("'ranked-match:' || projection.game_id::TEXT");
   });
 });

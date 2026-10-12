@@ -18,4 +18,4 @@ The function must retain Supabase's JWT verification and must not be deployed wi
 
 ## Deployment gate
 
-Before deployment, run the function in an isolated Supabase staging project and verify valid, expired and cross-project JWTs; two-player role mapping; worker interruption after begin; duplicate command replay; same-cell collision; deadline expiry; RLS; and absence of protected data in responses and logs. The production flag remains off until those checks and outbox delivery tests pass.
+Before deployment, run the function in an isolated Supabase staging project and verify valid, expired and cross-project JWTs; two-player role mapping; worker interruption after begin; duplicate command replay; same-cell collision; deadline expiry; RLS; and absence of protected data in responses and logs. The projection transport and outbox publisher are implemented, but the production flag remains off until their staging delivery and recovery checks pass.
