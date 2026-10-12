@@ -4,6 +4,7 @@
 
 import { getModeConfig as importedGetModeConfig, getModeScoring as importedGetModeScoring, ADJACENCY_SCORING } from './gameModes.js';
 import { HINT_CONFIG } from './gameConfig.js';
+import { createCanonicalMatchState } from './matchProtocol.js';
 
 export class ImageProcessor {
   constructor(imageSource, gridSize = 10) {
@@ -1122,6 +1123,10 @@ export class GameLogic {
       pieceMarks: { ...this.pieceMarks },
       nexusResolved: this.nexusResolved
     };
+  }
+
+  exportCanonicalState(metadata = {}) {
+    return createCanonicalMatchState(this, metadata);
   }
 
   exportForDatabase() {
