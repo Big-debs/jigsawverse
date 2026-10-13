@@ -140,16 +140,19 @@ export async function getLobbyStatus({ admin, actorId, gameId }) {
     fail('Actor is not assigned to the lobby', 'unauthorized_actor', 403);
   }
   const job = await queryOne(
-    admin.from('ranked_match_jobs').select('status').eq('game_id', gameId),
+    admin.from('ranked_match_jobs').select('status, attempts').eq('game_id', gameId),
     'asset_job_not_found'
   );
+  const assetStatus = job.status === 'failed' && job.attempts < 5
+    ? 'retrying'
+    : job.status;
   return {
     status: 'ok',
     authorityModel: 'authoritative_v2',
     gameId,
     gameCode: game.game_code,
     lobbyStatus: game.status,
-    assetStatus: job.status,
+    assetStatus,
     opponentJoined: Boolean(game.player_b_id),
     opponentName: actorId === game.player_a_id ? game.player_b_name : null,
     ready: game.status === 'active' && job.status === 'prepared'

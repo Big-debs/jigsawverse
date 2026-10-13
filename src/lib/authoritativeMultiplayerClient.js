@@ -152,6 +152,10 @@ export class AuthoritativeMultiplayerClient {
     return { success: true, winner: this.gameState?.winner ?? null };
   }
 
+  recover() {
+    return this.session.recover('client_reconnect');
+  }
+
   disconnect() {
     return this.session.disconnect();
   }

@@ -107,6 +107,7 @@ describe('authoritative multiplayer client adapter', () => {
 
     await client.connect();
     const result = await client.makeMove(0, 1);
+    await client.recover();
 
     expect(result).toEqual({ success: true, awaitingCheck: false });
     expect(transport.submitCommand).toHaveBeenCalledWith(expect.objectContaining({
@@ -117,6 +118,7 @@ describe('authoritative multiplayer client adapter', () => {
     }));
     expect(updates).toEqual([0, 1]);
     expect(listener).toBeTypeOf('function');
+    expect(transport.fetchProjection).toHaveBeenCalledTimes(3);
     expect(client.gameState.playerBRack).toEqual([null]);
   });
 });

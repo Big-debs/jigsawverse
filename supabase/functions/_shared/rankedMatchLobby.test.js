@@ -23,7 +23,7 @@ const adminWith = ({ authority = 'authoritative_v2', jobStatus = 'prepared' } = 
       player_b_name: 'Guest'
     }],
     match_authority_pins: authority ? [{ game_id: GAME_ID, authority_model: authority }] : [],
-    ranked_match_jobs: [{ game_id: GAME_ID, status: jobStatus }]
+    ranked_match_jobs: [{ game_id: GAME_ID, status: jobStatus, attempts: 1 }]
   };
   const rpc = vi.fn(async (name) => ({
     data: [{
@@ -113,6 +113,15 @@ describe('trusted ranked lobby coordinator', () => {
       ready: true
     });
     expect(result).not.toHaveProperty('pieceCatalog');
+  });
+
+  it('reports a scheduled worker failure as retrying', async () => {
+    const result = await getLobbyStatus({
+      admin: adminWith({ jobStatus: 'failed' }),
+      actorId: HOST,
+      gameId: GAME_ID
+    });
+    expect(result).toMatchObject({ assetStatus: 'retrying', ready: false });
   });
 
   it('rejects malformed settings before calling the database', async () => {

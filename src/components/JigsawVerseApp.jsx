@@ -3,7 +3,18 @@ import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle
 import { supabase } from '../config/supabase';
 import { authService } from '../services/auth.service';
 import { gameService } from '../services/game.service';
+import { storageService } from '../services/storage.service';
 import { MultiplayerGameHost, MultiplayerGameGuest } from '../lib/multiplayer';
+import { AuthoritativeLobbyService } from '../lib/authoritativeLobbyService';
+import {
+  bootstrapAuthoritativeMatch,
+  waitForAuthoritativeMatch
+} from '../lib/authoritativeMatchFlow';
+import {
+  MULTIPLAYER_AUTHORITY,
+  authorityForExistingMatch,
+  authorityForNewMatch
+} from '../config/featureFlags';
 import ModeSelectScreen from './ModeSelectScreen';
 import GameSettingsPanel from './GameSettingsPanel';
 import MoveHistoryPanel from './MoveHistoryPanel';
@@ -238,6 +249,11 @@ const JigsawVerseApp = () => {
     setError(null);
   }, []);
 
+  const handleWaitingGameStart = useCallback((preparedData) => {
+    if (preparedData) setGameData((current) => ({ ...current, ...preparedData }));
+    navigate(ROUTES.GAMEPLAY);
+  }, [navigate]);
+
   const handleLogout = async () => {
     try {
       // Disconnect from any active game
@@ -375,7 +391,11 @@ const JigsawVerseApp = () => {
         {currentRoute === ROUTES.WAITING_ROOM && (
           <WaitingRoom
             gameCode={gameData?.gameCode}
+            gameData={gameData}
+            user={user}
             multiplayerRef={multiplayerRef}
+            connectionManager={connectionManagerRef.current}
+            setError={setError}
             onCancel={async () => {
               if (multiplayerRef.current) {
                 await multiplayerRef.current.disconnect();
@@ -383,7 +403,7 @@ const JigsawVerseApp = () => {
               }
               navigate(ROUTES.HOME);
             }}
-            onGameStart={() => navigate(ROUTES.GAMEPLAY)}
+            onGameStart={handleWaitingGameStart}
           />
         )}
 
@@ -667,7 +687,30 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
           mode: selectedMode
         });
       } else {
-        // Multiplayer: use existing flow
+        const authority = authorityForNewMatch();
+        if (authority === MULTIPLAYER_AUTHORITY.AUTHORITATIVE_V2) {
+          setProgress('Uploading puzzle...');
+          const image = await storageService.uploadPuzzleImage(user.id, imageFile);
+          setProgress('Creating secure match...');
+          const lobby = await new AuthoritativeLobbyService({ supabase }).create({
+            imageId: image.id,
+            gridSize,
+            gameplayMode: selectedMode || 'CLASSIC',
+            playerName: user.user_metadata?.username || 'Player A',
+            timeLimit: (gridSize + 2) * 60
+          });
+          onGameCreated({
+            gameId: lobby.gameId,
+            gameCode: lobby.gameCode,
+            authorityModel: lobby.authorityModel,
+            assetStatus: lobby.assetStatus,
+            imagePreview,
+            isSinglePlayer: false
+          });
+          return;
+        }
+
+        // Legacy multiplayer remains the default until the v2 flag is enabled.
         const gameHost = new MultiplayerGameHost();
         multiplayerRef.current = gameHost;
 
@@ -860,13 +903,69 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
 // WAITING ROOM
 // =====================================================
 
-const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
+const WaitingRoom = ({
+  gameCode,
+  gameData,
+  user,
+  multiplayerRef,
+  connectionManager,
+  setError,
+  onCancel,
+  onGameStart
+}) => {
   const [copied, setCopied] = useState(false);
   const [opponentName, setOpponentName] = useState(null);
   const [players, setPlayers] = useState([]);
+  const [preparationStatus, setPreparationStatus] = useState(gameData?.assetStatus || null);
+  const authoritative = gameData?.authorityModel === MULTIPLAYER_AUTHORITY.AUTHORITATIVE_V2;
+
+  useEffect(() => {
+    if (!authoritative || !gameData?.gameId || !user?.id) return undefined;
+    const controller = new AbortController();
+    const prepare = async () => {
+      try {
+        const lobbyService = new AuthoritativeLobbyService({ supabase });
+        await waitForAuthoritativeMatch({
+          lobbyService,
+          gameId: gameData.gameId,
+          signal: controller.signal,
+          onStatus: (status) => {
+            setPreparationStatus(status.assetStatus);
+            if (status.opponentJoined) setOpponentName(status.opponentName || 'Opponent');
+          }
+        });
+        const prepared = await bootstrapAuthoritativeMatch({
+          supabase,
+          userId: user.id,
+          gameId: gameData.gameId
+        });
+        if (controller.signal.aborted) {
+          await prepared.client.disconnect();
+          return;
+        }
+        multiplayerRef.current = prepared.client;
+        connectionManager.setReconnectCallback(() => prepared.client.recover());
+        connectionManager.updateStatus(CONNECTION_STATUS.CONNECTED);
+        connectionManager.startHeartbeat(
+          createHeartbeatCheck(multiplayerRef),
+          HEARTBEAT_CONFIG.INTERVAL
+        );
+        onGameStart({ ...prepared.gameData, imagePreview: gameData.imagePreview });
+      } catch (err) {
+        if (err?.code !== 'cancelled') {
+          console.error('Authoritative match preparation failed:', err);
+          setError('Unable to prepare secure match. Please try again.');
+          connectionManager.updateStatus(CONNECTION_STATUS.ERROR);
+        }
+      }
+    };
+    void prepare();
+    return () => controller.abort();
+  }, [authoritative, gameData?.gameId, gameData?.imagePreview, user?.id, multiplayerRef, connectionManager, onGameStart, setError]);
 
   // Setup callbacks for opponent joining
   useEffect(() => {
+    if (authoritative) return undefined;
     if (!multiplayerRef.current) return;
 
     const gameHost = multiplayerRef.current;
@@ -900,7 +999,7 @@ const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
       gameHost.onPresenceUpdate = null;
       gameHost.onGameUpdate = null;
     };
-  }, [multiplayerRef, onGameStart]);
+  }, [authoritative, multiplayerRef, onGameStart]);
 
   const handleCopy = async () => {
     try {
@@ -945,7 +1044,11 @@ const WaitingRoom = ({ gameCode, multiplayerRef, onCancel, onGameStart }) => {
             </div>
 
             <h2 className="text-2xl font-bold text-white mb-2">Waiting for Opponent...</h2>
-            <p className="text-purple-200 mb-6">Share this code to start playing</p>
+            <p className="text-purple-200 mb-6">
+              {authoritative && preparationStatus !== 'prepared'
+                ? 'Preparing the secure puzzle. Share this code while you wait.'
+                : 'Share this code to start playing'}
+            </p>
 
             <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
               <p className="text-white/80 text-xs sm:text-sm mb-1 sm:mb-2">Game Code</p>
@@ -994,6 +1097,38 @@ const JoinGameScreen = ({ user, multiplayerRef, connectionManager, onGameJoined,
     setProgress('Finding game...');
 
     try {
+      const lobbyService = new AuthoritativeLobbyService({ supabase });
+      const resolved = await lobbyService.join({
+        gameCode,
+        playerName: user.user_metadata?.username || 'Player B'
+      });
+      const authority = authorityForExistingMatch(resolved);
+      if (authority === MULTIPLAYER_AUTHORITY.AUTHORITATIVE_V2) {
+        setProgress('Preparing secure puzzle...');
+        await waitForAuthoritativeMatch({
+          lobbyService,
+          gameId: resolved.gameId,
+          onStatus: (status) => {
+            if (status.assetStatus === 'processing') setProgress('Building puzzle pieces...');
+          }
+        });
+        const prepared = await bootstrapAuthoritativeMatch({
+          supabase,
+          userId: user.id,
+          gameId: resolved.gameId
+        });
+        multiplayerRef.current = prepared.client;
+        connectionManager.setReconnectCallback(() => prepared.client.recover());
+        connectionManager.updateStatus(CONNECTION_STATUS.CONNECTED);
+        connectionManager.startHeartbeat(
+          createHeartbeatCheck(multiplayerRef),
+          HEARTBEAT_CONFIG.INTERVAL
+        );
+        setProgress('Game joined!');
+        onGameJoined(prepared.gameData);
+        return;
+      }
+
       // Create multiplayer guest instance
       const gameGuest = new MultiplayerGameGuest();
       multiplayerRef.current = gameGuest;
@@ -1134,9 +1269,8 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
       });
       setGameState(initialState);
       setLoading(false);
-    } else if (gameData?.gameState) {
-      console.warn('multiplayer gameLogic missing, using persisted gameState fallback.');
-      setGameState(gameData.gameState);
+    } else if (multiplayer.gameState || gameData?.gameState) {
+      setGameState(multiplayer.gameState || gameData.gameState);
       setLoading(false);
     } else {
       setLoading(false);
@@ -1246,7 +1380,19 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
 
   // Timer countdown effect
   useEffect(() => {
-    if (!multiplayerRef.current?.gameLogic) return;
+    const multiplayer = multiplayerRef.current;
+    if (!multiplayer) return;
+
+    if (!multiplayer.gameLogic) {
+      if (multiplayer.authorityModel !== MULTIPLAYER_AUTHORITY.AUTHORITATIVE_V2) return;
+      const interval = setInterval(() => {
+        setGameState((previous) => {
+          if (!previous || (previous.timerRemaining ?? 0) <= 0) return previous;
+          return { ...previous, timerRemaining: previous.timerRemaining - 1 };
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
 
     const interval = setInterval(() => {
       const gameLogic = multiplayerRef.current?.gameLogic;
@@ -1667,7 +1813,7 @@ const GameplayScreen = ({ isHost, multiplayerRef, gameData, gameSettings, onSett
               }
             }}
             hintsUsed={gameState?.scores?.[myPlayer]?.hintsUsed || 0}
-            disabled={!isMyTurn}
+            disabled={!isMyTurn || !multiplayerRef.current?.gameLogic}
           />
         </div>
       </div>

@@ -1,6 +1,6 @@
 # Sprint 1 authoritative client integration
 
-**Status:** initialized-match adapter, pinned routing, trusted asset preparation and leased queue worker, queue-backed lobby coordinator, bootstrap endpoint and client handshake implemented; screen integration and staging deployment pending
+**Status:** local client, trusted lobby, leased asset worker, bootstrap, private projection, and gameplay handoff implemented; staging deployment and activation approval pending
 
 ## Authority routing
 
@@ -36,9 +36,9 @@ the asset map reaches gameplay state. Production assets must use server-issued
 opaque piece IDs; the current image slicer's position-derived IDs are not
 suitable for ranked secrecy.
 
-## Why lobby activation remains off
+## Feature-flagged lobby activation
 
-The current host flow creates and slices the puzzle before a second player is
+The retained legacy host flow creates and slices the puzzle before a second player is
 assigned. The v2 initializer requires two pinned players and protected initial
 canonical state. Sending the existing client-generated piece mapping to the
 initializer would make the browser the source of ranked answers and would
@@ -64,13 +64,23 @@ npm run worker:ranked-assets -- 25
 
 The worker output contains aggregate prepared/failed counts only.
 
-Before the creation flag can be connected to the lobby, the implementation and
-deployment must additionally:
+The host screen now consults `VITE_AUTHORITATIVE_MULTIPLAYER_V2` only when it
+creates a new multiplayer match. With the flag enabled it uploads the approved
+source, asks the trusted coordinator to create and pin the lobby, waits for the
+opponent and asset job, then bootstraps signed pieces and the private
+projection. With the flag disabled it retains the legacy host flow.
 
-1. connect the feature-flagged host and guest screens to the lobby service and bootstrap handshake;
-2. deploy the private bucket, coordinator, worker, bootstrap migration, and Edge functions in staging; and
-3. pass the remaining release gates.
+The guest screen always asks the trusted coordinator to resolve the game code.
+It follows the returned persisted authority: legacy matches continue through
+the legacy guest, while v2 matches are atomically joined and bootstrapped. A
+flag change therefore cannot switch an existing match. Retryable asset-worker
+failures remain in the preparation state; only an exhausted job is terminal.
 
-The existing multiplayer screens continue to instantiate the legacy classes.
-Merely setting the environment variable does not activate v2 lobby creation in
-this increment.
+Before activation, the deployment must additionally:
+
+1. deploy the private bucket, coordinator, worker, bootstrap migration, and Edge functions in staging;
+2. configure and observe the ranked asset worker schedule; and
+3. pass the remaining release gates and activation approvals.
+
+The flag must remain off until those staging gates pass. The code path being
+present is not approval to activate authoritative match creation.
