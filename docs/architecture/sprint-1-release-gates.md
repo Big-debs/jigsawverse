@@ -31,6 +31,7 @@ the migration contract. It must pass on the exact candidate commit.
 | Projection UI mapping | Foreign rack IDs, answer coordinates, and unrevealed scores do not enter gameplay state | Client-adapter tests | Pass locally |
 | Trusted bootstrap boundary | Client sends only game ID; worker verifies player/pin and builds revision zero from a service-only manifest | Bootstrap worker, Edge source-boundary, and migration contract tests | Pass locally |
 | Ranked asset preparation | Trusted image slicing, opaque IDs, private paths, transactional manifest/pin, and failure cleanup | Provisioner and storage migration tests | Pass locally |
+| Trusted lobby coordination | Creation atomically pins v2 and queues preparation; join serializes player-B assignment; existing matches resolve persisted authority | Coordinator, Edge-boundary, browser-service, and migration tests | Pass locally |
 
 The provider-neutral store in
 `supabase/functions/_shared/authoritativeCommandGateHarness.js` models the

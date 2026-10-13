@@ -1,6 +1,6 @@
 # Sprint 1 authoritative client integration
 
-**Status:** initialized-match adapter, pinned routing, trusted asset preparation, bootstrap endpoint and client handshake implemented; staging deployment and lobby activation pending
+**Status:** initialized-match adapter, pinned routing, trusted asset preparation, queue-backed lobby coordinator, bootstrap endpoint and client handshake implemented; queue worker, staging deployment and lobby activation pending
 
 ## Authority routing
 
@@ -44,16 +44,20 @@ canonical state. Sending the existing client-generated piece mapping to the
 initializer would make the browser the source of ranked answers and would
 expose target positions through position-derived piece IDs.
 
-The trusted bootstrap boundary now implements persisted service-only pins,
-server-side state construction, and safe response filtering. Before the
-creation flag can be connected to the lobby, the deployment must additionally:
+The trusted lobby boundary now creates the game, immutable authority pin, and
+asset-preparation job in one transaction. Join requests first resolve the
+persisted authority: unpinned existing games stay on the legacy path, while v2
+games are claimed atomically by the trusted coordinator. Status responses
+contain readiness and opponent-presence metadata only; jobs, manifests, and
+answers remain service-only.
 
-1. provision the match's authority pin only through the trusted new-match coordinator;
-2. wait for or atomically assign both player slots;
-3. deploy the implemented trusted asset worker and private bucket migration;
-4. connect the queue-backed coordinator to the implemented provisioning RPC;
-5. deploy and validate the bootstrap migration and Edge function in staging; and
-6. pass the remaining release gates.
+Before the creation flag can be connected to the lobby, the implementation and
+deployment must additionally:
+
+1. implement the worker that claims queued jobs, downloads the approved source image, and invokes the existing trusted provisioner;
+2. connect the feature-flagged host and guest screens to the lobby service and bootstrap handshake;
+3. deploy the private bucket, coordinator, worker, bootstrap migration, and Edge functions in staging; and
+4. pass the remaining release gates.
 
 The existing multiplayer screens continue to instantiate the legacy classes.
 Merely setting the environment variable does not activate v2 lobby creation in
