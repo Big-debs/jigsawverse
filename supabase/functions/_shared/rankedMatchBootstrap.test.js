@@ -22,10 +22,10 @@ const manifest = () => ({
     { pieceId: 1000000169, correctPosition: 1 }
   ],
   asset_manifest: [
-    { pieceId: 1000000041, assetUrl: 'https://assets.test/a.png', isEdge: true },
-    { pieceId: 1000000083, assetUrl: 'https://assets.test/b.png', isEdge: true },
-    { pieceId: 1000000127, assetUrl: 'https://assets.test/c.png', isEdge: true },
-    { pieceId: 1000000169, assetUrl: 'https://assets.test/d.png', isEdge: true }
+    { pieceId: 1000000041, storagePath: `games/${GAME_ID}/1000000041.png`, isEdge: true },
+    { pieceId: 1000000083, storagePath: `games/${GAME_ID}/1000000083.png`, isEdge: true },
+    { pieceId: 1000000127, storagePath: `games/${GAME_ID}/1000000127.png`, isEdge: true },
+    { pieceId: 1000000169, storagePath: `games/${GAME_ID}/1000000169.png`, isEdge: true }
   ]
 });
 
@@ -69,6 +69,14 @@ const createAdmin = ({ existingProjection = null } = {}) => {
   });
   return {
     rpc,
+    storage: {
+      from: vi.fn(() => ({
+        createSignedUrls: vi.fn(async (paths) => ({
+          data: paths.map((path) => ({ signedUrl: `https://signed.test/${path}` })),
+          error: null
+        }))
+      }))
+    },
     from(table) {
       const filters = [];
       const builder = {
@@ -111,9 +119,9 @@ describe('ranked match trusted bootstrap', () => {
     expect(initial.canonicalState.racks.playerB).toHaveLength(1);
     expect(initial.canonicalState.piecePool).toHaveLength(2);
     expect(JSON.stringify(initial.projections)).not.toContain('correctPosition');
-    expect(initial.pieceAssets[0]).toEqual({
-      id: 1000000041,
-      imageData: 'https://assets.test/a.png',
+    expect(initial.assetRecords[0]).toEqual({
+      pieceId: 1000000041,
+      storagePath: `games/${GAME_ID}/1000000041.png`,
       isEdge: true
     });
   });
@@ -134,6 +142,12 @@ describe('ranked match trusted bootstrap', () => {
       projection: { revision: 0 }
     });
     expect(result).not.toHaveProperty('canonicalState');
+    expect(result.pieceAssets[0]).toEqual({
+      id: 1000000041,
+      imageData: `https://signed.test/games/${GAME_ID}/1000000041.png`,
+      isEdge: true
+    });
+    expect(result.assetExpiresIn).toBe(3600);
     expect(admin.rpc).toHaveBeenCalledOnce();
     expect(admin.rpc).toHaveBeenCalledWith(
       'initialize_authoritative_match_v2',

@@ -1,6 +1,6 @@
 # Sprint 1 trusted ranked-match bootstrap
 
-**Status:** service-only data contract, bootstrap worker, Edge boundary, and client transport implemented; trusted asset preparation and staging deployment pending
+**Status:** service-only data contract, trusted asset worker, bootstrap boundary, signed delivery, and client transport implemented; staging deployment and lobby coordination pending
 
 ## Trust boundary
 
@@ -22,8 +22,9 @@ A trusted asset-preparation job must create exactly one catalogue and asset
 entry per board cell. Piece IDs are unique integers in the server-only opaque
 namespace (`>= 1,000,000,000`) and are unrelated to target positions. The
 protected catalogue maps each ID to one unique target position. The safe asset
-list maps each ID to an asset URL and optional edge display flag; it may not
-contain target position, row, column, or edge-topology fields.
+list maps each ID to a private storage path and optional edge display flag; it
+may not contain target position, row, column, public/signed URL, or
+edge-topology fields.
 
 The source image must be cut into independent piece assets before provisioning.
 The existing browser image slicer is not valid for ranked bootstrap because its
@@ -49,9 +50,8 @@ candidate state or treats client state as a fallback.
 
 ## Remaining activation work
 
-- Implement the trusted image-cutting and manifest-provisioning job.
-- Decide whether asset URLs are short-lived signed URLs or access-controlled
-  CDN URLs, then test expiry and refresh behavior.
+- Deploy the trusted image-cutting and manifest-provisioning job.
+- Test one-hour signed URL expiry and reconnect refresh behavior.
 - Provision pins only from the approved new-match coordinator; existing legacy
   games must never be repinned.
 - Deploy the migration and Edge function in isolated staging and run the RLS,

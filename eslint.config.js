@@ -36,4 +36,10 @@ export default [
       'react/prop-types': 'off',
     },
   },
+  {
+    files: ['server/**/*.js', 'scripts/**/*.{js,mjs}'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ];

@@ -1,6 +1,6 @@
 # Sprint 1 authoritative client integration
 
-**Status:** initialized-match adapter, pinned routing, bootstrap endpoint and client handshake implemented; trusted asset preparation and lobby activation pending
+**Status:** initialized-match adapter, pinned routing, trusted asset preparation, bootstrap endpoint and client handshake implemented; staging deployment and lobby activation pending
 
 ## Authority routing
 
@@ -50,9 +50,8 @@ creation flag can be connected to the lobby, the deployment must additionally:
 
 1. provision the match's authority pin only through the trusted new-match coordinator;
 2. wait for or atomically assign both player slots;
-3. generate opaque piece IDs and the protected answer catalogue in the trusted asset pipeline;
-4. create render assets addressable by opaque ID without embedding target
-   coordinates;
+3. deploy the implemented trusted asset worker and private bucket migration;
+4. connect the queue-backed coordinator to the implemented provisioning RPC;
 5. deploy and validate the bootstrap migration and Edge function in staging; and
 6. pass the remaining release gates.
 

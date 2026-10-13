@@ -10,6 +10,8 @@ import { assertCanonicalMatchState } from '../../../src/lib/trustedMatchEvaluato
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MIN_OPAQUE_PIECE_ID = 1_000_000_000;
+const RANKED_PIECE_BUCKET = 'ranked-piece-assets';
+const SIGNED_ASSET_TTL_SECONDS = 3600;
 
 export class RankedMatchBootstrapError extends Error {
   constructor(message, { code = 'bootstrap_failed', status = 500 } = {}) {
@@ -57,7 +59,7 @@ const shuffled = (values, randomIndex) => {
   return result;
 };
 
-export function validateRankedPuzzleManifest(manifest) {
+export function validateRankedPuzzleManifest(manifest, expectedGameId = null) {
   const rows = manifest?.rows;
   const cols = manifest?.cols;
   const rackCapacity = manifest?.rack_capacity;
@@ -95,20 +97,23 @@ export function validateRankedPuzzleManifest(manifest) {
   }
 
   const assetIds = new Set();
-  const safeAssets = manifest.asset_manifest.map((asset) => {
+  const assetRecords = manifest.asset_manifest.map((asset) => {
     if (!ids.has(asset?.pieceId) || assetIds.has(asset.pieceId)) {
       fail('Manifest asset IDs must match the piece catalogue exactly');
     }
-    if (typeof asset.assetUrl !== 'string' || asset.assetUrl.trim() === '') {
-      fail('Manifest asset URL is invalid');
+    const expectedPrefix = expectedGameId ? `games/${expectedGameId}/` : 'games/';
+    if (typeof asset.storagePath !== 'string'
+      || !asset.storagePath.startsWith(expectedPrefix)
+      || !/^games\/[0-9a-f-]{36}\/[0-9]+\.png$/i.test(asset.storagePath)) {
+      fail('Manifest asset storage path is invalid');
     }
-    const forbidden = ['correctPosition', 'row', 'col', 'edges']
+    const forbidden = ['assetUrl', 'imageData', 'correctPosition', 'row', 'col', 'edges']
       .find((key) => Object.hasOwn(asset, key));
     if (forbidden) fail(`Manifest asset contains forbidden field: ${forbidden}`);
     assetIds.add(asset.pieceId);
     return {
-      id: asset.pieceId,
-      imageData: asset.assetUrl,
+      pieceId: asset.pieceId,
+      storagePath: asset.storagePath,
       isEdge: Boolean(asset.isEdge)
     };
   });
@@ -124,7 +129,7 @@ export function validateRankedPuzzleManifest(manifest) {
       pieceId,
       correctPosition
     })),
-    safeAssets
+    assetRecords
   };
 }
 
@@ -136,7 +141,7 @@ export function buildInitialRankedMatch({
   randomIndex = defaultRandomIndex
 }) {
   requireUuid(gameId, 'gameId');
-  const prepared = validateRankedPuzzleManifest(manifest);
+  const prepared = validateRankedPuzzleManifest(manifest, gameId);
   const pieces = prepared.pieceCatalog.map(({ pieceId, correctPosition }) => ({
     id: pieceId,
     correctPosition
@@ -167,9 +172,30 @@ export function buildInitialRankedMatch({
       playerA: createViewerProjection(canonicalState, 'playerA'),
       playerB: createViewerProjection(canonicalState, 'playerB')
     },
-    pieceAssets: prepared.safeAssets
+    assetRecords: prepared.assetRecords
   };
 }
+
+const createSignedPieceAssets = async (admin, assetRecords) => {
+  if (!admin?.storage?.from) fail('Trusted storage client is unavailable', 'storage_unavailable');
+  const paths = assetRecords.map(({ storagePath }) => storagePath);
+  const { data, error } = await admin.storage
+    .from(RANKED_PIECE_BUCKET)
+    .createSignedUrls(paths, SIGNED_ASSET_TTL_SECONDS);
+  if (error || !Array.isArray(data) || data.length !== paths.length) {
+    fail('Unable to sign ranked piece assets', 'asset_signing_failed');
+  }
+  return data.map((signed, index) => {
+    if (typeof signed?.signedUrl !== 'string' || signed.signedUrl === '') {
+      fail('Signed ranked piece asset is invalid', 'asset_signing_failed');
+    }
+    return {
+      id: assetRecords[index].pieceId,
+      imageData: signed.signedUrl,
+      isEdge: assetRecords[index].isEdge
+    };
+  });
+};
 
 const fetchProjection = async (admin, gameId, actorId) => {
   const { data, error } = await admin
@@ -223,7 +249,7 @@ export async function bootstrapRankedMatch({
       .eq('game_id', gameId),
     'manifest_not_ready'
   );
-  const prepared = validateRankedPuzzleManifest(manifest);
+  const prepared = validateRankedPuzzleManifest(manifest, gameId);
   let stored = await fetchProjection(admin, gameId, actorId);
   if (!stored) {
     if (game.status !== 'active') fail('Match is not ready to start', 'match_not_active', 409);
@@ -265,6 +291,7 @@ export async function bootstrapRankedMatch({
     authorityModel: 'authoritative_v2',
     viewerRole: stored.viewer_role,
     projection: stored.projection,
-    pieceAssets: prepared.safeAssets
+    pieceAssets: await createSignedPieceAssets(admin, prepared.assetRecords),
+    assetExpiresIn: SIGNED_ASSET_TTL_SECONDS
   };
 }

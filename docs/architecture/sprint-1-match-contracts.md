@@ -28,6 +28,7 @@ The canonical state contains protected solution mappings, true scores, both rack
 - A staging-only shadow parity harness that compares protected outcomes while emitting redacted mismatch codes and never affecting authoritative commits.
 - Pinned authority-routing helpers and an initialized-match client adapter that maps safe projections to the renderer and sends semantic commands without local gameplay mutation.
 - A service-only authority pin and prepared-manifest schema plus authenticated bootstrap worker that constructs revision zero without accepting client-authored answers or state.
+- A trusted Sharp-based image worker, private piece bucket, transactional provisioning RPC, deterministic retry-safe opaque IDs, and authenticated signed asset delivery.
 
 ## Remaining Sprint 1 work
 
@@ -36,8 +37,8 @@ The canonical state contains protected solution mappings, true scores, both rack
 3. Validate the additive migration and rollback procedure against an isolated Supabase staging project.
 4. Deploy and verify the server-only worker in an isolated Supabase staging project, including interruption recovery and secret handling.
 5. Deploy and schedule the authenticated projection transport/outbox publisher in staging; verify private-channel settings, recovery and backlog monitoring.
-6. Implement and deploy the trusted asset-preparation job that provisions opaque piece manifests, then connect the approved creation flag to the lobby.
-7. Validate the bootstrap migration, Edge function, asset access, and duplicate initialization behavior in staging.
+6. Deploy the trusted asset worker and connect it to a queue-backed new-match coordinator, then connect the approved creation flag to the lobby.
+7. Validate the bootstrap and private-asset migrations, Edge function, signed asset access, cleanup, and duplicate initialization behavior in staging.
 8. Wire the independent legacy adapter and restricted report sink, then complete the shadow parity staging matrix before revoking direct competitive writes.
 
 The existing multiplayer implementation remains the active legacy path during this work. Ranked exposure must remain disabled until the authority, secrecy, reconnect and concurrency exit gates pass.
