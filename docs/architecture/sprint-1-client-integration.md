@@ -1,6 +1,6 @@
 # Sprint 1 authoritative client integration
 
-**Status:** initialized-match adapter, pinned routing, trusted asset preparation, queue-backed lobby coordinator, bootstrap endpoint and client handshake implemented; queue worker, staging deployment and lobby activation pending
+**Status:** initialized-match adapter, pinned routing, trusted asset preparation and leased queue worker, queue-backed lobby coordinator, bootstrap endpoint and client handshake implemented; screen integration and staging deployment pending
 
 ## Authority routing
 
@@ -51,13 +51,25 @@ games are claimed atomically by the trusted coordinator. Status responses
 contain readiness and opponent-presence metadata only; jobs, manifests, and
 answers remain service-only.
 
+The ranked asset worker claims one eligible job with a unique lease token and
+`SKIP LOCKED`, downloads only the server-selected `images.storage_path`, and
+passes the bytes to the trusted provisioner. Completion and failure updates
+must present the same lease token. Expired leases are recoverable, retries use
+bounded exponential backoff, and five failed attempts stop automatic claims.
+Operators can drain up to 100 jobs per invocation with:
+
+```sh
+npm run worker:ranked-assets -- 25
+```
+
+The worker output contains aggregate prepared/failed counts only.
+
 Before the creation flag can be connected to the lobby, the implementation and
 deployment must additionally:
 
-1. implement the worker that claims queued jobs, downloads the approved source image, and invokes the existing trusted provisioner;
-2. connect the feature-flagged host and guest screens to the lobby service and bootstrap handshake;
-3. deploy the private bucket, coordinator, worker, bootstrap migration, and Edge functions in staging; and
-4. pass the remaining release gates.
+1. connect the feature-flagged host and guest screens to the lobby service and bootstrap handshake;
+2. deploy the private bucket, coordinator, worker, bootstrap migration, and Edge functions in staging; and
+3. pass the remaining release gates.
 
 The existing multiplayer screens continue to instantiate the legacy classes.
 Merely setting the environment variable does not activate v2 lobby creation in

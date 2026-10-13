@@ -8,9 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "provision:ranked-assets": "node scripts/provision-ranked-puzzle.mjs",
+    "worker:ranked-assets": "node scripts/process-ranked-assets.mjs",
     "lint": "eslint src server scripts supabase/functions/_shared/*.js",
     "test": "vitest run",
-    "test:sprint1-gates": "vitest run server/rankedAssetProvisioner.test.js scripts/provision-ranked-puzzle.test.js supabase/functions/_shared/authoritativeCommandGateHarness.test.js supabase/functions/_shared/rankedMatchBootstrap.test.js supabase/functions/_shared/rankedMatchLobby.test.js supabase/functions/ranked-match-bootstrap-v2/index.test.js supabase/functions/ranked-match-lobby-v2/index.test.js src/lib/authoritativeMatchSession.test.js src/lib/authoritativeMultiplayerClient.test.js src/lib/authoritativeLobbyService.test.js src/lib/supabaseAuthoritativeMatchTransport.test.js src/config/featureFlags.test.js supabase/migrations/authoritative_multiplayer_v2_foundation.test.js supabase/migrations/ranked_match_bootstrap_v2.test.js supabase/migrations/ranked_piece_asset_provisioning.test.js supabase/migrations/ranked_match_lobby_v2.test.js"
+    "test:sprint1-gates": "vitest run server/rankedAssetProvisioner.test.js server/rankedAssetJobWorker.test.js scripts/provision-ranked-puzzle.test.js scripts/process-ranked-assets.test.js supabase/functions/_shared/authoritativeCommandGateHarness.test.js supabase/functions/_shared/rankedMatchBootstrap.test.js supabase/functions/_shared/rankedMatchLobby.test.js supabase/functions/ranked-match-bootstrap-v2/index.test.js supabase/functions/ranked-match-lobby-v2/index.test.js src/lib/authoritativeMatchSession.test.js src/lib/authoritativeMultiplayerClient.test.js src/lib/authoritativeLobbyService.test.js src/lib/supabaseAuthoritativeMatchTransport.test.js src/config/featureFlags.test.js supabase/migrations/authoritative_multiplayer_v2_foundation.test.js supabase/migrations/ranked_match_bootstrap_v2.test.js supabase/migrations/ranked_piece_asset_provisioning.test.js supabase/migrations/ranked_match_lobby_v2.test.js supabase/migrations/ranked_asset_job_worker_v2.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
