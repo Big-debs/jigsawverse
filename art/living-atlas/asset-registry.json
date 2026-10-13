@@ -328,5 +328,12 @@
       "sourcePath": "generated-repository-index",
       "sourceSha256": null
     }
+  ],
+  "additionalManifests": [
+    {
+      "path": "art/living-atlas/lookdev/pass-07/pass07-manifest.json",
+      "status": "lookdev-not-production",
+      "description": "Pass 07 materials, lighting, texture candidates, CPU image/UV fixtures and glyph atlas; validated by script but NOT GPU/device tested"
+    }
   ]
 }

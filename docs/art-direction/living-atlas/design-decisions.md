@@ -18,13 +18,14 @@
 | 04 | 390x844 mobile approach | Concept; verify tap targets and actual counts |
 | 05 | Geometry contract, materials, orientation, rack and rails | Modeling specification |
 | 06 | Source geometry GLBs, engineering plates, glyph concepts | Importable **graybox**; not production art |
+| 07 | Procedural materials, lighting presets, 2D image/UV fixture, six-kind glyph legibility sheet and quality tiers | Candidate **look-development**; CPU proof only, no GPU/mobile benchmark |
 
 ## Remaining constraints
 
 - Do not copy incorrect grids, piece silhouettes, arrow counts or rack layouts from illustrative images.
 - Validate 390x844 touch UX with children/physical devices; use 44 CSS-pixel essential controls.
 - Atlas Workshop visuals are provisional; real cultural motifs require provenance and review.
-- No production shaders, photography UVs, texture compression, animations or device benchmarks were completed in Pass 06.
+- No production shaders, photography GPU UVs, texture compression, animations or device benchmarks were completed. Pass 07 adds candidate PBR atlases and a CPU-only image test, not final runtime textures.
 - Do not treat CAESAR exploratory gameplay telemetry as a scientifically validated cognitive assessment.
 
 ## Approval register
