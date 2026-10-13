@@ -1,6 +1,11 @@
 # Sprint 1 authority rollout and rollback
 
-**Status:** additive foundation, worker, projection transport and shadow harness implemented; not deployed or activated
+**Status:** additive foundation, worker, projection transport, shadow harness and local concurrency gates implemented; not deployed or activated
+
+The executable local/staging boundary and release evidence checklist are in
+[`sprint-1-release-gates.md`](./sprint-1-release-gates.md). Local deterministic
+passes are prerequisites only; they do not replace the staging rows in that
+checklist.
 
 ## Activation sequence
 
