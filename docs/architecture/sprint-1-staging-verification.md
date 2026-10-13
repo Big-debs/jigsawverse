@@ -3,6 +3,10 @@
 **Status:** guarded verifier implemented; no staging project was configured in
 this checkout, so no remote deployment or verification has been performed.
 
+Local Supabase may be used for the no-cost preflight when a separate hosted
+staging project is unavailable. Local evidence does not satisfy the final
+hosted-staging deployment, recovery, monitoring, or approval gates.
+
 ## Safety boundary
 
 The verifier creates and deletes users, storage objects, an image, a lobby,
@@ -14,6 +18,10 @@ unless all of these conditions hold:
 - `STAGING_PROJECT_REF` is a valid project reference and exactly matches the
   hostname in `STAGING_SUPABASE_URL`; and
 - `STAGING_EXPECTED_GIT_SHA` is a full SHA matching the current checkout.
+
+The checkout must also be clean. Any tracked or untracked change causes the
+verifier to stop before contacting Supabase, keeping evidence tied to the exact
+candidate commit.
 
 The staging queue must also contain no queued, processing, or failed ranked
 asset jobs. This prevents the verifier's single-job worker invocation from
@@ -74,6 +82,26 @@ It emits one JSON object containing only the candidate SHA, run ID, duration,
 counts, statuses, and revisions. It never reports projections, racks, answer
 catalogues, asset paths, credentials, raw provider errors, or canonical state.
 Fixture cleanup runs in `finally`, including users and storage objects.
+
+## Local preflight
+
+Start the stack from the candidate checkout with `npx supabase start`. Obtain
+the local values with `npx supabase status -o env`, then set:
+
+```text
+VERIFICATION_TARGET=local
+LOCAL_SUPABASE_URL=http://127.0.0.1:54321
+LOCAL_SUPABASE_ANON_KEY=<local ANON_KEY>
+LOCAL_SUPABASE_SERVICE_ROLE_KEY=<local SERVICE_ROLE_KEY>
+LOCAL_PROJECT_REF=local
+LOCAL_ENVIRONMENT_NAME=local
+ALLOW_LOCAL_MUTATIONS=true
+LOCAL_EXPECTED_GIT_SHA=<full candidate SHA>
+```
+
+The local guard rejects `localhost`, non-loopback hosts, alternate ports,
+HTTPS, URL paths, and any project reference other than `local`. Run
+`npm run verify:authoritative-staging`; cleanup is identical to staging.
 
 ## Evidence and remaining gates
 

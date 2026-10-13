@@ -4,14 +4,22 @@ import { describe, expect, it } from 'vitest';
 const source = readFileSync(new URL('./verify-authoritative-staging.mjs', import.meta.url), 'utf8');
 
 describe('authoritative staging verifier boundary', () => {
-  it('requires explicit staging identity, mutation opt-in, and candidate SHA', () => {
-    for (const name of [
-      'STAGING_PROJECT_REF',
-      'STAGING_ENVIRONMENT_NAME',
-      'ALLOW_STAGING_MUTATIONS',
-      'STAGING_EXPECTED_GIT_SHA'
-    ]) expect(source).toContain(`required('${name}')`);
+  it('requires explicit target identity, mutation opt-in, and candidate SHA', () => {
+    for (const expression of [
+      '`${prefix}_PROJECT_REF`',
+      '`${prefix}_ENVIRONMENT_NAME`',
+      '`ALLOW_${prefix}_MUTATIONS`',
+      '`${prefix}_EXPECTED_GIT_SHA`'
+    ]) expect(source).toContain(`required(${expression})`);
     expect(source).toContain('assertStagingTarget');
+    expect(source).toContain("['status', '--porcelain']");
+    expect(source).toContain('dirty_candidate_checkout');
+  });
+
+  it('supports an explicitly selected loopback-only local target', () => {
+    expect(source).toContain("verificationTarget === 'local'");
+    expect(source).toContain('assertLocalTarget');
+    expect(source).toContain("const prefix = local ? 'LOCAL' : 'STAGING'");
   });
 
   it('checks two-player, observer, trusted RPC, concurrency and outbox boundaries', () => {

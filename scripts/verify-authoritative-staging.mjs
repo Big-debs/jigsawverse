@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
-import { assertStagingTarget } from '../server/stagingSafety.js';
+import { assertLocalTarget, assertStagingTarget } from '../server/stagingSafety.js';
 import { processNextRankedAssetJob } from '../server/rankedAssetJobWorker.js';
 import { AuthoritativeLobbyService } from '../src/lib/authoritativeLobbyService.js';
 import { createMatchCommand, MATCH_COMMAND_TYPES } from '../src/lib/matchProtocol.js';
@@ -15,15 +15,25 @@ const required = (name) => {
 };
 
 const actualGitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-const supabaseUrl = required('STAGING_SUPABASE_URL');
-const anonKey = required('STAGING_SUPABASE_ANON_KEY');
-const serviceRoleKey = required('STAGING_SUPABASE_SERVICE_ROLE_KEY');
-const target = assertStagingTarget({
+const workingTreeStatus = execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim();
+if (workingTreeStatus) {
+  throw Object.assign(new Error('Verification requires a clean candidate checkout'), { code: 'dirty_candidate_checkout' });
+}
+const verificationTarget = process.env.VERIFICATION_TARGET?.trim() || 'staging';
+if (!['staging', 'local'].includes(verificationTarget)) {
+  throw Object.assign(new Error('VERIFICATION_TARGET must be staging or local'), { code: 'invalid_verification_target' });
+}
+const local = verificationTarget === 'local';
+const prefix = local ? 'LOCAL' : 'STAGING';
+const supabaseUrl = required(`${prefix}_SUPABASE_URL`);
+const anonKey = required(`${prefix}_SUPABASE_ANON_KEY`);
+const serviceRoleKey = required(`${prefix}_SUPABASE_SERVICE_ROLE_KEY`);
+const target = (local ? assertLocalTarget : assertStagingTarget)({
   supabaseUrl,
-  projectRef: required('STAGING_PROJECT_REF'),
-  environmentName: required('STAGING_ENVIRONMENT_NAME'),
-  allowMutations: required('ALLOW_STAGING_MUTATIONS'),
-  expectedGitSha: required('STAGING_EXPECTED_GIT_SHA'),
+  projectRef: required(`${prefix}_PROJECT_REF`),
+  environmentName: required(`${prefix}_ENVIRONMENT_NAME`),
+  allowMutations: required(`ALLOW_${prefix}_MUTATIONS`),
+  expectedGitSha: required(`${prefix}_EXPECTED_GIT_SHA`),
   actualGitSha
 });
 

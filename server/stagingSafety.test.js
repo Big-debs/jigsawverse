@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertStagingTarget } from './stagingSafety.js';
+import { assertLocalTarget, assertStagingTarget } from './stagingSafety.js';
 
 const REF = 'abcdefghijklmnopqrst';
 const SHA = 'a'.repeat(40);
@@ -24,5 +24,32 @@ describe('staging mutation safety gate', () => {
     ['expectedGitSha', 'b'.repeat(40), 'candidate_sha_mismatch']
   ])('rejects unsafe %s', (field, value, code) => {
     expect(() => assertStagingTarget({ ...valid(), [field]: value })).toThrow(expect.objectContaining({ code }));
+  });
+});
+
+describe('local mutation safety gate', () => {
+  const local = () => ({
+    supabaseUrl: 'http://127.0.0.1:54321',
+    projectRef: 'local',
+    environmentName: 'local',
+    allowMutations: 'true',
+    expectedGitSha: SHA,
+    actualGitSha: SHA
+  });
+
+  it('accepts only the exact loopback target and candidate', () => {
+    expect(assertLocalTarget(local())).toEqual({ projectRef: 'local', candidateGitSha: SHA });
+  });
+
+  it.each([
+    ['environmentName', 'staging', 'environment_not_local'],
+    ['allowMutations', 'false', 'mutations_not_enabled'],
+    ['projectRef', 'abcdefghijklmnopqrst', 'invalid_local_project_ref'],
+    ['supabaseUrl', 'http://localhost:54321', 'local_target_mismatch'],
+    ['supabaseUrl', 'https://127.0.0.1:54321', 'local_target_mismatch'],
+    ['supabaseUrl', 'http://127.0.0.1:54322', 'local_target_mismatch'],
+    ['expectedGitSha', 'b'.repeat(40), 'candidate_sha_mismatch']
+  ])('rejects unsafe %s', (field, value, code) => {
+    expect(() => assertLocalTarget({ ...local(), [field]: value })).toThrow(expect.objectContaining({ code }));
   });
 });
