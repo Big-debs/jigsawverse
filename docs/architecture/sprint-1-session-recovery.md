@@ -1,6 +1,6 @@
 # Sprint 1 authoritative session recovery
 
-**Status:** client-side provider-neutral session boundary implemented; Supabase transport pending
+**Status:** client session, Supabase transport and initialized-match UI adapter implemented; trusted bootstrap and staging activation pending
 
 ## Transport contract
 
@@ -27,4 +27,9 @@ Commands are serialized per client session. Each command pins the current revisi
 
 ## Integration gate
 
-The Supabase adapter, private topic authorization and outbox publisher are implemented. Do not connect this session to production until staging deployment, publisher scheduling and recovery tests are complete. The existing multiplayer classes remain unchanged and `authoritativeMultiplayerV2` remains off.
+The Supabase adapter, private topic authorization, outbox publisher and
+initialized-match UI adapter are implemented. Do not connect this session to
+production until trusted bootstrap, opaque piece assets, staging deployment,
+publisher scheduling and recovery tests are complete. The existing lobby still
+uses the legacy multiplayer classes and `authoritativeMultiplayerV2` remains
+off.

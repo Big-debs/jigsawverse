@@ -4,6 +4,11 @@ export { GAME_MODES, MODE_SCORING, getModeConfig, getModeScoring, getAvailableMo
 export { VISUAL_CONFIG, HINT_CONFIG, ACCESSIBILITY_DEFAULTS } from './gameConfig';
 export { AuthoritativeMatchSession } from './authoritativeMatchSession';
 export {
+  AuthoritativeMultiplayerClient,
+  createSafePieceAssetMap,
+  projectionToGameplayState
+} from './authoritativeMultiplayerClient';
+export {
   AuthoritativeTransportError,
   SupabaseAuthoritativeMatchTransport,
   authoritativeProjectionTopic

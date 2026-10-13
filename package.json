@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint src",
     "test": "vitest run",
-    "test:sprint1-gates": "vitest run supabase/functions/_shared/authoritativeCommandGateHarness.test.js src/lib/authoritativeMatchSession.test.js supabase/migrations/authoritative_multiplayer_v2_foundation.test.js"
+    "test:sprint1-gates": "vitest run supabase/functions/_shared/authoritativeCommandGateHarness.test.js src/lib/authoritativeMatchSession.test.js src/lib/authoritativeMultiplayerClient.test.js src/config/featureFlags.test.js supabase/migrations/authoritative_multiplayer_v2_foundation.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

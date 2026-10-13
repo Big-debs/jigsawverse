@@ -27,6 +27,8 @@ the migration contract. It must pass on the exact candidate commit.
 | Projection delivery | Exactly one private outbox row per player for an accepted revision | Stateful harness and migration contract tests | Pass locally |
 | Reconnect and event gaps | Duplicate/out-of-order events are ignored and gaps trigger a fresh snapshot | Session recovery tests | Pass locally |
 | Schema isolation | Canonical state, commands, and outbox remain service-only | Migration contract tests | Pass locally |
+| Client authority routing | New-match flags and persisted in-progress authority are separate decisions | Routing tests | Pass locally |
+| Projection UI mapping | Foreign rack IDs, answer coordinates, and unrevealed scores do not enter gameplay state | Client-adapter tests | Pass locally |
 
 The provider-neutral store in
 `supabase/functions/_shared/authoritativeCommandGateHarness.js` models the
