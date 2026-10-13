@@ -17,6 +17,11 @@ npm run test:sprint1-gates
 The command covers the stateful command worker harness, client recovery, and
 the migration contract. It must pass on the exact candidate commit.
 
+After deploying that candidate to an isolated staging project, follow
+[`sprint-1-staging-verification.md`](./sprint-1-staging-verification.md). The
+guarded verifier contributes aggregate evidence to several staging rows but
+does not mark any row passed by its presence alone.
+
 | Gate | Required outcome | Current evidence | Status |
 | --- | --- | --- | --- |
 | Concurrent same-revision commands | Exactly one commit; the other command receives `revision_conflict` | Deterministic worker/RPC-model test | Pass locally |
