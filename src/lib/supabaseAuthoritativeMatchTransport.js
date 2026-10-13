@@ -140,4 +140,29 @@ export class SupabaseAuthoritativeMatchTransport {
     }
     return data;
   }
+
+  async bootstrapMatch({ gameId }) {
+    requireUuid(gameId, 'gameId');
+    const { data, error } = await this.supabase.functions.invoke('ranked-match-bootstrap-v2', {
+      body: { gameId }
+    });
+    if (error) {
+      const status = error.context?.status;
+      throw new AuthoritativeTransportError('Ranked match bootstrap failed', {
+        code: 'bootstrap_request_failed',
+        retryable: !Number.isInteger(status) || status >= 500
+      });
+    }
+    if (data?.status !== 'ready'
+      || data.authorityModel !== 'authoritative_v2'
+      || !['playerA', 'playerB'].includes(data.viewerRole)
+      || !data.projection
+      || !Array.isArray(data.pieceAssets)) {
+      throw new AuthoritativeTransportError('Ranked bootstrap response is invalid', {
+        code: 'invalid_bootstrap_response',
+        retryable: false
+      });
+    }
+    return data;
+  }
 }

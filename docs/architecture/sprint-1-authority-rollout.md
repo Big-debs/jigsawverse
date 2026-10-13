@@ -12,10 +12,11 @@ checklist.
 1. Verify the production deployment SHA and export the live Supabase schema, RLS, grants, RPC definitions and publication membership.
 2. Apply the additive migration in an isolated staging project. Confirm that existing `games`, `game_state` and legacy Broadcast behavior are unchanged.
 3. Run migration tests with two authenticated player accounts and one unrelated account. The unrelated account must receive no projection; players must see only their own `match_projections` row; authenticated clients must not read canonical state, commands or outbox rows or execute the v2 RPCs.
-4. Deploy the trusted command worker with a service-role secret held only in the server environment. It derives `actor_id` from verified authentication before invoking `begin_authoritative_match_command_v2` and never returns canonical state.
-5. Wire the independent legacy adapter and restricted telemetry sink into the staging-only `observeEvaluation` hook. Compare outcome, score, reveal, rack and terminal-state parity without allowing shadow results to affect authority.
-6. Create new protocol-v2 matches only behind `authoritativeMultiplayerV2`. Never convert a match already in progress.
-7. After reconnect, collision, duplicate-command, deadline and load gates pass, stop creating ranked legacy matches. Revoke legacy direct writes in a separate reviewed migration.
+4. Deploy the trusted asset-preparation job and bootstrap worker. Provision an immutable `authoritative_v2` pin, opaque piece manifest and coordinate-free assets only for approved new matches; the browser submits only the game ID.
+5. Deploy the trusted command worker with a service-role secret held only in the server environment. It derives `actor_id` from verified authentication before invoking `begin_authoritative_match_command_v2` and never returns canonical state.
+6. Wire the independent legacy adapter and restricted telemetry sink into the staging-only `observeEvaluation` hook. Compare outcome, score, reveal, rack and terminal-state parity without allowing shadow results to affect authority.
+7. Create new protocol-v2 matches only behind `authoritativeMultiplayerV2`. Never convert a match already in progress.
+8. After reconnect, collision, duplicate-command, deadline and load gates pass, stop creating ranked legacy matches. Revoke legacy direct writes in a separate reviewed migration.
 
 ## Rollback before legacy-write revocation
 

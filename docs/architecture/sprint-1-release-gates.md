@@ -29,6 +29,7 @@ the migration contract. It must pass on the exact candidate commit.
 | Schema isolation | Canonical state, commands, and outbox remain service-only | Migration contract tests | Pass locally |
 | Client authority routing | New-match flags and persisted in-progress authority are separate decisions | Routing tests | Pass locally |
 | Projection UI mapping | Foreign rack IDs, answer coordinates, and unrevealed scores do not enter gameplay state | Client-adapter tests | Pass locally |
+| Trusted bootstrap boundary | Client sends only game ID; worker verifies player/pin and builds revision zero from a service-only manifest | Bootstrap worker, Edge source-boundary, and migration contract tests | Pass locally |
 
 The provider-neutral store in
 `supabase/functions/_shared/authoritativeCommandGateHarness.js` models the
@@ -54,6 +55,7 @@ project running the exact candidate commit and migration.
 | Load and latency | Product-approved concurrency, p95/p99 latency, error-rate, and soak thresholds are met | Approved load profile and results | Pending |
 | Shadow parity | Approved deterministic corpus and soak have zero unexplained divergence | Safe mismatch-code report | Pending |
 | Secret and logging review | Service-role secret is server-only and logs/telemetry contain no protected state | Security review | Pending |
+| Ranked asset preparation | Opaque IDs and coordinate-free piece assets are generated and provisioned only inside the trusted pipeline | Pipeline run and metadata attack report | Pending |
 
 Staging reports may contain game ID, command ID, command type, status, revision,
 safe error code, duration, and counts. They must not contain canonical state,

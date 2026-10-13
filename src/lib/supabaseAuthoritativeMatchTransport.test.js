@@ -85,6 +85,24 @@ describe('Supabase authoritative match transport', () => {
     expect(result.status).toBe('accepted');
   });
 
+  it('bootstraps by game ID without sending canonical state or piece answers', async () => {
+    const bootstrap = {
+      status: 'ready',
+      authorityModel: 'authoritative_v2',
+      viewerRole: 'playerA',
+      projection: { revision: 0 },
+      pieceAssets: [{ id: 1000000041, imageData: 'https://assets.test/a.png' }]
+    };
+    const { client } = createClient({ functionResult: { data: bootstrap, error: null } });
+    const transport = new SupabaseAuthoritativeMatchTransport({ supabase: client });
+
+    await expect(transport.bootstrapMatch({ gameId: GAME_ID })).resolves.toEqual(bootstrap);
+    expect(client.functions.invoke).toHaveBeenCalledWith('ranked-match-bootstrap-v2', {
+      body: { gameId: GAME_ID }
+    });
+    expect(JSON.stringify(client.functions.invoke.mock.calls[0])).not.toContain('correctPosition');
+  });
+
   it('marks client errors as non-retryable without exposing response details', async () => {
     const { client } = createClient({
       functionResult: {

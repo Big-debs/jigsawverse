@@ -1,6 +1,6 @@
 # Sprint 1 authoritative client integration
 
-**Status:** initialized-match adapter and pinned routing implemented; trusted match bootstrap and lobby activation pending
+**Status:** initialized-match adapter, pinned routing, bootstrap endpoint and client handshake implemented; trusted asset preparation and lobby activation pending
 
 ## Authority routing
 
@@ -44,17 +44,17 @@ canonical state. Sending the existing client-generated piece mapping to the
 initializer would make the browser the source of ranked answers and would
 expose target positions through position-derived piece IDs.
 
-Before the creation flag can be connected to the lobby, a trusted bootstrap
-boundary must:
+The trusted bootstrap boundary now implements persisted service-only pins,
+server-side state construction, and safe response filtering. Before the
+creation flag can be connected to the lobby, the deployment must additionally:
 
-1. persist the match's authority model independently of the current flag;
+1. provision the match's authority pin only through the trusted new-match coordinator;
 2. wait for or atomically assign both player slots;
-3. generate opaque piece IDs and the protected answer catalogue server-side;
+3. generate opaque piece IDs and the protected answer catalogue in the trusted asset pipeline;
 4. create render assets addressable by opaque ID without embedding target
    coordinates;
-5. invoke `initialize_authoritative_match_v2` with revision-zero canonical
-   state and both projections; and
-6. return only the caller's safe bootstrap metadata and projection.
+5. deploy and validate the bootstrap migration and Edge function in staging; and
+6. pass the remaining release gates.
 
 The existing multiplayer screens continue to instantiate the legacy classes.
 Merely setting the environment variable does not activate v2 lobby creation in
