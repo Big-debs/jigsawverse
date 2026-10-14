@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "version": "0.7.0-lookdev",
+  "universe": "living-atlas",
+  "theme": "atlas-workshop",
+  "gameFamilies": [
+    "assemble",
+    "planar"
+  ],
+  "status": "design-development-not-production",
+  "sourcePass": "06",
+  "assets": [
+    {
+      "path": "README.md",
+      "bytes": 8653,
+      "sha256": "8c22d13b43a07bb00233fb94bc539f1551d69fb6a2c0011330ca3fc5a1fe5bf8",
+      "kind": "design-reference"
+    },
+    {
+      "path": "fixtures/assemble_uv_fixture.json",
+      "bytes": 6645,
+      "sha256": "71f757853e8a77933591b61765c7f2aa5a17ad89f18249f3ef0d22f119a0ee70",
+      "kind": "design-reference"
+    },
+    {
+      "path": "fixtures/assemble_uv_pixel_proof.png",
+      "bytes": 52411,
+      "sha256": "5f6cb7e4f383e3430752dea2009a1561ef1ae838627f1c8b90000c3d031aa4f6",
+      "kind": "render-proof"
+    },
+    {
+      "path": "fixtures/assemble_uv_reference.png",
+      "bytes": 39704,
+      "sha256": "0b9d6999b413d33a3b72ebaf79df8ce4468de7ee4ad68015961600090d9b18a3",
+      "kind": "render-proof"
+    },
+    {
+      "path": "fixtures/assemble_uv_tiles_5x5.png",
+      "bytes": 43744,
+      "sha256": "d993fcd5676563bb4aeb2c63617aa5e7cc5ff266b187111cde5c3f2b839b404f",
+      "kind": "render-proof"
+    },
+    {
+      "path": "fixtures/planar_glyph_size_proof.png",
+      "bytes": 89559,
+      "sha256": "b57725620e6115ab1a306fd239a03c88aa3c6c4ca42dae97dfe090e009064db3",
+      "kind": "render-proof"
+    },
+    {
+      "path": "glyphs/planar_glyph_atlas.png",
+      "bytes": 34639,
+      "sha256": "627706a75dc9570733624bd961eaf8ba1a5ba0b452efa6a4de57781f12080a2c",
+      "kind": "design-reference"
+    },
+    {
+      "path": "glyphs/planar_glyph_atlas.svg",
+      "bytes": 2056,
+      "sha256": "7f3210d1fb4b5641a88604f935dd14ba46d5acfc1ff7a81a8936e00cef2b4315",
+      "kind": "design-reference"
+    },
+    {
+      "path": "lighting/lighting-presets.json",
+      "bytes": 2941,
+      "sha256": "f631d98a2d2cc03de73219bcce552ec363f75f1552b057a2a8275387551d518c",
+      "kind": "design-reference"
+    },
+    {
+      "path": "plates/pass07_actual_material_swatch.png",
+      "bytes": 133147,
+      "sha256": "cbd01fb89cd995c4286f4b5f10f2e7e3d2f88afeb55c933736e8b2f4d5fe1540",
+      "kind": "design-reference"
+    },
+    {
+      "path": "plates/pass07_cinematic_concept_reference.webp",
+      "bytes": 381762,
+      "sha256": "4aff0fedfe6bb75c4c0cfba081aa417eb338aaa2df36f29bc50efb6f5b97621b",
+      "kind": "lookdev-art"
+    },
+    {
+      "path": "plates/pass07_three_tier_design_proof.png",
+      "bytes": 72866,
+      "sha256": "a51cbc0e021952a9f0922964bbfbe41c71f585f20a7448cbdb65d1a5597722b6",
+      "kind": "design-reference"
+    },
+    {
+      "path": "textures/atlas_basecolor.png",
+      "bytes": 59211,
+      "sha256": "53d5d22bab0aaf55d54417e6e74de8fdc0290ea3e682bade97981da17aab8d8f",
+      "kind": "design-reference"
+    },
+    {
+      "path": "textures/atlas_normal.png",
+      "bytes": 127128,
+      "sha256": "63ce3959d6e1bc5198d4018eb313443b30ec1f566fb34b6c3418c3f51c8783ca",
+      "kind": "design-reference"
+    },
+    {
+      "path": "textures/atlas_orm.png",
+      "bytes": 74721,
+      "sha256": "f65bd575a7f6de51d51982e554b0bff2a027855353222dad18ad84a7b85f32f2",
+      "kind": "design-reference"
+    },
+    {
+      "path": "textures/inlay_emissive_mask.png",
+      "bytes": 769,
+      "sha256": "36d03fb7fffc95355d669c11f81c24a0317272cb402cb703c6e6f37440b4c6eb",
+      "kind": "design-reference"
+    },
+    {
+      "path": "textures/material-presets.json",
+      "bytes": 5616,
+      "sha256": "cc5788826fba4009c9e0833becab5526337eedd7b010fc2e7f11668d495cccae",
+      "kind": "design-reference"
+    },
+    {
+      "path": "tools/build_pass07.py",
+      "bytes": 17906,
+      "sha256": "f4a9a18e5d2dcfc1363e565f248c565c9736f019f181fae047ca293ebe2b9bc5",
+      "kind": "tool"
+    },
+    {
+      "path": "tools/validate_pass07.py",
+      "bytes": 3448,
+      "sha256": "9eecec8bac3821bcea3782ece920998fd45b08f60d33fb0db5d0f3de174087b1",
+      "kind": "tool"
+    }
+  ],
+  "gates": [
+    "GPU image-space UV parity",
+    "physical-phone glyph legibility",
+    "LOD/frame/memory testing",
+    "art/right approvals",
+    "no hidden correctness reveal"
+  ]
+}

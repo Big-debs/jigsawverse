@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "status": "design parameters not physically benchmarked",
+  "unitSystem": "threejs scene units, default cell 1; color values in hex",
+  "colorManagement": {
+    "output": "sRGB",
+    "referenceExposure": 1,
+    "imageFaceToneMapped": false
+  },
+  "presets": [
+    {
+      "id": "daylight-gameplay",
+      "purpose": "Default Assemble/Planar active gameplay",
+      "worldBackdrop": "static/daylight",
+      "hemisphere": {
+        "sky": "#D6E8FF",
+        "ground": "#8E705A",
+        "intensity": 0.8
+      },
+      "key": {
+        "type": "directional",
+        "color": "#FFE1B3",
+        "intensity": 2.0,
+        "direction": [
+          0.5,
+          1,
+          0.7
+        ],
+        "castShadow": "high-only"
+      },
+      "fill": {
+        "type": "ambient",
+        "color": "#C6D4EC",
+        "intensity": 0.35
+      },
+      "emissiveIntensity": 0.25,
+      "postprocessing": false,
+      "camera": "orthographic",
+      "needsPhysicalVerification": true
+    },
+    {
+      "id": "golden-hour-menu",
+      "purpose": "Menu and noninteractive world presentation only",
+      "worldBackdrop": "static/golden-hour",
+      "hemisphere": {
+        "sky": "#F9CEA2",
+        "ground": "#695145",
+        "intensity": 0.75
+      },
+      "key": {
+        "type": "directional",
+        "color": "#FFC37D",
+        "intensity": 2.3,
+        "direction": [
+          -0.6,
+          1,
+          0.3
+        ],
+        "castShadow": "high-only"
+      },
+      "fill": {
+        "type": "ambient",
+        "color": "#A8BBDE",
+        "intensity": 0.27
+      },
+      "emissiveIntensity": 0.3,
+      "postprocessing": "optional menu only",
+      "camera": "perspective",
+      "needsPhysicalVerification": true
+    },
+    {
+      "id": "night-tournament-menu",
+      "purpose": "Lobby / tournament results only; not competitive active board",
+      "worldBackdrop": "static/night",
+      "hemisphere": {
+        "sky": "#6B88D0",
+        "ground": "#2B243D",
+        "intensity": 0.55
+      },
+      "key": {
+        "type": "directional",
+        "color": "#AFCFFF",
+        "intensity": 1.35,
+        "direction": [
+          0.5,
+          1,
+          0.2
+        ],
+        "castShadow": false
+      },
+      "fill": {
+        "type": "ambient",
+        "color": "#8799C1",
+        "intensity": 0.3
+      },
+      "emissiveIntensity": 0.45,
+      "postprocessing": "optional menu only",
+      "camera": "perspective",
+      "needsPhysicalVerification": true
+    }
+  ],
+  "guardrails": [
+    "Puzzle image UV sampled in sRGB without tone mapping or tinted lighting.",
+    "No visually graded correct/incorrect placement before authorized reveal.",
+    "Planar glyph identity readable with ambient lighting; no reliance on bloom.",
+    "Lighting never changes selection targets, logical state, timer or tile kind IDs.",
+    "Preview presets must be measured and revised on physical low-tier mobile."
+  ]
+}

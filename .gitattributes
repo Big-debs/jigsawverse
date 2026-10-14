@@ -1,0 +1,4 @@
+art/living-atlas/**/*.json text eol=lf
+art/living-atlas/**/*.md text eol=lf
+art/living-atlas/**/*.py text eol=lf
+art/living-atlas/**/*.svg text eol=lf

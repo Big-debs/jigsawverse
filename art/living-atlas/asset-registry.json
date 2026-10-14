@@ -1,0 +1,339 @@
+{
+  "schemaVersion": 1,
+  "product": "Jigsawverse",
+  "universe": "The Living Atlas",
+  "gameFamilies": [
+    "Assemble",
+    "Jigsawverse Planar"
+  ],
+  "excluded": "Planar-Cube educational trainer",
+  "status": "concept-graybox-not-production",
+  "rawMasterArchive": "Jigsawverse_Living_Atlas_Passes_01-06_Handoff.zip",
+  "approvalRequired": [
+    "creative",
+    "gameplay-parity",
+    "licensing-and-cultural-review",
+    "mobile-device-QA"
+  ],
+  "assets": [
+    {
+      "path": "art/living-atlas/concepts/00-tournament-visual-reference/initial-tournament-poster.webp",
+      "bytes": 176000,
+      "sha256": "bd025138508661a9792a3065f12311464d5d0d5b74a64908555aa930e2b90a5b",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/00-tournament-visual-reference/a_vibrant_high_energy_polished_3d_cgi_styled_pos.png",
+      "sourceSha256": "c5803f014bfeb913feb3c360a1f3a55eb8583255ea7cae1048e638ce70c5cfc4"
+    },
+    {
+      "path": "art/living-atlas/concepts/00-tournament-visual-reference/afrofuturist-tournament-poster.webp",
+      "bytes": 240564,
+      "sha256": "7e15f235570ad6de7db78650d82b4c3448603af0a754a9c095254317b1836af4",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/00-tournament-visual-reference/a_vibrant_cinematic_illustrated_cgi_poster_of_an.png",
+      "sourceSha256": "0db1b1991c267d8c5d75c87ed3ea70017b78023d91edfe0e119b78d7f1a5b492"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-01-universe/living-atlas-concept-01.webp",
+      "bytes": 249906,
+      "sha256": "555b26dda00a4fd84d11c7b2cc28be428c3a8b6f6f0f850feebcefb6f75ac64f",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-01-universe/a_rich_infographic_style_concept_art_board_for_a_g.png",
+      "sourceSha256": "40b59fe9348893db74b995f617079a332cbc5e52f8d028b6429364f1f14ea66b"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-01-universe/living-atlas-concept-02.webp",
+      "bytes": 250390,
+      "sha256": "532b8c3e25bf418b8c3764eadac8d0f913088b04c3fd8358ca2752d367695720",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-01-universe/a_wide_high_resolution_cinematic_concept_present.png",
+      "sourceSha256": "1bc7d983084554747d6ed72f421f886c11e547f3efbf8e01f40e66b8812bdeeb"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-02-board-language/paired-board-language-01.webp",
+      "bytes": 252050,
+      "sha256": "c280f4ad507cb2dab2a2f482f30059a84bd4650b6376d6c793f5d0fec2533d4b",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-02-board-language/a_polished_concept_art_game_ui_style_presentation.png",
+      "sourceSha256": "4c0c916947028dec75ffba47da9c6ec6b31f4de811f6319c0b5ba81c783b72fa"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-02-board-language/paired-board-language-02.webp",
+      "bytes": 243096,
+      "sha256": "6ef296311d48b274f63883f33c22d437c7752958c3d0e68b78648059658d8b94",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-02-board-language/a_wide_cinematic_polished_concept_art_ui_desig.png",
+      "sourceSha256": "9b2c9262455f9bfeb5795166620d844838e5b282da0f322c33af09b7f23ad662"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-03-playable-concepts/gameplay-study-01.webp",
+      "bytes": 168788,
+      "sha256": "507db740168e80b0e651a6421ea1ae1fb87811457a66231190e3b8c77ae3ad86",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-03-playable-concepts/a_widescreen_split_concept_art_ui_design_board.png",
+      "sourceSha256": "535d0c4d50972604fc1ede7c72da7d30b10c9ebaf9f5cb8db0dcea5195bdad89"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-03-playable-concepts/gameplay-study-02.webp",
+      "bytes": 165938,
+      "sha256": "5ff06126982725a37d7449871f43aa75b13bb974654c6d35333579508fe2442e",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-03-playable-concepts/a_wide_cinematic_split_screen_concept_art_ux_mock.png",
+      "sourceSha256": "3831e91142dc07d287343221cf08b96bab37137a437b645b880243ce667cd2d9"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-03-playable-concepts/assemble-standalone.webp",
+      "bytes": 164784,
+      "sha256": "5135b8bde210fa70ec357cb0e650726494a8fc9068b2160f73f61ab59a8965c5",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-03-playable-concepts/Jigsawverse_Pass03_Assemble_Concept.png",
+      "sourceSha256": "cf130c39d0d305e77f6653af7afb20f736a74172ae85550b71f8ca84ab6a47d5"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-03-playable-concepts/planar-standalone.webp",
+      "bytes": 157558,
+      "sha256": "d33e30dc9656685fe62fa30defbda81707698e1a5afe15655b681a74fa008929",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-03-playable-concepts/Jigsawverse_Pass03_Planar_Concept.png",
+      "sourceSha256": "e56dd569d1cc6653d1ff901960c8a9e1b8444eb88f4077e317a92044e1f6edee"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-04-mobile/mobile-ux-study.webp",
+      "bytes": 229458,
+      "sha256": "bcc84b5a0bf2aaa1f1417e069fcc3fb1975980d63656e9d7e4ff138276c3d5a4",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-04-mobile/a_wide_high_detail_ui_concept_board_mockup_coll.png",
+      "sourceSha256": "b42548344d709a295468663f37b0e5a7c4dba53c4b2d979e4230696d66b78a9d"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-04-mobile/assemble-mobile-390x844.webp",
+      "bytes": 98644,
+      "sha256": "ce7165f21271ae310064e28b34c4e22f50e3d07cb211e0f27481e9297500c30a",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-04-mobile/Jigsawverse_Pass04_Assemble_390x844.png",
+      "sourceSha256": "2ecdecf809598e36a3bfbdcfc118deaaacd6f0f7ad1f0c20f9ae64e2ce2b8ff4"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-04-mobile/planar-mobile-390x844.webp",
+      "bytes": 77828,
+      "sha256": "2902c65afac47bafbb950107eb9ecb14c427f523dbffb6da124bbec943c97355",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-04-mobile/Jigsawverse_Pass04_Planar_390x844.png",
+      "sourceSha256": "b439fd3894801929c21fca72d3d1cc16cda48b8411cb25395ecc7efd6ce6fa55"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-04-mobile/mobile-comparison.webp",
+      "bytes": 78904,
+      "sha256": "7f81a650819da4676b140a0c22b8ee8af67ba9c414a92ad303496ced97c000f2",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-04-mobile/Jigsawverse_Pass04_Mobile_Comparison.png",
+      "sourceSha256": "48c007d10d5cf2e9d6616ae35068f7a1b1c87832561e23a773b07f908190e50a"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-05-modeling-concept/modeling-lookdev.webp",
+      "bytes": 213660,
+      "sha256": "60c3e9bdebe47eb0ea65d9e6f8098c7cfa94f1369798b00d60b0dedbcd487001",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-05-modeling-concept/a_clean_high_detail_concept_board_style_guide_l.png",
+      "sourceSha256": "5bafc73e4d77ea55e3be0be748ad943358871f3f52484bd5aa2773c0bb4ab1d5"
+    },
+    {
+      "path": "art/living-atlas/concepts/pass-06-engineering-art-reference/engineering-lookdev.webp",
+      "bytes": 203412,
+      "sha256": "64a6b78036f8feec78f7201edf11cf5680f3a80d3fc51bd8a9f3144bd843e1a1",
+      "kind": "concept-preview",
+      "sourcePath": "art/concepts/pass-06-engineering-art-reference/a_high_detail_infographic_blueprint_style_concept.png",
+      "sourceSha256": "663410937570affb6ebb44ac3ca0e14cd313b764f4aa8dd956f489165f676635"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-05/Living_Atlas_Pass05_3D_Modeling_Brief.md",
+      "bytes": 10945,
+      "sha256": "4bdef53950e1f80be40425743857f6283b019762b531ae3d29f4017db6a00b24",
+      "kind": "documentation",
+      "sourcePath": "art/modeling/pass-05/Living_Atlas_Pass05_3D_Modeling_Brief.md",
+      "sourceSha256": "4bdef53950e1f80be40425743857f6283b019762b531ae3d29f4017db6a00b24"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-05/Living_Atlas_Pass05_Exact_Grid_Schematic.png",
+      "bytes": 83526,
+      "sha256": "f3ac8d83a86f28399559d736d058d708ac6b317ed35dbc4b369fc4ad3c0aba01",
+      "kind": "engineering-plate",
+      "sourcePath": "art/modeling/pass-05/Living_Atlas_Pass05_Exact_Grid_Schematic.png",
+      "sourceSha256": "f3ac8d83a86f28399559d736d058d708ac6b317ed35dbc4b369fc4ad3c0aba01"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/glb/cell_separator.glb",
+      "bytes": 1252,
+      "sha256": "a31316ef8ded9151224a8cdecd28c73a4aa5b7e38379866f675023c5a3664f69",
+      "kind": "graybox",
+      "sourcePath": "art/modeling/pass-06/glb/cell_separator.glb",
+      "sourceSha256": "a31316ef8ded9151224a8cdecd28c73a4aa5b7e38379866f675023c5a3664f69"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/glb/tile_beveled.glb",
+      "bytes": 1416,
+      "sha256": "7bb874c4a3482a72d44bf0c72079ad6c399b877f9d604d0631477f75472484ad",
+      "kind": "graybox",
+      "sourcePath": "art/modeling/pass-06/glb/tile_beveled.glb",
+      "sourceSha256": "7bb874c4a3482a72d44bf0c72079ad6c399b877f9d604d0631477f75472484ad"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/plates/Plate_C_Shared_Tile_and_Modules.webp",
+      "bytes": 36470,
+      "sha256": "f864257db9911b01a76c66a61117178b050a419c69fd3265b606306d23bae110",
+      "kind": "engineering-plate-preview",
+      "sourcePath": "art/modeling/pass-06/plates/Plate_C_Shared_Tile_and_Modules.png",
+      "sourceSha256": "c3e1ab4dcb6fcbba3cd751f198a2d7475eecc13ebab57d53fbb0b9ceecf8bb10"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/plates/Plate_A_Assemble_Orthographic.webp",
+      "bytes": 51304,
+      "sha256": "02bde469df5b8dbddad2c1d8e640c31e54faf724e3a40f5b62593db891d7dbc2",
+      "kind": "engineering-plate-preview",
+      "sourcePath": "art/modeling/pass-06/plates/Plate_A_Assemble_Orthographic.png",
+      "sourceSha256": "2c8b60543267a9b12372cf38992f80702191f74aee528ee478ec084a4a802a74"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/glb/planar_6x6_with_rails_graybox.glb",
+      "bytes": 37364,
+      "sha256": "fbaf0c10dda7657a5ea3f130237713638621288d1172b245f9877b6728fd526b",
+      "kind": "graybox",
+      "sourcePath": "art/modeling/pass-06/glb/planar_6x6_with_rails_graybox.glb",
+      "sourceSha256": "fbaf0c10dda7657a5ea3f130237713638621288d1172b245f9877b6728fd526b"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/glb/assemble_5x5_with_rack_graybox.glb",
+      "bytes": 34308,
+      "sha256": "66d5d799373a3b10501f21549fa1c49a1acdb6b5e00aa8d527764832343c7919",
+      "kind": "graybox",
+      "sourcePath": "art/modeling/pass-06/glb/assemble_5x5_with_rack_graybox.glb",
+      "sourceSha256": "66d5d799373a3b10501f21549fa1c49a1acdb6b5e00aa8d527764832343c7919"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/glyphs/planar_six_kinds_glyphs.webp",
+      "bytes": 15680,
+      "sha256": "d304757c2b25ea9570b584bd06766610637b7b92c5987289919df7f5bf8f7f86",
+      "kind": "engineering-plate-preview",
+      "sourcePath": "art/modeling/pass-06/glyphs/planar_six_kinds_glyphs.png",
+      "sourceSha256": "7fdd913bbc71b3d3e978d63b3011b14ad64a04f42598264dfbc266e5c35054be"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/glyphs/planar_six_kinds_glyphs.svg",
+      "bytes": 4725,
+      "sha256": "49da0ba750ad298e5554587a7aaebd03f3447e9efbeafd9c31f63fc129013688",
+      "kind": "glyph",
+      "sourcePath": "art/modeling/pass-06/glyphs/planar_six_kinds_glyphs.svg",
+      "sourceSha256": "49da0ba750ad298e5554587a7aaebd03f3447e9efbeafd9c31f63fc129013688"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/glb/frame_corner.glb",
+      "bytes": 1276,
+      "sha256": "53d9ef04ff8e076125dd923d18a6bccc4c24b494f9e00f490fbbe5ee8b2b4d2a",
+      "kind": "graybox",
+      "sourcePath": "art/modeling/pass-06/glb/frame_corner.glb",
+      "sourceSha256": "53d9ef04ff8e076125dd923d18a6bccc4c24b494f9e00f490fbbe5ee8b2b4d2a"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/Living_Atlas_Pass06_Modeling_Plates_and_Graybox_README.md",
+      "bytes": 4843,
+      "sha256": "06ea13310acd3480801a61c8b953f64dec7dda6961a9c793ba561e6934590ed0",
+      "kind": "documentation",
+      "sourcePath": "art/modeling/pass-06/Living_Atlas_Pass06_Modeling_Plates_and_Graybox_README.md",
+      "sourceSha256": "06ea13310acd3480801a61c8b953f64dec7dda6961a9c793ba561e6934590ed0"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/plates/Plate_B_Planar_Orthographic.webp",
+      "bytes": 69248,
+      "sha256": "56795d89e7969ad8c5548135d8c68dbdbba5c8c13121360a6f4658ea60ac98d1",
+      "kind": "engineering-plate-preview",
+      "sourcePath": "art/modeling/pass-06/plates/Plate_B_Planar_Orthographic.png",
+      "sourceSha256": "da2a22f0363d66e814cf00ddcdf1de5ed047e83a64e6b9992917e01ce368e952"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/plates/Plate_D_Exploded_Asset_Assemblies.webp",
+      "bytes": 49130,
+      "sha256": "8a448a0cbdbd7c535923ecf4f70774b757fc68adde35be27d8c847e10abc3b3a",
+      "kind": "engineering-plate-preview",
+      "sourcePath": "art/modeling/pass-06/plates/Plate_D_Exploded_Asset_Assemblies.png",
+      "sourceSha256": "ac3e5a354a51c241b66a16ae924829a20cb5865f7ea56c28aa1319bfc4739064"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/glb/frame_edge_1_unit.glb",
+      "bytes": 1252,
+      "sha256": "068159fc8d1370ef577c3224b12a4536601214ba2d211232634ae95efa2bc901",
+      "kind": "graybox",
+      "sourcePath": "art/modeling/pass-06/glb/frame_edge_1_unit.glb",
+      "sourceSha256": "068159fc8d1370ef577c3224b12a4536601214ba2d211232634ae95efa2bc901"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/manifest/graybox_manifest.json",
+      "bytes": 1250,
+      "sha256": "aae0d001a048502fc179b6a440aebf10aa7181ea4eb80b58d70ca92e26ffc3f7",
+      "kind": "documentation",
+      "sourcePath": "art/modeling/pass-06/manifest/graybox_manifest.json",
+      "sourceSha256": "aae0d001a048502fc179b6a440aebf10aa7181ea4eb80b58d70ca92e26ffc3f7"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/glb/shared_board_5x5.glb",
+      "bytes": 11264,
+      "sha256": "e593b77db8d43438415cead0bf07ca923d8079c228c34353c8cd382e19333b7c",
+      "kind": "graybox",
+      "sourcePath": "art/modeling/pass-06/glb/shared_board_5x5.glb",
+      "sourceSha256": "e593b77db8d43438415cead0bf07ca923d8079c228c34353c8cd382e19333b7c"
+    },
+    {
+      "path": "art/living-atlas/modeling/pass-06/glb/rail_channel_1_unit.glb",
+      "bytes": 1256,
+      "sha256": "e0c8aaaae5aaa05f88d386e39ce69ba3698b0b112adeb7f687b670f46ad8124b",
+      "kind": "graybox",
+      "sourcePath": "art/modeling/pass-06/glb/rail_channel_1_unit.glb",
+      "sourceSha256": "e0c8aaaae5aaa05f88d386e39ce69ba3698b0b112adeb7f687b670f46ad8124b"
+    },
+    {
+      "path": "docs/art-direction/living-atlas/README.md",
+      "bytes": 3327,
+      "sha256": "9f087b1cd2b3cea625b9a3c6039ab11843f3c8c8cad9965d9b7871e5517dbdc6",
+      "kind": "documentation",
+      "sourcePath": "README.md",
+      "sourceSha256": null
+    },
+    {
+      "path": "docs/art-direction/living-atlas/design-decisions.md",
+      "bytes": 2609,
+      "sha256": "7d4fa32ba41c68c42bdbc56d20eee4355943f37c10239639b73c4619af74b101",
+      "kind": "documentation",
+      "sourcePath": "docs/design-decisions.md",
+      "sourceSha256": null
+    },
+    {
+      "path": "docs/art-direction/living-atlas/source/Work_3D_Architecture_Specification.md",
+      "bytes": 64909,
+      "sha256": "5494dff42144bc51e3da0a8dd4104a51e9c616f23114bb6db7be22f3c98c5c58",
+      "kind": "documentation",
+      "sourcePath": "docs/source/Work_3D_Architecture_Specification.md",
+      "sourceSha256": null
+    },
+    {
+      "path": "docs/art-direction/living-atlas/source/Codex_3D_Phased_Implementation_Plan.md",
+      "bytes": 8747,
+      "sha256": "5f1d96f7b0a5d3392a28fc55793ec564afe043f7c9d955bbff170c2901699aad",
+      "kind": "documentation",
+      "sourcePath": "docs/source/Codex_3D_Phased_Implementation_Plan.md",
+      "sourceSha256": null
+    },
+    {
+      "path": "art/living-atlas/README.md",
+      "bytes": 3303,
+      "sha256": "a210b0feba2b8a1805a5f64d7cf45955966d9730c4a1b4789c06997b9c52c173",
+      "kind": "documentation",
+      "sourcePath": "generated-repository-index",
+      "sourceSha256": null
+    }
+  ],
+  "additionalManifests": [
+    {
+      "path": "art/living-atlas/lookdev/pass-07/pass07-manifest.json",
+      "status": "lookdev-not-production",
+      "description": "Pass 07 materials, lighting, texture candidates, CPU image/UV fixtures and glyph atlas; validated by script but NOT GPU/device tested"
+    }
+  ]
+}

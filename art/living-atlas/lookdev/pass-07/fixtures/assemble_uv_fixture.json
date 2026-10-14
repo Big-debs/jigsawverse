@@ -1,0 +1,442 @@
+{
+  "status": "CPU pixel reconstruction; NOT a Three.js texture-upload or GPU UV test",
+  "reference": "assemble_uv_reference.png",
+  "dimensions": [
+    1000,
+    1000
+  ],
+  "rows": 5,
+  "cols": 5,
+  "origin": "image top-left",
+  "tiles": [
+    {
+      "id": 0,
+      "row": 0,
+      "col": 0,
+      "pixelRectTopLeft": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.0,
+        0.0,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 1,
+      "row": 0,
+      "col": 1,
+      "pixelRectTopLeft": [
+        200,
+        0,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.2,
+        0.0,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 2,
+      "row": 0,
+      "col": 2,
+      "pixelRectTopLeft": [
+        400,
+        0,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.4,
+        0.0,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 3,
+      "row": 0,
+      "col": 3,
+      "pixelRectTopLeft": [
+        600,
+        0,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.6,
+        0.0,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 4,
+      "row": 0,
+      "col": 4,
+      "pixelRectTopLeft": [
+        800,
+        0,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.8,
+        0.0,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 5,
+      "row": 1,
+      "col": 0,
+      "pixelRectTopLeft": [
+        0,
+        200,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.0,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 6,
+      "row": 1,
+      "col": 1,
+      "pixelRectTopLeft": [
+        200,
+        200,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.2,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 7,
+      "row": 1,
+      "col": 2,
+      "pixelRectTopLeft": [
+        400,
+        200,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.4,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 8,
+      "row": 1,
+      "col": 3,
+      "pixelRectTopLeft": [
+        600,
+        200,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.6,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 9,
+      "row": 1,
+      "col": 4,
+      "pixelRectTopLeft": [
+        800,
+        200,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.8,
+        0.2,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 10,
+      "row": 2,
+      "col": 0,
+      "pixelRectTopLeft": [
+        0,
+        400,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.0,
+        0.4,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 11,
+      "row": 2,
+      "col": 1,
+      "pixelRectTopLeft": [
+        200,
+        400,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.2,
+        0.4,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 12,
+      "row": 2,
+      "col": 2,
+      "pixelRectTopLeft": [
+        400,
+        400,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.4,
+        0.4,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 13,
+      "row": 2,
+      "col": 3,
+      "pixelRectTopLeft": [
+        600,
+        400,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.6,
+        0.4,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 14,
+      "row": 2,
+      "col": 4,
+      "pixelRectTopLeft": [
+        800,
+        400,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.8,
+        0.4,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 15,
+      "row": 3,
+      "col": 0,
+      "pixelRectTopLeft": [
+        0,
+        600,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.0,
+        0.6,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 16,
+      "row": 3,
+      "col": 1,
+      "pixelRectTopLeft": [
+        200,
+        600,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.2,
+        0.6,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 17,
+      "row": 3,
+      "col": 2,
+      "pixelRectTopLeft": [
+        400,
+        600,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.4,
+        0.6,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 18,
+      "row": 3,
+      "col": 3,
+      "pixelRectTopLeft": [
+        600,
+        600,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.6,
+        0.6,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 19,
+      "row": 3,
+      "col": 4,
+      "pixelRectTopLeft": [
+        800,
+        600,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.8,
+        0.6,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 20,
+      "row": 4,
+      "col": 0,
+      "pixelRectTopLeft": [
+        0,
+        800,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.0,
+        0.8,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 21,
+      "row": 4,
+      "col": 1,
+      "pixelRectTopLeft": [
+        200,
+        800,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.2,
+        0.8,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 22,
+      "row": 4,
+      "col": 2,
+      "pixelRectTopLeft": [
+        400,
+        800,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.4,
+        0.8,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 23,
+      "row": 4,
+      "col": 3,
+      "pixelRectTopLeft": [
+        600,
+        800,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.6,
+        0.8,
+        0.2,
+        0.2
+      ]
+    },
+    {
+      "id": 24,
+      "row": 4,
+      "col": 4,
+      "pixelRectTopLeft": [
+        800,
+        800,
+        200,
+        200
+      ],
+      "uvRectTopLeftNormalized": [
+        0.8,
+        0.8,
+        0.2,
+        0.2
+      ]
+    }
+  ],
+  "referenceSha256": "0ca1acba2027ed582dc61563f0967ba0d2bd6b835b4d254acc84984dc2143a98",
+  "reconstructionSha256": "0ca1acba2027ed582dc61563f0967ba0d2bd6b835b4d254acc84984dc2143a98",
+  "exactCpuPixelParity": true,
+  "runtimeNote": "GLTF/Three.js UV origin and texture flipY handling must be verified against renderer; do not infer from this CPU test."
+}
