@@ -39,3 +39,11 @@ test('lab is isolated from production gameplay and multiplayer imports',()=>{
   assert.match(source,/GLTFLoader/);
   assert.match(source,/WebGLRenderer/);
 });
+test('renderer swaps preserve the status overlay outside the owned render surface',()=>{
+  const source=readFileSync(join(root,'tools/renderer-lab/src/main.js'),'utf-8');
+  assert.match(source,/id="renderSurface"/);
+  assert.match(source,/new FallbackRenderer\(\$\('#renderSurface'\)/);
+  assert.match(source,/new AtlasThreeRenderer\(\$\('#renderSurface'\)/);
+  assert.match(source,/id="stageTip"/);
+  assert.match(source,/WEBGL_lose_context/);
+});

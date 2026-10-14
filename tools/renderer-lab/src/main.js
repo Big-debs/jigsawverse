@@ -20,6 +20,7 @@ $('#app').innerHTML = `
     <section class="stage-card" aria-label="Game rendering laboratory">
       <div class="stage-head"><div><div class="stage-title" id="viewTitle">Assemble · Image restoration</div><div class="stage-sub" id="viewSub">5 × 5 / 25 cells · fixed ten-piece visual rack</div></div><span class="badge" id="rendererBadge">LOADING</span></div>
       <div class="stage" id="viewport" aria-label="3D scene or 2D fallback">
+        <div class="render-surface" id="renderSurface"></div>
         <span class="hint-overlay" id="stageTip">Tap a rack tile, then an empty cell. This is a local demo only.</span>
       </div>
       <div class="stage-foot"><span id="stageStatus" role="status">Preparing renderer…</span><span id="stageCount">0 demo interactions</span></div>
@@ -48,7 +49,7 @@ $('#app').innerHTML = `
         <div class="metric"><div class="metric-value" id="metricCalls">—</div><div class="metric-key">Draw calls</div></div>
         <div class="metric"><div class="metric-value" id="metricTriangles">—</div><div class="metric-key">Submitted triangles</div></div>
         <div class="metric"><div class="metric-value" id="metricTextures">—</div><div class="metric-key">GPU textures (Three.js count)</div></div>
-      </div><button class="control" id="copyBtn" type="button" style="width:100%;margin-top:12px">Copy technical report</button>
+      </div><div class="seg" style="margin-top:12px"><button class="control" id="copyBtn" type="button">Copy technical report</button><button class="control" id="contextLossBtn" type="button" disabled>Test context loss</button></div>
       <p class="small">Measurements are browser-session samples only; they are not physical-device FPS certification.</p></section>
     </aside>
   </div>
@@ -70,6 +71,7 @@ function updateButtons(){
   $('#stageTip').textContent=prefs.family==='assemble'?'Tap a rack tile, then an empty cell. Visual demo, no scoring.':'Choose a rail in the controls; whole lines wrap one cell. No match logic.';
   $('#uvBtn').setAttribute('aria-pressed',String(previewState.uvProof||false));
   $('#uvBtn').classList.toggle('active',Boolean(previewState.uvProof));
+  $('#contextLossBtn').disabled=activeKind!=='3d';
   $('#stageCount').textContent=`${previewState.demoMoves} demo interaction${previewState.demoMoves===1?'':'s'}`;
 }
 function onAction(action){
@@ -82,7 +84,7 @@ function onAction(action){
 function sync(){updateButtons();if(active)active.setState(previewState,prefs);}
 function disposeActive(){if(active){active.dispose();active=null;}activeKind='none';}
 function openFallback(reason){
-  disposeActive();active=new FallbackRenderer($('#viewport'),onAction);activeKind='2d';
+  disposeActive();active=new FallbackRenderer($('#renderSurface'),onAction);activeKind='2d';
   diagnostics={renderer:'Canvas2D',frameP95Ms:null,drawCalls:null,triangles:null,textures:null};
   $('#rendererBadge').textContent='2D FALLBACK';setStatus(reason||'Playable presentation fallback');sync();refreshMetrics();
 }
@@ -95,7 +97,7 @@ async function boot(){
   try{
     const { AtlasThreeRenderer }=await import('./threeScene.js');if(token!==bootToken)return;
     disposeActive();
-    const scene=new AtlasThreeRenderer($('#viewport'),onAction,(values)=>{diagnostics={renderer:'WebGL2 / Three.js',...values};refreshMetrics();},()=>{
+    const scene=new AtlasThreeRenderer($('#renderSurface'),onAction,(values)=>{diagnostics={renderer:'WebGL2 / Three.js',...values};refreshMetrics();},()=>{
       if(token===bootToken && prefs.renderer==='auto'){prefs.renderer='fallback';updateButtons();openFallback('WebGL context lost · safe fallback');}
     });
     active=scene;activeKind='3d';await scene.mount(previewState,prefs);
@@ -123,5 +125,10 @@ for(const [id,dir] of [['#minusBtn',-1],['#plusBtn',1]])$(id).addEventListener('
 $('#copyBtn').addEventListener('click',async()=>{
   const report={pass:8,mode:prefs.family,quality:prefs.quality,lighting:prefs.light,adapter:activeKind,...diagnostics,userAgent:navigator.userAgent,viewport:{width:$('#viewport').clientWidth,height:$('#viewport').clientHeight},timestamp:new Date().toISOString(),note:'Local renderer visual fixture; not gameplay or device certification'};
   try{await navigator.clipboard.writeText(JSON.stringify(report,null,2));setStatus('Technical report copied to clipboard');}catch{setStatus('Clipboard unavailable. See developer console for report.');console.info(report);}
+});
+$('#contextLossBtn').addEventListener('click',()=>{
+  const gl=$('#renderSurface canvas')?.getContext('webgl2');
+  const extension=gl?.getExtension('WEBGL_lose_context');
+  if(extension)extension.loseContext();else setStatus('WEBGL_lose_context unavailable in this browser');
 });
 updateButtons();openFallback('Safe 2D preview while Three.js initializes');void boot();

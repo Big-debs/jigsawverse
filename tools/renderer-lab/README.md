@@ -8,7 +8,7 @@ This technical laboratory renders **Assemble** and **Jigsawverse Planar** in a s
 
 ```bash
 cd tools/renderer-lab
-npm install
+npm ci
 npm run dev
 ```
 
@@ -25,7 +25,7 @@ To run deterministic tests and asset-contract checks:
 npm test
 ```
 
-> The laboratory has its **own** `package.json`. It does not modify the root `package.json` or register any new production route. It intentionally has no committed lockfile at this stage; `npm install` and a successful Vite build must be verified in a network-enabled CI workspace, after which the reviewed lockfile should be committed before deployment.
+> The laboratory has its **own** `package.json` and reviewed lockfile. It does not modify the root `package.json` or register any new production route. Use Node 20.19 or newer and `npm ci` for a reproducible install.
 
 ## What the lab actually does
 
@@ -45,7 +45,7 @@ npm test
 3. Switch Low / Medium / High quality and daylight/golden-hour/night lighting.
 4. Assemble: select a rack tile then an empty cell; toggle **UV corner proof** to view all 25 original image fragments correctly oriented. The fixture shows neutral interactions only.
 5. Planar: choose row/column and line index (1–6); shift −1 or +1. Wrap is a visual demonstration, **not** cascade/replay parity.
-6. Copy a technical report and verify which rendering adapter is actually active.
+6. Copy a technical report and verify which rendering adapter is actually active. The lab-only **Test context loss** control exercises the real `WEBGL_lose_context` path when the browser exposes it.
 
 ## Asset dependencies
 
@@ -63,13 +63,13 @@ All asset URLs come directly from `art/living-atlas/` — no duplicated source G
 
 | Check | Current result | Gate before any production integration |
 | --- | --- | --- |
-| Existing original GLB metadata and dimensions | Passed static tests | Load and inspect actual meshes in browser and Blender |
+| Existing original GLB metadata and dimensions | Passed static parser and real browser GLB load | Inspect actual meshes in Blender |
 | Deterministic Assemble demo: 25 cells, ten-piece rack | Passed unit tests | Gameplay rules parity against `GameLogic` |
 | Deterministic Planar demo: 36 cells, stable IDs, shift/wrap | Passed unit tests | Deterministic trace/cascade parity against actual Planar engine |
 | CPU Assemble source image reconstruction (Pass 07) | Already passed static fixture proof | Confirm GPU correct UV top/bottom corners, no color shift, mip bleed |
-| Loader, Three.js package install, Vite dist | Not run in this offline environment | Network-enabled `npm install`, clean build, browser E2E |
-| Real browser WebGL2, context loss and fallback | Not yet executed end-to-end | Chrome Android, Safari iOS and desktop QA |
-| 390×844 physical touch, glyph readability | Not tested | Physical-device accessibility and UX observation |
+| Loader, Three.js package install, Vite dist | Passed with locked Vite 8.3.4; clean audit, tests and build | Repeat with `npm ci` in CI |
+| Real browser WebGL2, context loss and fallback | Passed in desktop Chromium; one canvas before and after fallback/recovery | Chrome Android and Safari iOS QA |
+| 390×844 layout and glyph readability | Passed emulated viewport with no horizontal overflow | Physical-device touch and accessibility observation |
 | 15-minute thermals / FPS / memory budgets | Not tested | Physical-device load and resource-lifecycle gates |
 
 ## Architectural limitations to address next
