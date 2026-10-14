@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { cellPosition, KIND_COLORS, KINDS } from './demoState.js';
+import { cellPosition, KIND_COLORS, KINDS, tileTransition } from './demoState.js';
 import { imageUvRect, glyphUvRect } from './uvContract.js';
 
 // All runtime references point at the SINGLE versioned art library in the repository.
@@ -83,6 +83,12 @@ export class AtlasThreeRenderer {
     ]);
     if(this.disposed)return;
     this.models={assemble:assemble.scene,planar:planar.scene,tile:tile.scene};
+    const normalized=new Set();
+    for(const model of Object.values(this.models))model.traverse(obj=>{
+      if(obj.isMesh&&!obj.geometry.getAttribute('normal')&&!normalized.has(obj.geometry)){
+        obj.geometry.computeVertexNormals();normalized.add(obj.geometry);
+      }
+    });
     this.images={base,normal,orm};this.imageTexture=image;this.glyphTexture=glyph;
     for(const t of [image,glyph]){t.colorSpace=THREE.SRGBColorSpace;t.flipY=true;t.anisotropy=2;this.ownedTextures.add(t);}
     this.unlitImage=new THREE.MeshBasicMaterial({map:image,toneMapped:false,side:THREE.DoubleSide});this.materials.add(this.unlitImage);
@@ -224,10 +230,12 @@ export class AtlasThreeRenderer {
     const start=old.get(id);
     piece.position.copy(start??goal);
     this.tiles.set(id,piece);this.pieceRoot.add(piece);
-    if(start&&start.distanceTo(goal)>.005&&previous?.demoMoves!==this.state.demoMoves){
+    const moved=Boolean(start&&start.distanceTo(goal)>.005);
+    const transition=tileTransition(moved,previous,this.state);
+    if(transition==='animate'){
       const distance=start.distanceTo(goal),wrap=this.mode==='planar'&&distance>1.5;
       this.tweens.push({piece,start:start.clone(),goal,begin:performance.now(),duration:wrap?320:210,wrap});
-    }
+    }else if(transition==='snap')piece.position.copy(goal);
   }
 
   pick(e) {
