@@ -1,6 +1,6 @@
 # Living Atlas — Pass 10: Atlas Workshop Environment Integration
 
-**Status:** Desktop WebGL2 validated in the isolated Three.js laboratory. Physical-device and production approvals remain **OPEN**.
+**Status:** Desktop WebGL2 validated in the isolated Three.js laboratory, with one successful physical iOS Safari sample. Android, extended-duration mobile and production approvals remain **OPEN**.
 **Scope:** Jigsawverse Assemble and Jigsawverse Planar exclusively; standalone Planar-Cube trainer is excluded.
 
 ## Delivered
@@ -43,10 +43,18 @@ The environment is **one world**, not separate visual identities for each game. 
 - A real `WEBGL_lose_context` event replaced WebGL with the safe Canvas2D fallback, cleared the diagnostics and retained one canvas. Restarting Auto restored WebGL2 and the five-object Low Workshop without console errors.
 - Browser-session frame samples remained within the proposed Low desktop threshold during these checks. They are not physical-device, battery or thermal certification.
 
+## Physical-device observations
+
+| Reported date | Device | OS / browser | Family / tier | Renderer sample | Battery / thermals | Observation |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-14 | iPhone 13 | iOS 26.3.1 / Safari | Assemble / High | 17.0 ms sampled frame p95; 154 draw calls; 1,498 submitted triangles; 15 GPU textures | Negligible reported battery change; no heat observed | No stuttering observed. User-supplied screenshot `IMG_6903.png`; test duration and exact before/after battery percentages were not supplied. |
+
+This is a positive physical-device observation, not a performance certification. The laboratory reports browser-session samples rather than sustained FPS, and a duration is required before drawing battery or thermal conclusions.
+
 ## Acceptance gates still pending
 
-1. Measure frame p95, memory, texture counts, mobile thermals, interaction latency and startup time on physical budget Android, midrange Android and iOS Safari hardware.
-2. Record the exact device model, OS, browser, tier duration, battery delta and observed heat/stutter alongside the copied technical reports.
+1. Measure frame p95, memory, texture counts, mobile thermals, interaction latency and startup time on physical budget and midrange Android hardware, and complete an extended-duration iOS Safari run.
+2. Record the exact tier duration and before/after battery percentages for the iOS sample, plus complete device, OS, browser, duration, battery and heat/stutter reports for the Android samples.
 3. Repeat the clean install, test suite and production build in CI.
 4. Obtain art direction, cultural rights and release approval. Keep the official tournament security/authority and child-data privacy gates separate.
 
