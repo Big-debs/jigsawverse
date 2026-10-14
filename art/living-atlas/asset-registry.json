@@ -298,8 +298,8 @@
     },
     {
       "path": "docs/art-direction/living-atlas/design-decisions.md",
-      "bytes": 2332,
-      "sha256": "d046b0b00cc9fd97c48856b3c03e8c72874685e73c8e7667200ac4f8c4d7bfbd",
+      "bytes": 2609,
+      "sha256": "7d4fa32ba41c68c42bdbc56d20eee4355943f37c10239639b73c4619af74b101",
       "kind": "documentation",
       "sourcePath": "docs/design-decisions.md",
       "sourceSha256": null
@@ -314,16 +314,16 @@
     },
     {
       "path": "docs/art-direction/living-atlas/source/Codex_3D_Phased_Implementation_Plan.md",
-      "bytes": 8834,
-      "sha256": "2da1913c2d845c0d9a807f9b34423dfa07ba14c6fc4e3ce040e7cf9bb032d351",
+      "bytes": 8747,
+      "sha256": "5f1d96f7b0a5d3392a28fc55793ec564afe043f7c9d955bbff170c2901699aad",
       "kind": "documentation",
       "sourcePath": "docs/source/Codex_3D_Phased_Implementation_Plan.md",
       "sourceSha256": null
     },
     {
       "path": "art/living-atlas/README.md",
-      "bytes": 2914,
-      "sha256": "92e945b71ff9773ad46642949bb1a6250b305c1ac01fc7b01f0339cfdf95949a",
+      "bytes": 3303,
+      "sha256": "a210b0feba2b8a1805a5f64d7cf45955966d9730c4a1b4789c06997b9c52c173",
       "kind": "documentation",
       "sourcePath": "generated-repository-index",
       "sourceSha256": null
