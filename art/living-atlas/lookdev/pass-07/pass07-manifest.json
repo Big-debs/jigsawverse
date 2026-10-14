@@ -120,8 +120,8 @@
     },
     {
       "path": "tools/validate_pass07.py",
-      "bytes": 3041,
-      "sha256": "dd51156a7dae68c260fd61696ccdb072804cd0baaadf98bf9a67b31292c92df8",
+      "bytes": 3448,
+      "sha256": "9eecec8bac3821bcea3782ece920998fd45b08f60d33fb0db5d0f3de174087b1",
       "kind": "tool"
     }
   ],

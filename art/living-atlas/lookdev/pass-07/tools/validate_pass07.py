@@ -4,6 +4,14 @@ from pathlib import Path
 from PIL import Image
 import argparse, json, hashlib, sys
 
+TEXT_SUFFIXES={'.json','.md','.py','.svg'}
+
+def manifest_bytes(path):
+ data=path.read_bytes()
+ # Git may materialize text files as CRLF on Windows. The manifest records
+ # repository-canonical LF bytes so validation must use the same form.
+ return data.replace(b'\r\n',b'\n') if path.suffix.lower() in TEXT_SUFFIXES else data
+
 def contrast(f,b):
  def lum(s):
   x=[int(s[i:i+2],16)/255 for i in (1,3,5)]
@@ -40,7 +48,10 @@ def main():
   manifest=json.loads(manifest_path.read_text())
   for obj in manifest['assets']:
    fp=root/obj['path'];present=fp.is_file();check(present,f"exists {obj['path']}")
-   if present:check(hashlib.sha256(fp.read_bytes()).hexdigest()==obj['sha256'],f"SHA256 {obj['path']}")
+   if present:
+    data=manifest_bytes(fp)
+    check(len(data)==obj['bytes'],f"bytes {obj['path']}")
+    check(hashlib.sha256(data).hexdigest()==obj['sha256'],f"SHA256 {obj['path']}")
  if notes:
   print('\nVALIDATION FAILED:',len(notes),'failed checks')
   return 1
