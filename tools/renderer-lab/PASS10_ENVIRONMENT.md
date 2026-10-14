@@ -1,6 +1,6 @@
 # Living Atlas — Pass 10: Atlas Workshop Environment Integration
 
-**Status:** Implemented in isolated Three.js laboratory. **Not production-approved.**
+**Status:** Desktop WebGL2 validated in the isolated Three.js laboratory. Physical-device and production approvals remain **OPEN**.
 **Scope:** Jigsawverse Assemble and Jigsawverse Planar exclusively; standalone Planar-Cube trainer is excluded.
 
 ## Delivered
@@ -33,13 +33,21 @@ The environment is **one world**, not separate visual identities for each game. 
 - On switching tiers or game families, dispose prior world geometry before constructing the replacement.
 - Workshop visibility can be disabled to compare board-only readability/performance without changing game state.
 
+## Completed engineering validation
+
+- A clean `npm ci` installed 16 packages from the committed lockfile and reported zero vulnerabilities. All **15 Node tests** and JavaScript syntax checks passed; the Vite 8.3.4 production build completed successfully.
+- A real desktop Chromium WebGL2 session exercised all **18** game-family, quality-tier and lighting-preset combinations. Each retained one renderer canvas and the expected 5/17/28 Workshop objects after diagnostics settled, with no console errors.
+- Desktop visual checks covered Assemble and Planar at Low/Daylight, Medium/Golden Hour and High/Tournament Night. The environment remained decorative and left the board, ten-piece Assemble rack, Planar rails, hint and controls unobstructed.
+- At 390×844, both families were checked at Low and High. The High tier's 28 objects did not occlude the Assemble rack or Planar rails, and the document had no horizontal overflow.
+- Twenty Planar resets, ten quality changes and ten Workshop/Board-only changes completed without errors. A second High→Low and Workshop→Board-only cycle retained one canvas and plateaued at the same Low-tier draw calls, triangles, textures and five visible props.
+- A real `WEBGL_lose_context` event replaced WebGL with the safe Canvas2D fallback, cleared the diagnostics and retained one canvas. Restarting Auto restored WebGL2 and the five-object Low Workshop without console errors.
+- Browser-session frame samples remained within the proposed Low desktop threshold during these checks. They are not physical-device, battery or thermal certification.
+
 ## Acceptance gates still pending
 
-1. On a clean connected checkout: `cd tools/renderer-lab && npm ci && npm test && npm run build`.
-2. In a real WebGL2 browser, visually compare both games across Low, Medium and High plus all three Pass 07 lighting presets.
-3. Verify the actual screenshot at 390x844 and desktop: no occluded Assemble rack, Planar rails, controls or hints; no image UV or glyph regression.
-4. Confirm there are no GPU resource leaks after 20 game resets, 10 quality changes, and 10 world on/off changes.
-5. Measure frame p95, memory, texture counts, mobile thermals, interaction latency and startup time on physical budget Android and iOS Safari hardware.
-6. Obtain art direction, cultural rights and release approval. Keep the official tournament security/authority and child-data privacy gates separate.
+1. Measure frame p95, memory, texture counts, mobile thermals, interaction latency and startup time on physical budget Android, midrange Android and iOS Safari hardware.
+2. Record the exact device model, OS, browser, tier duration, battery delta and observed heat/stutter alongside the copied technical reports.
+3. Repeat the clean install, test suite and production build in CI.
+4. Obtain art direction, cultural rights and release approval. Keep the official tournament security/authority and child-data privacy gates separate.
 
 No production Jigsawverse gameplay code, ranked multiplayer, database migration or user-facing deployment is changed by this Pass 10 laboratory.
