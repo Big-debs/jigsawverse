@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createWorkshopScene } from './worldScene.js';
 import { cellPosition, KIND_COLORS, KINDS, tileTransition } from './demoState.js';
 import { imageUvRect, glyphUvRect } from './uvContract.js';
 
@@ -53,7 +54,7 @@ function glyphGeometry(kind) {
 export class AtlasThreeRenderer {
   constructor(container, onAction, onMetrics, onContextLost) {
     this.container=container;this.onAction=onAction;this.onMetrics=onMetrics;this.onContextLost=onContextLost;
-    this.disposed=false;this.models={};this.boardGeometries=new Set();this.pieceGeometries=new Set();this.ownedTextures=new Set();this.materials=new Set();this.qualityMaterials=new Set();this.qualityTextures=new Set();this.clickMaterial=null;this.frameTimes=[];this.tiles=new Map();this.pickables=[];
+    this.disposed=false;this.models={};this.boardGeometries=new Set();this.pieceGeometries=new Set();this.ownedTextures=new Set();this.materials=new Set();this.qualityMaterials=new Set();this.qualityTextures=new Set();this.clickMaterial=null;this.workshop=null;this.frameTimes=[];this.tiles=new Map();this.pickables=[];
     this.canvas=document.createElement('canvas');this.canvas.className='three-canvas';this.canvas.setAttribute('aria-label','Interactive 3D visual reference. Accessibility controls are available in the side panel.');
     this.renderer=new THREE.WebGLRenderer({canvas:this.canvas,alpha:true,antialias:true,powerPreference:'low-power',preserveDrawingBuffer:false});
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1;
@@ -142,6 +143,7 @@ export class AtlasThreeRenderer {
     if(modeChanged||qualityChanged){this.mode=state.family;this.buildStatic();}
     else if(prev!==state){this.rebuildPieces(prev);}
     if(modeChanged||qualityChanged||lightChanged){this.applyLighting(options);this.light=options.light;}
+    if(this.workshop)this.workshop.group.visible=options.world!=='board-only';
   }
 
   clearQualityResources() {
@@ -151,9 +153,13 @@ export class AtlasThreeRenderer {
   }
 
   buildStatic() {
+    this.workshop?.dispose();this.workshop=null;
     this.clearGeneratedGeometries();
     if(this.clickMaterial){this.clickMaterial.dispose();this.materials.delete(this.clickMaterial);this.clickMaterial=null;}
     while(this.sceneRoot.children.length)this.sceneRoot.remove(this.sceneRoot.children[0]);
+    this.workshop=createWorkshopScene({quality:this.quality,family:this.mode,materials:this.materialMap});
+    this.workshop.group.visible=this.options?.world!=='board-only';
+    this.sceneRoot.add(this.workshop.group);
     this.boardRoot=new THREE.Group();this.sceneRoot.add(this.boardRoot);
     const src=this.models[this.mode].clone(true);
     src.traverse(obj=>{
@@ -281,7 +287,7 @@ export class AtlasThreeRenderer {
     this.renderer.render(this.scene,this.camera);
     if(this.onMetrics&&(!this.lastReport||time-this.lastReport>1100)){
       this.lastReport=time;
-      this.onMetrics({frameP95Ms:p95(this.frameTimes),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,textures:this.renderer.info.memory.textures});
+      this.onMetrics({frameP95Ms:p95(this.frameTimes),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,textures:this.renderer.info.memory.textures,workshopProps:this.workshop?.group.visible?this.workshop.plan.props.length:0});
     }
     this.raf=requestAnimationFrame(t=>this.animate(t));
   }
@@ -289,6 +295,7 @@ export class AtlasThreeRenderer {
   dispose() {
     if(this.disposed)return;this.disposed=true;this.running=false;cancelAnimationFrame(this.raf);
     this.observer?.disconnect();
+    this.workshop?.dispose();this.workshop=null;
     this.canvas.removeEventListener('pointerdown',this.handlePointer);
     this.canvas.removeEventListener('webglcontextlost',this.handleLoss);
     for(const m of this.materials)status(m);
