@@ -3,7 +3,7 @@ import { initialAssemble, initialPlanar, assemblePlace, planarShift } from './de
 
 const $ = (selector) => document.querySelector(selector);
 const prefs = {
-  family: 'assemble', quality: 'low', light: 'daylight-gameplay', renderer: 'auto',
+  family: 'assemble', quality: 'low', light: 'daylight-gameplay', renderer: 'auto', world: 'workshop',
   axis: 'row', index: 2, showUV: false,
 };
 let previewState = initialAssemble();
@@ -13,7 +13,7 @@ let diagnostics = { renderer: 'initializing', frameP95Ms: null, drawCalls: null,
 $('#app').innerHTML = `
 <main class="shell">
   <header class="top">
-    <div><div class="eyebrow">Jigsawverse · Concept engineering</div><div class="brand">The Living Atlas</div><div class="subbrand">ATLAS WORKSHOP · RENDERER LAB / 08</div></div>
+    <div><div class="eyebrow">Jigsawverse · Concept engineering</div><div class="brand">The Living Atlas</div><div class="subbrand">ATLAS WORKSHOP · RENDERER LAB / 10</div></div>
     <div class="top-copy">Real GLB geometry, UV and material experiments for <strong>Assemble</strong> and <strong>Planar</strong>. Isolated from production gameplay, scoring, realtime rooms and CAESAR telemetry.</div>
   </header>
   <div class="page-grid">
@@ -36,6 +36,7 @@ $('#app').innerHTML = `
         <button class="control active" data-quality="low" type="button">Low</button><button class="control" data-quality="medium" type="button">Medium</button><button class="control" data-quality="high" type="button">High</button></div>
         <div class="label"><label for="lightSelect">Environment lighting</label></div>
         <select id="lightSelect" class="select"><option value="daylight-gameplay">Daylight · Gameplay</option><option value="golden-hour-menu">Golden Hour · Preview</option><option value="night-tournament-menu">Tournament Night · Preview</option></select>
+        <div class="label">Decorative 3D environment</div><div class="seg" role="group" aria-label="Decorative world"><button class="control active" id="workshopBtn" type="button" aria-pressed="true">Atlas Workshop</button><button class="control" id="boardOnlyBtn" type="button" aria-pressed="false">Board only</button></div><p class="small">Visual-only scene; the 2D fallback remains independent.</p>
       </section>
       <section class="panel"><div class="panel-title">Technical interaction fixture</div>
       <div id="assembleControls"><p class="muted">Select any tile in the ten-piece rack, then select an empty board cell. This tests semantic picking and animated placement, not correctness.</p>
@@ -48,7 +49,7 @@ $('#app').innerHTML = `
         <div class="metric"><div class="metric-value" id="metricFps">—</div><div class="metric-key">Sampled frame p95 (ms)</div></div>
         <div class="metric"><div class="metric-value" id="metricCalls">—</div><div class="metric-key">Draw calls</div></div>
         <div class="metric"><div class="metric-value" id="metricTriangles">—</div><div class="metric-key">Submitted triangles</div></div>
-        <div class="metric"><div class="metric-value" id="metricTextures">—</div><div class="metric-key">GPU textures (Three.js count)</div></div>
+        <div class="metric"><div class="metric-value" id="metricTextures">—</div><div class="metric-key">GPU textures (Three.js count)</div></div><div class="metric"><div class="metric-value" id="metricWorkshop">—</div><div class="metric-key">Visible workshop props</div></div>
       </div><div class="seg" style="margin-top:12px"><button class="control" id="copyBtn" type="button">Copy technical report</button><button class="control" id="contextLossBtn" type="button" disabled>Test context loss</button></div>
       <p class="small">Measurements are browser-session samples only; they are not physical-device FPS certification.</p></section>
     </aside>
@@ -69,6 +70,7 @@ function updateButtons(){
   $('#viewTitle').textContent=prefs.family==='assemble'?'Assemble · Image restoration':'Planar · The shifting lattice';
   $('#viewSub').textContent=prefs.family==='assemble'?'5 × 5 / 25 cells · fixed ten-piece visual rack':'6 × 6 / 36 cells · six glyph kinds · whole-line shifts';
   $('#stageTip').textContent=prefs.family==='assemble'?'Tap a rack tile, then an empty cell. Visual demo, no scoring.':'Choose a rail in the controls; whole lines wrap one cell. No match logic.';
+  for(const [id,selected] of [['#workshopBtn',prefs.world==='workshop'],['#boardOnlyBtn',prefs.world==='board-only']]){$(id).classList.toggle('active',selected);$(id).setAttribute('aria-pressed',String(selected));}
   $('#uvBtn').setAttribute('aria-pressed',String(previewState.uvProof||false));
   $('#uvBtn').classList.toggle('active',Boolean(previewState.uvProof));
   $('#contextLossBtn').disabled=activeKind!=='3d';
@@ -108,7 +110,7 @@ async function boot(){
 function refreshMetrics(){
   const val=(k)=>diagnostics[k];
   $('#metricFps').textContent=val('frameP95Ms')==null?'—':Number(val('frameP95Ms')).toFixed(1);
-  $('#metricCalls').textContent=val('drawCalls')??'—';$('#metricTriangles').textContent=val('triangles')??'—';$('#metricTextures').textContent=val('textures')??'—';
+  $('#metricCalls').textContent=val('drawCalls')??'—';$('#metricTriangles').textContent=val('triangles')??'—';$('#metricTextures').textContent=val('textures')??'—';$('#metricWorkshop').textContent=val('workshopProps')??'—';
 }
 $('#assembleBtn').addEventListener('click',()=>{prefs.family='assemble';previewState=initialAssemble();sync();});
 $('#planarBtn').addEventListener('click',()=>{prefs.family='planar';previewState=initialPlanar();sync();});
@@ -116,6 +118,8 @@ $('#autoBtn').addEventListener('click',()=>{prefs.renderer='auto';updateButtons(
 $('#fallbackBtn').addEventListener('click',()=>{prefs.renderer='fallback';++bootToken;openFallback('Manual fallback selected');});
 for(const el of document.querySelectorAll('[data-quality]'))el.addEventListener('click',()=>{prefs.quality=el.dataset.quality;sync();});
 $('#lightSelect').addEventListener('change',e=>{prefs.light=e.target.value;sync();});
+$('#workshopBtn').addEventListener('click',()=>{prefs.world='workshop';sync();});
+$('#boardOnlyBtn').addEventListener('click',()=>{prefs.world='board-only';sync();});
 $('#uvBtn').addEventListener('click',()=>{previewState={...previewState,uvProof:!previewState.uvProof};sync();});
 $('#resetAssemble').addEventListener('click',()=>{previewState=initialAssemble();sync();});
 $('#resetPlanar').addEventListener('click',()=>{previewState=initialPlanar();sync();});
@@ -123,7 +127,7 @@ $('#axisSelect').addEventListener('change',e=>{prefs.axis=e.target.value;sync();
 $('#indexSelect').addEventListener('change',e=>{prefs.index=Number(e.target.value);sync();});
 for(const [id,dir] of [['#minusBtn',-1],['#plusBtn',1]])$(id).addEventListener('click',()=>{previewState=planarShift(previewState,prefs.axis,prefs.index,dir);sync();});
 $('#copyBtn').addEventListener('click',async()=>{
-  const report={pass:8,mode:prefs.family,quality:prefs.quality,lighting:prefs.light,adapter:activeKind,...diagnostics,userAgent:navigator.userAgent,viewport:{width:$('#viewport').clientWidth,height:$('#viewport').clientHeight},timestamp:new Date().toISOString(),note:'Local renderer visual fixture; not gameplay or device certification'};
+  const report={pass:10,mode:prefs.family,quality:prefs.quality,lighting:prefs.light,world:prefs.world,adapter:activeKind,...diagnostics,userAgent:navigator.userAgent,viewport:{width:$('#viewport').clientWidth,height:$('#viewport').clientHeight},timestamp:new Date().toISOString(),note:'Local renderer visual fixture; not gameplay or device certification'};
   try{await navigator.clipboard.writeText(JSON.stringify(report,null,2));setStatus('Technical report copied to clipboard');}catch{setStatus('Clipboard unavailable. See developer console for report.');console.info(report);}
 });
 $('#contextLossBtn').addEventListener('click',()=>{
