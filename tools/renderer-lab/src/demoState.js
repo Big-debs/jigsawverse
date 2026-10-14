@@ -6,6 +6,7 @@ export const KINDS = Object.freeze(['sun', 'river', 'seed', 'ember', 'indigo', '
 export const KIND_COLORS = Object.freeze(['#efc169', '#22799a', '#2d7758', '#b95a43', '#6252a0', '#e7bc86']);
 // Coordinates agree with the Pass 06 Y-up / XZ-plane contract.
 export const cellPosition = (row, col, count) => ({ x: col + 0.5 - count / 2, z: row + 0.5 - count / 2 });
+export const tileTransition = (moved, previous, next) => !moved ? 'none' : previous?.demoMoves !== next.demoMoves ? 'animate' : 'snap';
 
 export function initialAssemble() {
   return {
