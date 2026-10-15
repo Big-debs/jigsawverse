@@ -68,10 +68,11 @@ test('version, shape, origin and family gates reject incompatible frames',()=>{
   assert.throws(()=>validateProjection({...frame,version:2}),/version mismatch/);
   assert.throws(()=>validateProjection({...frame,origin:'planar-local'}),/invalid Assemble origin/);
   assert.throws(()=>validateProjection({...frame,board:{...frame.board,cols:6}}),/cell count mismatch/);
-  assert.throws(()=>validateProjection({...frame,family:'planar'}),/Planar requires 6x6/);
+  const {rack,...noRack}=frame;
+  assert.throws(()=>validateProjection({...noRack,family:'planar',origin:'planar-local'}),/Planar requires 6x6/);
 });
 test('frozen server viewer frame is a detached snapshot',()=>{
-  const input={...makeFrame(),origin:'server-viewer'};
+  const input=JSON.parse(JSON.stringify({...makeFrame(),origin:'server-viewer'}));
   const stable=acceptServerViewerProjection(input);
   input.board.cells[1]={renderToken:'viz_modified12'};
   assert.equal(stable.board.cells[1].renderToken,'viz_000000005');
