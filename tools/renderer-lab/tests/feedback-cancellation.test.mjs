@@ -76,3 +76,12 @@ test('reset and mode/renderer switches may call cancellation repeatedly', () => 
     assert.equal(frames.size,0);
   });
 });
+
+test('idle cancellation does not announce a preview that never started', () => {
+  withAnimationHarness(() => {
+    const node = { textContent: '' };
+    const feedback = new FeedbackController(node);
+    feedback.cancelPreview();
+    assert.equal(node.textContent, 'Sound off · visual feedback available');
+  });
+});
