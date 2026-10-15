@@ -52,11 +52,12 @@ export class FeedbackController {
     }catch{this.enabled=false;this.label('Audio unsupported · visual feedback active');}
   }
   cancelPreview() {
+    const wasPlaying=this.raf!==0;
     this.sequenceId++;
     if(this.raf)cancelAnimationFrame(this.raf);
     this.raf=0;
-    // Keep the live accessibility message consistent with the stopped sequence.
-    this.label('Preview stopped · no game changes');
+    // Only announce an interruption when a storyboard was actually playing.
+    if(wasPlaying)this.label('Preview stopped · no game changes');
   }
   playPreview() {
     this.cancelPreview();
