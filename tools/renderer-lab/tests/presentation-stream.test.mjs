@@ -45,6 +45,7 @@ test('new session and stale frame require explicit reset',()=>{
   assert.equal(s.pushFrame(planar(1)).status,'stale-frame');
   const other=projectPlanarEngineBoard(Array.from({length:36},(_,i)=>({id:i,kind:'sun'})),{sessionId:'other-room',revision:0,tokenOf});
   assert.equal(s.pushFrame(other).status,'new-session-requires-reset');
+  assert.equal(s.pushFrame({...planar(3),origin:'server-viewer'}).status,'new-session-requires-reset');
   s.reset();
   assert.equal(s.pushFrame(other).status,'applied-frame');
 });
