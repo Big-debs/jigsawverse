@@ -55,6 +55,8 @@ export class FeedbackController {
     this.sequenceId++;
     if(this.raf)cancelAnimationFrame(this.raf);
     this.raf=0;
+    // Keep the live accessibility message consistent with the stopped sequence.
+    this.label('Preview stopped · no game changes');
   }
   playPreview() {
     this.cancelPreview();
