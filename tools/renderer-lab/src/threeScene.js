@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MOTION_TYPES, motionDuration } from './motionContract.js';
 import { createWorkshopScene } from './worldScene.js';
 import { calculateViewportFit } from './mobileLayout.js';
 import { cellPosition, KIND_COLORS, KINDS, tileTransition } from './demoState.js';
@@ -55,7 +56,7 @@ function glyphGeometry(kind) {
 export class AtlasThreeRenderer {
   constructor(container, onAction, onMetrics, onContextLost) {
     this.container=container;this.onAction=onAction;this.onMetrics=onMetrics;this.onContextLost=onContextLost;
-    this.disposed=false;this.models={};this.boardGeometries=new Set();this.pieceGeometries=new Set();this.ownedTextures=new Set();this.materials=new Set();this.qualityMaterials=new Set();this.qualityTextures=new Set();this.clickMaterial=null;this.workshop=null;this.frameTimes=[];this.tiles=new Map();this.pickables=[];
+    this.disposed=false;this.models={};this.boardGeometries=new Set();this.pieceGeometries=new Set();this.ownedTextures=new Set();this.materials=new Set();this.qualityMaterials=new Set();this.qualityTextures=new Set();this.clickMaterial=null;this.workshop=null;this.selectionPulse=null;this.frameTimes=[];this.tiles=new Map();this.pickables=[];
     this.canvas=document.createElement('canvas');this.canvas.className='three-canvas';this.canvas.setAttribute('aria-label','Interactive 3D visual reference. Accessibility controls are available in the side panel.');
     this.renderer=new THREE.WebGLRenderer({canvas:this.canvas,alpha:true,antialias:true,powerPreference:'low-power',preserveDrawingBuffer:false});
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1;
@@ -218,7 +219,7 @@ export class AtlasThreeRenderer {
     while(this.pieceRoot.children.length)this.pieceRoot.remove(this.pieceRoot.children[0]);
     // UV/selection meshes are regenerated as small fixtures; geometry and material reuse is intentional.
     this.pickables=this.pickables.filter(x=>x.userData.pick?.type==='place');
-    this.tiles=new Map();this.tweens=[];
+    this.tiles=new Map();this.tweens=[];this.selectionPulse=null;
     if(this.mode==='assemble'){
       const board=this.state.uvProof?Array.from({length:25},(_,i)=>i):this.state.board;
       board.forEach((id,idx)=>{if(id==null)return;const p=cellPosition(Math.floor(idx/5),idx%5,5);this.insertTile(id,null,id,p,priorPositions,previous);});
@@ -243,6 +244,15 @@ export class AtlasThreeRenderer {
       const distance=start.distanceTo(goal),wrap=this.mode==='planar'&&distance>1.5;
       this.tweens.push({piece,start:start.clone(),goal,begin:performance.now(),duration:wrap?320:210,wrap});
     }else if(transition==='snap')piece.position.copy(goal);
+  }
+
+  playCue(cue) {
+    if(!cue||this.disposed)return;
+    if(cue.type===MOTION_TYPES.SELECT){
+      const piece=this.tiles.get(cue.pieceId);
+      if(!piece)return;
+      this.selectionPulse={piece,started:performance.now(),duration:motionDuration(cue.type,window.matchMedia('(prefers-reduced-motion: reduce)').matches)};
+    }
   }
 
   pick(e) {
@@ -285,6 +295,16 @@ export class AtlasThreeRenderer {
         } else {t.piece.position.copy(t.start).lerp(t.goal,eased);t.piece.position.y=Math.sin(Math.PI*u)*.17;}
         if(u>=1)t.piece.position.copy(t.goal);return u<1;
       });
+    }
+    if(this.selectionPulse){
+      const pulse=this.selectionPulse;
+      if(!this.tiles.has(this.state.selected)||this.tiles.get(this.state.selected)!==pulse.piece){this.selectionPulse=null;}
+      else{
+        const progress=pulse.duration===0?1:Math.min(1,(time-pulse.started)/pulse.duration);
+        // Lift cue only. No correctness, scoring or target mapping information.
+        pulse.piece.position.y=Math.sin(Math.PI*progress)*.13;
+        if(progress>=1){pulse.piece.position.y=0;this.selectionPulse=null;}
+      }
     }
     this.renderer.render(this.scene,this.camera);
     if(this.onMetrics&&(!this.lastReport||time-this.lastReport>1100)){
