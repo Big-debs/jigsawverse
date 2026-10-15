@@ -1,6 +1,6 @@
 # Living Atlas — Pass 11: Mobile Readability and Visual Integration
 
-**Status:** Isolated laboratory changes committed; current-branch WebGL and device acceptance **OPEN**.
+**Status:** Current-branch desktop WebGL2 validation is in progress. A 320px horizontal-overflow defect and physical-device acceptance remain **OPEN**.
 
 **Scope:** Jigsawverse Assemble and Jigsawverse Planar, inside the same Atlas Workshop. Standalone Planar-Cube excluded.
 
@@ -15,8 +15,20 @@
 ## Tests
 
 - **Pass 11 pure-contract tests:** 4/4 passed in Node 22 staging environment.
+- A clean install from the committed lockfile reported zero vulnerabilities. All **19 tests**, JavaScript syntax checks and the Vite 8.3.4 production build passed.
+- Real Chromium WebGL2 checks exercised 390x844, 320x568, 844x390 and 1280x800 viewport overrides. The mobile action panel moved beneath the stage, Planar interaction state survived resize and WebGL2/Canvas2D switching retained one canvas.
+- Visible mobile game controls measured 48 CSS px high. Planar glyph diagnostics reported 30.3px at 390x844, 25.5px at 320x568, 20.6px at 844x390 and 47.3px at 1280x800.
+- The 320x568 check exposed horizontal document overflow: the existing 320px body minimum exceeds the 305px client area after the desktop browser scrollbar is reserved. This must be corrected and retested.
 - GitHub source changes have been confined to `tools/renderer-lab`; nothing in the root app, rules, Supabase, multiplayer or CAESAR telemetry was modified.
-- This turn could not obtain a current-branch clean npm install/build, Three.js browser screenshot or physical-phone performance run. Existing Pass 10 desktop WebGL and iPhone 13 reports do not automatically validate these new CSS/camera changes.
+- Existing Pass 10 desktop WebGL and iPhone 13 reports do not automatically validate these new CSS/camera changes. Pass 11 physical-phone performance and readability remain untested.
+
+## Submitted browser-session samples
+
+| Timestamp | Platform / browser | Family / presentation | Viewport | Renderer sample |
+| --- | --- | --- | --- | --- |
+| 2026-10-15T00:10:06.067Z | Windows 10 x64 / Chrome 153.0.0.0 | Assemble; High; Golden Hour; Workshop | 862x546 | WebGL2 / Three.js; 16.9ms frame p95; 174 draw calls; 1,850 triangles; 14 textures; 28 Workshop props |
+
+The submitted report is a browser-session sample, not physical-device certification. Assemble has no Planar glyph value by design.
 
 ## Required validation before merge
 
