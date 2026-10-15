@@ -115,6 +115,7 @@ function onAction(action){
 function sync(){updateButtons();if(active)active.setState(previewState,prefs);}
 function disposeActive(){if(active){active.dispose();active=null;}activeKind='none';}
 function openFallback(reason){
+  feedback.cancelPreview();
   disposeActive();active=new FallbackRenderer($('#renderSurface'),onAction);activeKind='2d';
   diagnostics={renderer:'Canvas2D',frameP95Ms:null,drawCalls:null,triangles:null,textures:null};
   $('#rendererBadge').textContent='2D FALLBACK';setStatus(reason||'Playable presentation fallback');sync();refreshMetrics();
@@ -143,7 +144,7 @@ function refreshMetrics(){
 }
 $('#assembleBtn').addEventListener('click',()=>{feedback.cancelPreview();prefs.family='assemble';previewState=initialAssemble();sync();});
 $('#planarBtn').addEventListener('click',()=>{feedback.cancelPreview();prefs.family='planar';previewState=initialPlanar();sync();});
-$('#autoBtn').addEventListener('click',()=>{prefs.renderer='auto';updateButtons();void boot();});
+$('#autoBtn').addEventListener('click',()=>{feedback.cancelPreview();prefs.renderer='auto';updateButtons();void boot();});
 $('#fallbackBtn').addEventListener('click',()=>{feedback.cancelPreview();prefs.renderer='fallback';++bootToken;openFallback('Manual fallback selected');});
 for(const el of document.querySelectorAll('[data-quality]'))el.addEventListener('click',()=>{prefs.quality=el.dataset.quality;sync();});
 $('#lightSelect').addEventListener('change',e=>{prefs.light=e.target.value;sync();});
