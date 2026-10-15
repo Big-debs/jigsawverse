@@ -1,6 +1,6 @@
 # Living Atlas — Pass 11: Mobile Readability and Visual Integration
 
-**Status:** Current-branch desktop WebGL2 validation is in progress. A 320px horizontal-overflow defect and physical-device acceptance remain **OPEN**.
+**Status:** Current-branch clean build and 320x568 WebGL2/Canvas2D retest passed. Physical-device and gameplay-accessibility acceptance remain **OPEN**.
 
 **Scope:** Jigsawverse Assemble and Jigsawverse Planar, inside the same Atlas Workshop. Standalone Planar-Cube excluded.
 
@@ -18,7 +18,7 @@
 - A clean install from the committed lockfile reported zero vulnerabilities. All **19 tests**, JavaScript syntax checks and the Vite 8.3.4 production build passed.
 - Real Chromium WebGL2 checks exercised 390x844, 320x568, 844x390 and 1280x800 viewport overrides. The mobile action panel moved beneath the stage, Planar interaction state survived resize and WebGL2/Canvas2D switching retained one canvas.
 - Visible mobile game controls measured 48 CSS px high. Planar glyph diagnostics reported 30.3px at 390x844, 25.5px at 320x568, 20.6px at 844x390 and 47.3px at 1280x800.
-- The 320x568 check exposed horizontal document overflow: the existing 320px body minimum exceeds the 305px client area after the desktop browser scrollbar is reserved. This must be corrected and retested.
+- After removing the fixed body minimum, a clean 320x568 retest measured a 305px client width and 305px document scroll width: no horizontal overflow. Assemble and Planar retained a 300px-high stage, 48px mobile controls and one canvas through WebGL2 -> Canvas2D -> WebGL2 switching.
 - GitHub source changes have been confined to `tools/renderer-lab`; nothing in the root app, rules, Supabase, multiplayer or CAESAR telemetry was modified.
 - Existing Pass 10 desktop WebGL and iPhone 13 reports do not automatically validate these new CSS/camera changes. Pass 11 physical-phone performance and readability remain untested.
 
