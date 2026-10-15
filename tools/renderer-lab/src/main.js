@@ -1,4 +1,6 @@
 import { FallbackRenderer } from './fallback.js';
+import { cueForTransition } from './motionContract.js';
+import { FeedbackController } from './feedbackController.js';
 import { initialAssemble, initialPlanar, assemblePlace, planarShift } from './demoState.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -13,7 +15,7 @@ let diagnostics = { renderer: 'initializing', frameP95Ms: null, drawCalls: null,
 $('#app').innerHTML = `
 <main class="shell">
   <header class="top">
-    <div><div class="eyebrow">Jigsawverse · Concept engineering</div><div class="brand">The Living Atlas</div><div class="subbrand">ATLAS WORKSHOP · RENDERER LAB / 11</div></div>
+    <div><div class="eyebrow">Jigsawverse · Concept engineering</div><div class="brand">The Living Atlas</div><div class="subbrand">ATLAS WORKSHOP · RENDERER LAB / 12</div></div>
     <div class="top-copy">Real GLB geometry, UV and material experiments for <strong>Assemble</strong> and <strong>Planar</strong>. Isolated from production gameplay, scoring, realtime rooms and CAESAR telemetry.</div>
   </header>
   <div class="page-grid">
@@ -24,6 +26,7 @@ $('#app').innerHTML = `
         <span class="hint-overlay" id="stageTip">Tap a rack tile, then an empty cell. This is a local demo only.</span>
       </div>
       <div class="stage-foot"><span id="stageStatus" role="status">Preparing renderer…</span><span id="stageCount">0 demo interactions</span></div>
+      <div class="feedback-row"><span role="status" aria-live="polite" id="feedbackStatus">Sound off · visual feedback available</span><button type="button" class="control" id="soundToggle" aria-pressed="false">Sound: Off</button></div>
       <div class="mobile-action-host" id="mobileActionHost"></div>
     </section>
     <aside class="side" aria-label="Laboratory controls">
@@ -44,7 +47,7 @@ $('#app').innerHTML = `
       <div class="seg"><button class="control" id="uvBtn" type="button" aria-pressed="false">UV corner proof</button><button class="control" id="resetAssemble" type="button">Reset preview</button></div></div>
       <div id="planarControls" hidden><p class="muted">Choose a line and shift it one cell. Wrapping is demonstrated, but matches, scoring and cascades remain the real game's responsibility.</p>
       <div class="line-controls"><select id="axisSelect" class="select" aria-label="Line direction"><option value="row">Row</option><option value="column">Column</option></select><select id="indexSelect" class="select" aria-label="Line number"></select></div>
-      <div class="seg" style="margin-top:8px"><button class="control" id="minusBtn" type="button">← / ↑ Shift −1</button><button class="control" id="plusBtn" type="button">→ / ↓ Shift +1</button></div><button class="control" style="width:100%;margin-top:8px" id="resetPlanar" type="button">Reset lattice</button></div>
+      <div class="seg" style="margin-top:8px"><button class="control" id="minusBtn" type="button">← / ↑ Shift −1</button><button class="control" id="plusBtn" type="button">→ / ↓ Shift +1</button></div><button class="control" style="width:100%;margin-top:8px" id="resetPlanar" type="button">Reset lattice</button><button class="control" style="width:100%;margin-top:8px" id="previewCascade" type="button">Preview clear → drop → refill (illustration only)</button></div>
       <p class="note">No validity checks, matching, scoring, timer authority or multiplayer synchronization are implemented in this laboratory.</p></section>
       <section class="panel"><div class="panel-title">Renderer diagnostics</div><div class="metrics">
         <div class="metric"><div class="metric-value" id="metricFps">—</div><div class="metric-key">Sampled frame p95 (ms)</div></div>
@@ -90,12 +93,24 @@ function updateButtons(){
   $('#contextLossBtn').disabled=activeKind!=='3d';
   $('#stageCount').textContent=`${previewState.demoMoves} demo interaction${previewState.demoMoves===1?'':'s'}`;
 }
+const feedback=new FeedbackController($('#feedbackStatus'));
+$('#soundToggle').addEventListener('click',()=>{
+  const enabled=!feedback.enabled;feedback.setSound(enabled);
+  $('#soundToggle').setAttribute('aria-pressed',String(enabled));
+  $('#soundToggle').textContent=enabled?'Sound: On':'Sound: Off';
+});
+function emitCue(previous,action){
+  const cue=cueForTransition(previous,previewState,action);
+  feedback.play(cue);
+  active?.playCue?.(cue);
+}
 function onAction(action){
+  const previous=previewState;
   if(prefs.family==='assemble'){
     if(action.type==='select' && previewState.rack.includes(action.pieceId))previewState={...previewState,selected:action.pieceId};
     if(action.type==='place')previewState=assemblePlace(previewState,action.cell);
   }
-  sync();
+  sync();emitCue(previous,action);
 }
 function sync(){updateButtons();if(active)active.setState(previewState,prefs);}
 function disposeActive(){if(active){active.dispose();active=null;}activeKind='none';}
@@ -135,13 +150,14 @@ $('#lightSelect').addEventListener('change',e=>{prefs.light=e.target.value;sync(
 $('#workshopBtn').addEventListener('click',()=>{prefs.world='workshop';sync();});
 $('#boardOnlyBtn').addEventListener('click',()=>{prefs.world='board-only';sync();});
 $('#uvBtn').addEventListener('click',()=>{previewState={...previewState,uvProof:!previewState.uvProof};sync();});
-$('#resetAssemble').addEventListener('click',()=>{previewState=initialAssemble();sync();});
-$('#resetPlanar').addEventListener('click',()=>{previewState=initialPlanar();sync();});
+$('#resetAssemble').addEventListener('click',()=>{feedback.cancelPreview();previewState=initialAssemble();sync();});
+$('#resetPlanar').addEventListener('click',()=>{feedback.cancelPreview();previewState=initialPlanar();sync();});
 $('#axisSelect').addEventListener('change',e=>{prefs.axis=e.target.value;sync();});
 $('#indexSelect').addEventListener('change',e=>{prefs.index=Number(e.target.value);sync();});
-for(const [id,dir] of [['#minusBtn',-1],['#plusBtn',1]])$(id).addEventListener('click',()=>{previewState=planarShift(previewState,prefs.axis,prefs.index,dir);sync();});
+for(const [id,dir] of [['#minusBtn',-1],['#plusBtn',1]])$(id).addEventListener('click',()=>{const before=previewState;previewState=planarShift(previewState,prefs.axis,prefs.index,dir);sync();emitCue(before,{type:'shift',axis:prefs.axis,index:prefs.index,direction:dir});});
+$('#previewCascade').addEventListener('click',()=>feedback.playPreview());
 $('#copyBtn').addEventListener('click',async()=>{
-  const report={pass:11,mode:prefs.family,quality:prefs.quality,lighting:prefs.light,world:prefs.world,adapter:activeKind,...diagnostics,userAgent:navigator.userAgent,viewport:{width:$('#viewport').clientWidth,height:$('#viewport').clientHeight},timestamp:new Date().toISOString(),note:'Local renderer visual fixture; not gameplay or device certification'};
+  const report={pass:12,mode:prefs.family,quality:prefs.quality,lighting:prefs.light,world:prefs.world,adapter:activeKind,...diagnostics,userAgent:navigator.userAgent,viewport:{width:$('#viewport').clientWidth,height:$('#viewport').clientHeight},timestamp:new Date().toISOString(),note:'Local renderer visual fixture; not gameplay or device certification'};
   try{await navigator.clipboard.writeText(JSON.stringify(report,null,2));setStatus('Technical report copied to clipboard');}catch{setStatus('Clipboard unavailable. See developer console for report.');console.info(report);}
 });
 $('#contextLossBtn').addEventListener('click',()=>{
