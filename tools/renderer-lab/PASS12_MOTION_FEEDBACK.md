@@ -1,6 +1,6 @@
 # Living Atlas — Pass 12: Gameplay Motion and Feedback Laboratory
 
-**Status:** Experimental preview implementation, not production gameplay. Both Assemble and Jigsawverse Planar included; standalone Planar-Cube excluded.
+**Status:** Clean branch build and focused 320x568 browser validation passed. Experimental preview only; physical-device and production acceptance remain open. Both Assemble and Jigsawverse Planar included; standalone Planar-Cube excluded.
 
 ## Implemented
 
@@ -22,9 +22,11 @@
 
 ## Test record
 
-- Five isolated Node contract checks for this pass were executed against the same motion logic with representative fixture state and **passed**. This is not a clean full GitHub branch test run.
-- Full lab `npm ci && npm test && npm run build` has **not** been completed in the current tool environment because registry access was unavailable.
-- Three.js browser motion and optional audio have **not** been verified on a device in this pass.
+- A clean install from the committed lockfile installed 16 packages and reported zero vulnerabilities. All **28 tests**, JavaScript syntax checks and the Vite 8.3.4 production build passed.
+- At exactly 320x568, the latest branch measured a 305px client width and 305px document scroll width, so the inherited horizontal-overflow defect is fixed. WebGL2 rendered both families with one canvas; Planar reported a 24.3px glyph estimate, keeping the narrow-screen readability review open.
+- Resetting an active Planar storyboard changed the live region to `Preview stopped · no game changes`; it remained unchanged after the old sequence would have completed. Selecting Three.js Auto during a second active storyboard produced the same stable cancellation message, restarted WebGL2 and retained one canvas.
+- WebGL2 -> Canvas2D -> WebGL2 switching was also retested at 320x568 without horizontal overflow or a duplicate canvas.
+- Physical Android/iOS motion, optional-audio behavior, battery, thermal and accessibility acceptance remain open.
 
 ## Codex verification steps
 
