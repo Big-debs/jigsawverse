@@ -27,8 +27,9 @@
 | Timestamp | Platform / browser | Family / presentation | Viewport | Renderer sample |
 | --- | --- | --- | --- | --- |
 | 2026-10-15T00:10:06.067Z | Windows 10 x64 / Chrome 153.0.0.0 | Assemble; High; Golden Hour; Workshop | 862x546 | WebGL2 / Three.js; 16.9ms frame p95; 174 draw calls; 1,850 triangles; 14 textures; 28 Workshop props |
+| 2026-10-15T00:13:28.383Z | Reported Pixel 10 / Android 16 / Chrome 153.0.0.0 | Planar; High; Golden Hour; Workshop | 378x366 | WebGL2 / Three.js; 17.1ms frame p95; 188 draw calls; 2,224 triangles; 15 textures; 28 Workshop props; 31.4px glyphs |
 
-The submitted report is a browser-session sample, not physical-device certification. Assemble has no Planar glyph value by design.
+The submitted reports are browser-session samples, not physical-device certification. Assemble has no Planar glyph value by design. The Android user agent does not distinguish physical hardware from browser emulation, and the submitted report did not include duration, battery, heat, stutter or touch observations. Its 31.4px Planar glyph estimate is below the proposed 32px review threshold and therefore keeps the readability review open.
 
 ## Required validation before merge
 
