@@ -100,7 +100,7 @@ export class ViewerPresentationStream {
   pushFrame(incoming) {
     const safe=freezeProjection(incoming);
     if(this.frame) {
-      if(safe.sessionId!==this.frame.sessionId||safe.family!==this.frame.family) return {status:'new-session-requires-reset'};
+      if(safe.sessionId!==this.frame.sessionId||safe.family!==this.frame.family||safe.origin!==this.frame.origin) return {status:'new-session-requires-reset'};
       if(safe.revision<=this.frame.revision)return {status:'stale-frame'};
     }
     const skipped=this.frame && safe.revision>this.frame.revision+1;
