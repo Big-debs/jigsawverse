@@ -141,10 +141,10 @@ function refreshMetrics(){
   $('#metricFps').textContent=val('frameP95Ms')==null?'—':Number(val('frameP95Ms')).toFixed(1);
   $('#metricCalls').textContent=val('drawCalls')??'—';$('#metricTriangles').textContent=val('triangles')??'—';$('#metricTextures').textContent=val('textures')??'—';$('#metricWorkshop').textContent=val('workshopProps')??'—';$('#metricGlyph').textContent=val('glyphPx')??'—';
 }
-$('#assembleBtn').addEventListener('click',()=>{prefs.family='assemble';previewState=initialAssemble();sync();});
-$('#planarBtn').addEventListener('click',()=>{prefs.family='planar';previewState=initialPlanar();sync();});
+$('#assembleBtn').addEventListener('click',()=>{feedback.cancelPreview();prefs.family='assemble';previewState=initialAssemble();sync();});
+$('#planarBtn').addEventListener('click',()=>{feedback.cancelPreview();prefs.family='planar';previewState=initialPlanar();sync();});
 $('#autoBtn').addEventListener('click',()=>{prefs.renderer='auto';updateButtons();void boot();});
-$('#fallbackBtn').addEventListener('click',()=>{prefs.renderer='fallback';++bootToken;openFallback('Manual fallback selected');});
+$('#fallbackBtn').addEventListener('click',()=>{feedback.cancelPreview();prefs.renderer='fallback';++bootToken;openFallback('Manual fallback selected');});
 for(const el of document.querySelectorAll('[data-quality]'))el.addEventListener('click',()=>{prefs.quality=el.dataset.quality;sync();});
 $('#lightSelect').addEventListener('change',e=>{prefs.light=e.target.value;sync();});
 $('#workshopBtn').addEventListener('click',()=>{prefs.world='workshop';sync();});
