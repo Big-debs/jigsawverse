@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { GameLogic } from '../../../src/lib/gameLogic.js';
 import {
   PROJECTION_PROTOCOL,validateProjection,freezeProjection,
   projectSoloAssembleState,projectPlanarEngineBoard,acceptServerViewerProjection,
@@ -29,6 +30,28 @@ test('solo Assemble adapter strips all private engine and opponent fields',()=>{
   assert.equal(state.grid[1].correctPosition,23,'engine input remains unchanged');
   assert.equal(Object.isFrozen(frame.board.cells[1]),true);
   assert.equal(Object.isFrozen(frame.rack),true);
+});
+
+test('actual Assemble GameLogic state cannot expose hidden score through projection',()=>{
+  const pieces=Array.from({length:25},(_,id)=>({
+    id,correctPosition:id,imageData:`secret-image-${id}`,
+  }));
+  const engine=new GameLogic({rows:5,cols:5,totalPieces:25},pieces,'SINGLE_PLAYER');
+  engine.initializeSinglePlayer();
+  engine.scores.playerA.score=987654;
+  engine.revealedScores.playerA.score=123;
+  engine.pendingCheck={correct:true,score:987654};
+  const raw=engine.getGameState();
+  assert.match(JSON.stringify(raw),/987654/,'fixture contains the private score');
+  const frame=projectSoloAssembleState(raw,{
+    sessionId:'actual-solo',revision:4,rows:5,cols:5,tokenOf:tokenize,
+  });
+  const serialized=JSON.stringify(frame);
+  for(const forbidden of ['987654','scores','score','revealedScores','pendingCheck','correctPosition','imageData','playerBRack']){
+    assert.equal(serialized.includes(forbidden),false,forbidden);
+  }
+  assert.equal(frame.rack.length,10);
+  assert.equal(frame.board.cells.every(cell=>cell===null),true);
 });
 
 test('raw multiplayer getGameState cannot use solo shortcut',()=>{

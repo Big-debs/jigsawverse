@@ -104,8 +104,10 @@ export class ViewerPresentationStream {
       if(safe.revision<=this.frame.revision)return {status:'stale-frame'};
     }
     const skipped=this.frame && safe.revision>this.frame.revision+1;
-    this.frame=safe;
     this.onFrame(safe);
+    // Commit only after the renderer accepts the frame. A context-loss or
+    // renderer exception must leave the same authoritative update retryable.
+    this.frame=safe;
     return {status:skipped?'frame-gap-resynced':'applied-frame'};
   }
   pushEvent(incoming) {
@@ -115,8 +117,10 @@ export class ViewerPresentationStream {
     if(incoming.sequence<=this.lastSequence)return {status:'stale-event'};
     if(incoming.sequence!==this.lastSequence+1)return {status:'event-gap'};
     const event=freezeEvent(incoming);
-    this.lastSequence=event.sequence;
     this.onEvent(event);
+    // Keep sequence advancement transactional with successful presentation.
+    // Otherwise a renderer failure would turn a required retry into stale data.
+    this.lastSequence=event.sequence;
     return {status:'applied-event'};
   }
   getFrame(){return this.frame;}

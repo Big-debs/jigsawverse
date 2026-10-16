@@ -89,3 +89,32 @@ test('diagnostic replay produces deterministic immutable event and frame history
   assert.equal(Object.isFrozen(a.frames[0].board),true);
   assert.equal(Object.isFrozen(a.events[0]),true);
 });
+test('a frame remains retryable when renderer presentation fails',()=>{
+  let attempts=0;
+  const accepted=[];
+  const s=new ViewerPresentationStream({onFrame:f=>{
+    attempts++;
+    if(attempts===1)throw new Error('simulated context loss');
+    accepted.push(f);
+  }});
+  const f=planar(1);
+  assert.throws(()=>s.pushFrame(f),/simulated context loss/);
+  assert.equal(s.getFrame(),null);
+  assert.equal(s.pushFrame(f).status,'applied-frame');
+  assert.equal(accepted.length,1);
+});
+test('an event remains retryable when renderer presentation fails',()=>{
+  let attempts=0;
+  const accepted=[];
+  const s=new ViewerPresentationStream({onEvent:e=>{
+    attempts++;
+    if(attempts===1)throw new Error('simulated context loss');
+    accepted.push(e);
+  }});
+  s.pushFrame(planar(1));
+  const e=event(1,1,VISUAL_EVENT_KINDS.PLANAR_SHIFT,{axis:'row',index:0,direction:1});
+  assert.throws(()=>s.pushEvent(e),/simulated context loss/);
+  assert.equal(s.lastSequence,0);
+  assert.equal(s.pushEvent(e).status,'applied-event');
+  assert.equal(accepted.length,1);
+});

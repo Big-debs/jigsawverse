@@ -57,17 +57,28 @@ Future ranked multiplayer
 - Maintain the existing Phaser/Canvas2D fallback and feature flags. Rollout must be independently reversible without changing scoring.
 - The laboratory's 5x5 Assemble board/rack and 6x6 Planar layout do **not** imply production Assemble supports only 5x5: production currently supports other grid dimensions and may use rectangular boards. Unsupported lab layouts should fail loudly rather than render an incorrectly cropped puzzle.
 
+## Codex parity and recovery review (October 16, 2026)
+
+The review was repeated from a clean locked install on Pass 13 commit `b83af0d` and against the actual PR #50 Planar engine commit `0c86a9b`.
+
+- A deterministic real-engine turn (seed `1`, row `4`, shift `-1`) produced three cascades. The engine cleared `3 + 3 + 3` cells, generated `2 + 3 + 3` drop movements and `3 + 3 + 3` refills, and awarded `300 + 600 + 900` points internally. Ten ordered `shift/clear/drop/refill` visual events and three projected frames replayed to the exact final engine token/kind board. No score, gain, correctness, answer or solution field entered the serialized renderer data.
+- The projector was run against an actual `GameLogic.getGameState()` with distinct hidden and revealed score sentinels. The projected Assemble frame contained neither value and no score key, opponent rack, pending correctness, answer position or private image data.
+- Renderer callback failure is now transactional: a frame or event is committed only after its presentation callback succeeds. A simulated context-loss exception leaves the same update retryable instead of incorrectly marking it stale.
+- At a real browser viewport of `320 x 568`, forced WebGL context loss moved both Assemble and Planar to the safe Canvas2D fallback. Re-selecting Three.js restored one WebGL canvas, the ready status, and no horizontal overflow.
+- `npm ci`, all **53** tests, and `npm run build` passed. Vite reports only the existing advisory that the Three.js chunk is larger than 500 kB.
+
+Pass 13 remains an isolated contract: the actual PR #50 engine is not merged into this branch and these projections are not yet wired into the browser laboratory. The browser check therefore proves renderer fallback/recovery, while the cross-branch engine harness proves event and final-board parity. Production integration must preserve both boundaries.
+
 ## Tests and acceptance
 
 Focused Pass 13 contract tests cover privacy redaction, multiplayer rejection, board variants, object immutability, six Planar kinds, invalid raw fields, ordered events, duplicate/revision/gap handling, deterministic replay, and solo-only image-asset gating. The JavaScript runtime checks were executed directly against the actual committed source.
 
-**Still required before the next phase:**
+**Still required before production integration:**
 
-1. Clean `npm ci && npm test && npm run build` on the complete Pass 13 branch.
-2. In a network-enabled browser, exercise a complete solo Assemble turn using a **trusted local** image registry. No pre-reveal score may appear in renderer events, DOM data attributes, debug logs or network payloads.
-3. Once PR #50 is reconciled and reviewed, run the real Planar shift, wrapping match, cascade clear, drop and refill events through this visual adapter. Confirm exact board/token parity and replay after interruption.
-4. Define server-authenticated, per-viewer secret-safe multiplayer projections, version and retry compatibility, and leak-focused integration tests before multiplayer renderer integration.
-5. Actual mobile Android/iOS performance/accessibility, screen reading, reduced-motion, sound and glyph distinguishability QA.
-6. Phase 0 owner approval, cultural provenance, safeguarding/child data review, benchmarking and rollback sign-off.
+1. Reconcile/merge PR #50, then wire its accepted Planar cascade stages into the application-level presentation stream without duplicating rule logic in the renderer.
+2. Exercise a complete production solo Assemble turn using a **trusted local** image registry. Inspect DOM data, debug logs and network payloads in addition to the tested projection object; no pre-reveal score may appear.
+3. Define server-authenticated, per-viewer secret-safe multiplayer projections, version and retry compatibility, and leak-focused integration tests before multiplayer renderer integration.
+4. Actual mobile Android/iOS performance/accessibility, screen reading, reduced-motion, sound and glyph distinguishability QA.
+5. Phase 0 owner approval, cultural provenance, safeguarding/child data review, benchmarking and rollback sign-off.
 
 **No production source files, database policies, ranked scoring, multiplayer protocols or live deployment are changed.**
