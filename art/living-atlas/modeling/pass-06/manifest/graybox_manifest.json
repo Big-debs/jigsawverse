@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "status": "concept-graybox-not-production",
+  "world": "living-atlas",
+  "theme": "atlas-workshop",
+  "coordinateSystem": "glTF Y-up, gameplay XZ",
+  "cellUnit": 1.0,
+  "tile": {
+    "width": 0.92,
+    "depth": 0.92,
+    "height": 0.1,
+    "bevel": 0.035,
+    "pivot": "bottom-center"
+  },
+  "assembleFixture": {
+    "rows": 5,
+    "cols": 5,
+    "rackCapacity": 10,
+    "rackLayout": [
+      2,
+      5
+    ]
+  },
+  "planarFixture": {
+    "rows": 6,
+    "cols": 6,
+    "kinds": [
+      "sun",
+      "river",
+      "seed",
+      "ember",
+      "indigo",
+      "clay"
+    ],
+    "rails": [
+      "north",
+      "south",
+      "east",
+      "west"
+    ],
+    "commands": "select full row/column; shift one cell"
+  },
+  "assetIds": [
+    "tile.beveled",
+    "board.frame.edge",
+    "board.frame.corner",
+    "board.frame.base",
+    "board.frame.separator",
+    "assemble.rack.tray",
+    "planar.rail.channel"
+  ],
+  "notes": [
+    "No code or gameplay changes",
+    "All geometry for design verification only",
+    "Assemble tile faces intentionally lack UV image material",
+    "Planar kind visualization uses temporary colors; glyphs are separate SVG concept",
+    "No LOD decimation or texture compression implemented"
+  ]
+}

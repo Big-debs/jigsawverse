@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 1,
+  "status": "procedural-lookdev-not-production",
+  "assetWorld": "living-atlas",
+  "theme": "atlas-workshop",
+  "textureAtlas": {
+    "width": 512,
+    "height": 512,
+    "tileWidth": 256,
+    "gutterPx": 8,
+    "colorSpace": {
+      "baseColor": "sRGB",
+      "normal": "linear",
+      "orm": "linear"
+    },
+    "metallicRoughnessChannels": {
+      "G": "roughness",
+      "B": "metallic"
+    },
+    "ormChannels": {
+      "R": "AO (do not assume standard glTF uses ORM in one sampler)",
+      "G": "roughness",
+      "B": "metallic"
+    },
+    "files": {
+      "baseColor": "atlas_basecolor.png",
+      "normal": "atlas_normal.png",
+      "ORM": "atlas_orm.png"
+    },
+    "uvConvention": "atlasRects recorded top-left; GLTF mesh UV must be transformed/verified in renderer against these before use"
+  },
+  "materials": [
+    {
+      "id": "atlas.limestone",
+      "displayName": "Warm limestone",
+      "base": "#AA9983",
+      "roughness": 0.88,
+      "metallic": 0,
+      "normalScale": 0.35,
+      "kind": "stone",
+      "role": "structural frame and courtyard",
+      "atlasRectTopLeftPx": [
+        8,
+        8,
+        240,
+        240
+      ],
+      "atlasRectTopLeftNormalized": [
+        0.015625,
+        0.015625,
+        0.46875,
+        0.46875
+      ]
+    },
+    {
+      "id": "atlas.brass",
+      "displayName": "Satin brass",
+      "base": "#B38C4B",
+      "roughness": 0.42,
+      "metallic": 0.87,
+      "normalScale": 0.12,
+      "kind": "brass",
+      "role": "small trims, not puzzle faces",
+      "atlasRectTopLeftPx": [
+        264,
+        8,
+        240,
+        240
+      ],
+      "atlasRectTopLeftNormalized": [
+        0.515625,
+        0.015625,
+        0.46875,
+        0.46875
+      ]
+    },
+    {
+      "id": "atlas.clay",
+      "displayName": "Terracotta clay",
+      "base": "#BD7658",
+      "roughness": 0.79,
+      "metallic": 0,
+      "normalScale": 0.42,
+      "kind": "clay",
+      "role": "structural inlays and walls",
+      "atlasRectTopLeftPx": [
+        8,
+        264,
+        240,
+        240
+      ],
+      "atlasRectTopLeftNormalized": [
+        0.015625,
+        0.515625,
+        0.46875,
+        0.46875
+      ]
+    },
+    {
+      "id": "atlas.indigo-stone",
+      "displayName": "Indigo stone",
+      "base": "#29264D",
+      "roughness": 0.69,
+      "metallic": 0.02,
+      "normalScale": 0.25,
+      "kind": "indigo",
+      "role": "board surround, non-image tile sides",
+      "atlasRectTopLeftPx": [
+        264,
+        264,
+        240,
+        240
+      ],
+      "atlasRectTopLeftNormalized": [
+        0.515625,
+        0.515625,
+        0.46875,
+        0.46875
+      ]
+    },
+    {
+      "id": "atlas.ivory",
+      "displayName": "Ivory",
+      "base": "#FFF5DF",
+      "metallic": 0,
+      "roughness": 0.88,
+      "texture": null,
+      "role": "UI/text only; not a reflective puzzle face"
+    },
+    {
+      "id": "atlas.energy",
+      "displayName": "Energy accent",
+      "base": "#4BDAC5",
+      "metallic": 0,
+      "roughness": 1,
+      "emissive": "#4BDAC5",
+      "intensity": 0.35,
+      "texture": null,
+      "role": "inert rails and selection focus only; no hidden correctness cues"
+    }
+  ],
+  "gameplayImageFace": {
+    "toneMapped": false,
+    "lighting": "unlit",
+    "baseColorFactor": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "colorSpace": "sRGB",
+    "alphaMode": "OPAQUE",
+    "effects": "none",
+    "notes": "Puzzle image must not inherit tinted atlas roughness/metal/normal; image cropping handled by separate UV shader and transparent answer policy."
+  },
+  "qualityProfiles": {
+    "low": {
+      "textures": [
+        "flat colors",
+        "glyph atlas"
+      ],
+      "normalMaps": false,
+      "environment": "poster or graybox",
+      "postprocessing": false,
+      "shadows": false,
+      "maxParticles": 16
+    },
+    "medium": {
+      "textures": [
+        "basecolor",
+        "ORM",
+        "glyph atlas"
+      ],
+      "normalMaps": false,
+      "postprocessing": false,
+      "shadows": false,
+      "maxParticles": 48
+    },
+    "high": {
+      "textures": [
+        "basecolor",
+        "ORM",
+        "normal",
+        "glyph atlas"
+      ],
+      "normalMaps": true,
+      "postprocessing": "optional restrained effect after measured profiling",
+      "shadows": "one directional 1024 max, only if within targets",
+      "maxParticles": 96
+    }
+  },
+  "planarKinds": [
+    {
+      "id": "sun",
+      "tileColor": "#B87C26",
+      "glyphColor": "#141F35",
+      "foregroundBackgroundContrast": 4.66,
+      "glyphCellAtlasTopLeft": [
+        0,
+        0
+      ]
+    },
+    {
+      "id": "river",
+      "tileColor": "#176B82",
+      "glyphColor": "#FFF5DF",
+      "foregroundBackgroundContrast": 5.6,
+      "glyphCellAtlasTopLeft": [
+        1,
+        0
+      ]
+    },
+    {
+      "id": "seed",
+      "tileColor": "#25694D",
+      "glyphColor": "#FFF5DF",
+      "foregroundBackgroundContrast": 6.04,
+      "glyphCellAtlasTopLeft": [
+        2,
+        0
+      ]
+    },
+    {
+      "id": "ember",
+      "tileColor": "#A83B30",
+      "glyphColor": "#FFF5DF",
+      "foregroundBackgroundContrast": 5.81,
+      "glyphCellAtlasTopLeft": [
+        0,
+        1
+      ]
+    },
+    {
+      "id": "indigo",
+      "tileColor": "#44397D",
+      "glyphColor": "#FFF5DF",
+      "foregroundBackgroundContrast": 9.11,
+      "glyphCellAtlasTopLeft": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": "clay",
+      "tileColor": "#D6C1A3",
+      "glyphColor": "#182B3B",
+      "foregroundBackgroundContrast": 8.3,
+      "glyphCellAtlasTopLeft": [
+        2,
+        1
+      ]
+    }
+  ]
+}
