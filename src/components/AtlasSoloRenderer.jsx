@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { AtlasThreeRenderer } from '../../tools/renderer-lab/src/threeScene.js';
 
+const atlasOptions = (imageUrl) => ({
+  family: 'assemble', quality: 'low', light: 'daylight-gameplay',
+  world: 'board-only', imageUrl,
+});
+
 /**
  * Explicitly opt-in, solo-only 5x5 proof. No engine instance, opponent data,
  * scoring, correctness or secret fields may be passed through this component.
@@ -15,11 +20,6 @@ export default function AtlasSoloRenderer({
   const viewRef = useRef(view);
   actionRef.current = { onSelectFragment, onPlaceCell, onFallback };
   viewRef.current = view;
-
-  const options = {
-    family: 'assemble', quality: 'low', light: 'daylight-gameplay',
-    world: 'board-only', imageUrl,
-  };
 
   useEffect(() => {
     const host = hostRef.current;
@@ -39,10 +39,11 @@ export default function AtlasSoloRenderer({
         if (action.type === 'place') actionRef.current.onPlaceCell?.(action.cell);
       }, null, fail);
       rendererRef.current = renderer;
-      void renderer.mount(viewRef.current, {
-        family: 'assemble', quality: 'low', light: 'daylight-gameplay',
-        world: 'board-only', imageUrl,
-      }).catch(fail);
+      void renderer.mount(viewRef.current, atlasOptions(imageUrl))
+        // State may change while GLBs and textures are loading. Re-apply the
+        // latest projection so a slow mount cannot resurrect an old board.
+        .then(() => { if (!stopped) renderer.setState(viewRef.current, atlasOptions(imageUrl)); })
+        .catch(fail);
     } catch { fail(); }
 
     return () => {
@@ -55,7 +56,7 @@ export default function AtlasSoloRenderer({
 
   useEffect(() => {
     if (rendererRef.current?.models?.assemble) {
-      rendererRef.current.setState(view, options);
+      rendererRef.current.setState(view, atlasOptions(imageUrl));
     }
   }, [view, imageUrl]);
 

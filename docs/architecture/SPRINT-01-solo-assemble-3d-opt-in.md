@@ -2,6 +2,20 @@
 
 **Status:** Draft feature-flagged implementation for controlled QA. Not approved for production activation.
 
+## Codex review and gameplay verification (October 23, 2026)
+
+Review was completed against PR #59 commit `933bbb3` and the fixes recorded on this branch.
+
+- A clean root install, **11 application tests**, **53 renderer-contract tests**, ESLint, and the Vite production build pass. The root test command now sends Vitest and Node-native renderer suites to their intended runners instead of misreporting the renderer suites as empty Vitest failures.
+- The real browser flow used an uploaded 5×5 UV reference image with the QA flag enabled. Atlas 3D loaded the actual image, kept one canvas, and preserved state when switching to Classic 2D and back.
+- Real canvas input selected rack pieces and submitted placements through `GameLogic.placePiece()`. The rack refilled, five deliberately wrong placements remained neutral before the checkpoint, and at 20% the engine returned all five pieces and revealed the score (`-10`) only at the milestone.
+- A hint deducted its real engine cost and automatically returned to Classic 2D with one canvas. A separate two-second QA timer fixture reached the genuine **Time's Up** results screen; the production timer was restored after the check.
+- The end-to-end engine test continues from wrong-placement recovery through all 25 correct placements and completion while asserting that every projected frame omits scores, `correctPosition`, move history, and the opponent rack.
+- At `320 × 568`, Atlas 3D rendered one canvas with no horizontal overflow. Forced WebGL context loss in the branch's renderer laboratory moved to Canvas2D and recovered to exactly one WebGL canvas.
+- Browser console inspection found no projection tokens, score results, answer positions, opponent rack, or move history. Production dependency audit reports **0 vulnerabilities** after pinning the patched transitive `ws` release; remaining audit notices are development-tool dependencies.
+
+Review fixes include slow-mount state resynchronization, offline solo creation without requiring Supabase anonymous auth, the test-runner split, the real-engine completion regression test, and the patched WebSocket override.
+
 ## Scope and limitations
 
 - The existing **Assemble solo GameLogic** remains the sole authority for placement, scoring, time, milestone reveal, and hints. There are no gameplay or multiplayer algorithm changes.
@@ -31,8 +45,8 @@ Only the parent knows the engine piece objects, validation outcomes, hidden scor
 
 ## Critical QA acceptance and open issues
 
-1. Clean install, root Vitest test suite, lint and Vite build on the PR branch. This environment lacks GitHub/npm connectivity for executing the full installed dependency tree; five focused bridge behavior checks passed using the committed source.
-2. Validate **actual 5×5 solo play** on browser/mobile: selecting a genuine rack tile, placement, rack refill, a wrong placement, 20% score checkpoint, expiry/completion, and seamless return to Classic 2D without state loss.
+1. Clean install, complete application/renderer test suites, lint and Vite build are verified. Keep them required in CI.
+2. Desktop browser **actual 5×5 solo play** is verified for genuine rack selection, placement, rack refill, wrong-placement recovery, 20% score checkpoint, expiry, engine completion, hint fallback, and return to Classic 2D without state loss. Physical mobile play remains required.
 3. Check the selected game image loads with CORS permissions and that image slicing matches the source image, especially non-square image aspect ratios. Report fallback on blocked/expired URLs or WebGL context loss. Never use a demo sample as live image.
 4. Test hints: an active hint is intentionally routed back to Phaser because the 3D renderer does not yet present every existing hint shape.
 5. Test settings parity, accessible controls, keyboard navigation, reduced motion and 320px responsive layout. Any requirement not supported by 3D should retain the Phaser path.

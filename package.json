@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src",
-    "test": "vitest run"
+    "test": "vitest run src && node --test tools/renderer-lab/tests/*.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
@@ -31,6 +31,9 @@
     "tailwindcss": "^3.4.1",
     "vite": "^5.1.0",
     "vitest": "^1.6.0"
+  },
+  "overrides": {
+    "ws": "8.22.0"
   },
   "engines": {
     "node": ">=18.0.0"

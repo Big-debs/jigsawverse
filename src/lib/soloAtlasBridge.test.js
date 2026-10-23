@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSoloAtlasSession, isSoloAtlasEnabled } from './soloAtlasBridge.js';
+import { GameLogic } from './gameLogic.js';
 
 const pieces=()=>Array.from({length:25},(_,id)=>({
   id, correctPosition:(id*7)%25, imageData:'private-image-data'
@@ -57,5 +58,40 @@ describe('solo Atlas integration gates',()=>{
     const session=createSoloAtlasSession(list,dims,()=> 'abc123xyz');
     const state={...game(list),mode:'NEXUS'};
     expect(()=>session.project(state,null,0)).toThrow(/multiplayer/i);
+  });
+  it('tracks a real engine through refill, wrong milestone recovery, and completion',()=>{
+    const list=pieces();
+    const engine=new GameLogic(dims,list,'SINGLE_PLAYER');
+    engine.initializeSinglePlayer();
+    const session=createSoloAtlasSession(list,dims,()=> 'engine123');
+    let revision=0;
+
+    for(let attempt=0;attempt<5;attempt++){
+      const piece=engine.playerARack[0];
+      const wrongCell=engine.grid.findIndex((cell,index)=>cell===null&&index!==piece.correctPosition);
+      expect(engine.placePiece('playerA',piece.id,wrongCell).success).toBe(true);
+      const milestone=engine.reconcileSinglePlayerMilestone();
+      expect(milestone.reached).toBe(attempt===4);
+      const view=session.project(engine.getGameState(),null,++revision);
+      expect(JSON.stringify(view)).not.toMatch(/score|correctPosition|moveHistory|playerBRack/);
+    }
+
+    expect(engine.grid.every(cell=>cell===null)).toBe(true);
+    expect(engine.playerARack).toHaveLength(10);
+    expect(engine.scores.playerA.totalPlacements).toBe(5);
+
+    let safety=0;
+    while(!engine.isGameComplete()&&safety++<30){
+      const piece=engine.playerARack[0];
+      expect(piece).toBeTruthy();
+      expect(engine.placePiece('playerA',piece.id,piece.correctPosition).success).toBe(true);
+      engine.reconcileSinglePlayerMilestone();
+    }
+
+    expect(engine.isGameComplete()).toBe(true);
+    const finalView=session.project(engine.getGameState(),null,++revision);
+    expect(finalView.board.every(fragment=>Number.isSafeInteger(fragment))).toBe(true);
+    expect(finalView.rack).toEqual([]);
+    expect(JSON.stringify(finalView)).not.toMatch(/score|correctPosition|moveHistory|playerBRack/);
   });
 });
