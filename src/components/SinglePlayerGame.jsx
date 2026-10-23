@@ -4,8 +4,10 @@ import { GameLogic } from '../lib/gameLogic';
 import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
 import HintsPanel from './HintsPanel';
 import GameSettingsPanel from './GameSettingsPanel';
+import { createSoloAtlasSession, isSoloAtlasEnabled } from '../lib/soloAtlasBridge';
 
 const PhaserGame = lazy(() => import('./PhaserGame'));
+const AtlasSoloRenderer = lazy(() => import('./AtlasSoloRenderer'));
 
 const SinglePlayerGame = ({
   imageUrl,
@@ -41,10 +43,23 @@ const SinglePlayerGame = ({
   const [selectedPiece, setSelectedPiece] = useState(null);
   const [gameSettings, setGameSettings] = useState(settings);
   const [activeHint, setActiveHint] = useState(null);
+  const [preferAtlas3D, setPreferAtlas3D] = useState(false);
+  const [atlas3DFailed, setAtlas3DFailed] = useState(false);
+  const atlasSession = useState(() => isSoloAtlasEnabled() && typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? createSoloAtlasSession(pieces, puzzleDimensions, () => crypto.randomUUID()) : null)[0];
 
   const timerRef = useRef(null);
   const feedbackTimeoutRef = useRef(null);
   const lastScoreRef = useRef(null);
+  // Only the sanitized solo visual model is sent to the experimental renderer.
+  // Never give the renderer gameLogic or the raw gameState.
+  let atlasView = null;
+  if (atlasSession && !atlas3DFailed) {
+    try { atlasView = atlasSession.project(gameState, selectedPiece, totalPlacements); }
+    catch { atlasView = null; }
+  }
+  const canUseAtlas = Boolean(atlasSession && atlasView && typeof imageUrl === 'string' && imageUrl.trim());
+  const useAtlas = Boolean(preferAtlas3D && !atlas3DFailed && canUseAtlas && !activeHint);
 
   // Timer countdown
   useEffect(() => {
@@ -129,6 +144,8 @@ const SinglePlayerGame = ({
   }, [gameLogic, gameStatus]);
 
   const handleUseHint = (hintType) => {
+    // Hint highlighting is implemented by Phaser, not by this 3D preview.
+    setPreferAtlas3D(false);
     const result = gameLogic.useHint('playerA', hintType);
     if (result.success) {
       setScore(gameLogic.scores.playerA.score);
@@ -303,14 +320,36 @@ const SinglePlayerGame = ({
           )}
         </div>
 
-        {/* Center - Phaser Game Canvas */}
+        {/* Center - single active renderer; Phaser remains the safe default */}
         <div className="lg:col-span-9">
+          {canUseAtlas && !atlas3DFailed && (
+            <div className="flex gap-2 mb-3 text-sm" role="group" aria-label="Solo puzzle renderer">
+              <button type="button" onClick={() => setPreferAtlas3D(false)} aria-pressed={!useAtlas}
+                className="px-3 py-2 rounded-lg border border-slate-600 text-white">Classic 2D</button>
+              <button type="button" onClick={() => setPreferAtlas3D(true)} aria-pressed={useAtlas}
+                className="px-3 py-2 rounded-lg border border-amber-600 text-amber-100">Try Atlas 3D</button>
+            </div>
+          )}
           <Suspense fallback={
             <div className="w-full bg-slate-900/50 rounded-xl flex items-center justify-center" style={{ minHeight: '400px' }}>
               <div className="text-purple-300 text-lg">Loading game...</div>
             </div>
           }>
-            <PhaserGame
+            {useAtlas ? (
+              <AtlasSoloRenderer
+                view={atlasView}
+                imageUrl={imageUrl}
+                onSelectFragment={(fragment) => {
+                  if (!atlasSession.hasFragmentInRack(gameState, fragment)) return;
+                  const piece = atlasSession.pieceForFragment(fragment);
+                  if (piece) setSelectedPiece(piece);
+                }}
+                onPlaceCell={(cell) => {
+                  if (selectedPiece != null) handlePiecePlacement(selectedPiece.id, cell);
+                }}
+                onFallback={() => { setAtlas3DFailed(true); setPreferAtlas3D(false); }}
+              />
+            ) : <PhaserGame
               gameState={gameState}
               gridDimensions={puzzleDimensions}
               ghostImage={imageUrl}
@@ -323,7 +362,7 @@ const SinglePlayerGame = ({
               onPiecePlaced={(pieceId, gridIndex) => {
                 handlePiecePlacement(pieceId, gridIndex);
               }}
-            />
+            />}
           </Suspense>
         </div>
 

@@ -639,7 +639,7 @@ const CreateGameScreen = ({ user, multiplayerRef, connectionManager, selectedMod
   };
 
   const handleCreate = async () => {
-    if (!imageFile || !user) return;
+    if (!imageFile || (!user && isModeMultiplayer(selectedMode))) return;
 
     setCreating(true);
     setProgress('Initializing...');
