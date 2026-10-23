@@ -26,3 +26,11 @@
 @media(orientation:landscape) and (max-height:480px) and (max-width:950px){
   .stage{height:58vh;min-height:240px}
 }
+
+/* Pass 12: neutral, non-scoring feedback row. No attention-grabbing reward flashes. */
+.feedback-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#152438;border-top:1px solid #364b5d;padding:9px 14px;color:#cbdcd8;font-size:12px}
+.feedback-row [role=status]{min-width:0;overflow-wrap:anywhere}
+.feedback-row .control{min-height:44px;min-width:100px;white-space:nowrap}
+#previewCascade{background:#254658;border-color:#668c8d}
+@media(max-width:420px){.feedback-row{padding:8px 10px;font-size:11px}.feedback-row .control{min-width:94px;min-height:48px}}
+@media(prefers-reduced-motion:reduce){.control,.feedback-row{transition:none!important;animation:none!important}}
