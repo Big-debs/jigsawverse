@@ -58,7 +58,8 @@ const SinglePlayerGame = ({
     try { atlasView = atlasSession.project(gameState, selectedPiece, totalPlacements); }
     catch { atlasView = null; }
   }
-  const useAtlas = Boolean(preferAtlas3D && !atlas3DFailed && atlasView && !activeHint);
+  const canUseAtlas = Boolean(atlasSession && atlasView && typeof imageUrl === 'string' && imageUrl.trim());
+  const useAtlas = Boolean(preferAtlas3D && !atlas3DFailed && canUseAtlas && !activeHint);
 
   // Timer countdown
   useEffect(() => {
@@ -321,7 +322,7 @@ const SinglePlayerGame = ({
 
         {/* Center - single active renderer; Phaser remains the safe default */}
         <div className="lg:col-span-9">
-          {atlasSession && !atlas3DFailed && (
+          {canUseAtlas && !atlas3DFailed && (
             <div className="flex gap-2 mb-3 text-sm" role="group" aria-label="Solo puzzle renderer">
               <button type="button" onClick={() => setPreferAtlas3D(false)} aria-pressed={!useAtlas}
                 className="px-3 py-2 rounded-lg border border-slate-600 text-white">Classic 2D</button>
