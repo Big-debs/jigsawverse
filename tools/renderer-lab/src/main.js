@@ -88,7 +88,7 @@ function openFallback(reason){
   diagnostics={renderer:'Canvas2D',frameP95Ms:null,drawCalls:null,triangles:null,textures:null};
   $('#rendererBadge').textContent='2D FALLBACK';setStatus(reason||'Playable presentation fallback');sync();refreshMetrics();
 }
-function hasWebGL2(){try{const c=document.createElement('canvas');const gl=c.getContext('webgl2',{antialias:false});return Boolean(gl);}catch{return false;}}
+function hasWebGL2(){try{const c=document.createElement('canvas');const gl=c.getContext('webgl2',{antialias:false});const supported=Boolean(gl);gl?.getExtension('WEBGL_lose_context')?.loseContext();return supported;}catch{return false;}}
 async function boot(){
   const token=++bootToken;
   if(prefs.renderer==='fallback'){openFallback('2D fallback selected');return;}
@@ -98,10 +98,10 @@ async function boot(){
     const { AtlasThreeRenderer }=await import('./threeScene.js');if(token!==bootToken)return;
     disposeActive();
     const scene=new AtlasThreeRenderer($('#renderSurface'),onAction,(values)=>{diagnostics={renderer:'WebGL2 / Three.js',...values};refreshMetrics();},()=>{
-      if(token===bootToken && prefs.renderer==='auto'){prefs.renderer='fallback';updateButtons();openFallback('WebGL context lost · safe fallback');}
+      if(token===bootToken && prefs.renderer==='auto'){++bootToken;prefs.renderer='fallback';updateButtons();openFallback('WebGL context lost · safe fallback');}
     });
     active=scene;activeKind='3d';await scene.mount(previewState,prefs);
-    if(token!==bootToken){scene.dispose();return;}
+    if(token!==bootToken||active!==scene){scene.dispose();return;}
     $('#rendererBadge').textContent='THREE.JS · WEBGL2';setStatus('Real GLBs loaded · visual fixture ready');sync();
   }catch(err){if(token!==bootToken)return;console.warn('3D renderer unavailable',err);openFallback(`3D unavailable: ${String(err.message||err).slice(0,80)}. 2D fallback active.`);}
 }

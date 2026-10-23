@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { cellPosition, KIND_COLORS, KINDS } from './demoState.js';
+import { cellPosition, KIND_COLORS, KINDS, tileTransition } from './demoState.js';
+import { imageUvRect, glyphUvRect } from './uvContract.js';
 
 // All runtime references point at the SINGLE versioned art library in the repository.
 // Vite emits fingerprinted URLs; no duplicate 3D source art lives in this experiment.
@@ -15,7 +16,6 @@ import ormUrl from '../../../art/living-atlas/lookdev/pass-07/textures/atlas_orm
 import lightingPresets from '../../../art/living-atlas/lookdev/pass-07/lighting/lighting-presets.json';
 import materialPresets from '../../../art/living-atlas/lookdev/pass-07/textures/material-presets.json';
 
-const KIND_INDICES = Object.fromEntries(KINDS.map((k,i)=>[k,i]));
 const PIXEL_INSET = 8;
 const QUALITY_DPR = {low:1,medium:1.5,high:2};
 const PALETTE_IDS = ['atlas.limestone','atlas.brass','atlas.clay','atlas.indigo-stone'];
@@ -37,15 +37,15 @@ function atlasTexture(image, quadrant, colorSpace=THREE.NoColorSpace) {
 }
 function imageFragmentGeometry(n,row,col,size=.914) {
   const g=new THREE.PlaneGeometry(size,size);g.rotateX(-Math.PI/2);
-  const uv=g.getAttribute('uv');const u0=col/n,u1=(col+1)/n,v0=1-(row+1)/n,v1=1-row/n;
+  const uv=g.getAttribute('uv');const {u0,u1,v0,v1}=imageUvRect(n,row,col);
   // PlaneGeometry original order: top-left, top-right, bottom-left, bottom-right.
   uv.setXY(0,u0,v1);uv.setXY(1,u1,v1);uv.setXY(2,u0,v0);uv.setXY(3,u1,v0);
   uv.needsUpdate=true;
   return g;
 }
 function glyphGeometry(kind) {
-  const idx=KIND_INDICES[kind];const g=new THREE.PlaneGeometry(.72,.72);g.rotateX(-Math.PI/2);
-  const u0=(idx%3)/3,u1=u0+1/3,v1=1-Math.floor(idx/3)/2,v0=v1-1/2;
+  const g=new THREE.PlaneGeometry(.72,.72);g.rotateX(-Math.PI/2);
+  const {u0,u1,v0,v1}=glyphUvRect(kind);
   const uv=g.getAttribute('uv');uv.setXY(0,u0,v1);uv.setXY(1,u1,v1);uv.setXY(2,u0,v0);uv.setXY(3,u1,v0);uv.needsUpdate=true;
   return g;
 }
@@ -53,7 +53,7 @@ function glyphGeometry(kind) {
 export class AtlasThreeRenderer {
   constructor(container, onAction, onMetrics, onContextLost) {
     this.container=container;this.onAction=onAction;this.onMetrics=onMetrics;this.onContextLost=onContextLost;
-    this.disposed=false;this.models={};this.boardGeometries=new Set();this.pieceGeometries=new Set();this.ownedTextures=new Set();this.materials=new Set();this.qualityMaterials=new Set();this.qualityTextures=new Set();this.frameTimes=[];this.tiles=new Map();this.pickables=[];
+    this.disposed=false;this.models={};this.boardGeometries=new Set();this.pieceGeometries=new Set();this.ownedTextures=new Set();this.materials=new Set();this.qualityMaterials=new Set();this.qualityTextures=new Set();this.clickMaterial=null;this.frameTimes=[];this.tiles=new Map();this.pickables=[];
     this.canvas=document.createElement('canvas');this.canvas.className='three-canvas';this.canvas.setAttribute('aria-label','Interactive 3D visual reference. Accessibility controls are available in the side panel.');
     this.renderer=new THREE.WebGLRenderer({canvas:this.canvas,alpha:true,antialias:true,powerPreference:'low-power',preserveDrawingBuffer:false});
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1;
@@ -83,6 +83,12 @@ export class AtlasThreeRenderer {
     ]);
     if(this.disposed)return;
     this.models={assemble:assemble.scene,planar:planar.scene,tile:tile.scene};
+    const normalized=new Set();
+    for(const model of Object.values(this.models))model.traverse(obj=>{
+      if(obj.isMesh&&!obj.geometry.getAttribute('normal')&&!normalized.has(obj.geometry)){
+        obj.geometry.computeVertexNormals();normalized.add(obj.geometry);
+      }
+    });
     this.images={base,normal,orm};this.imageTexture=image;this.glyphTexture=glyph;
     for(const t of [image,glyph]){t.colorSpace=THREE.SRGBColorSpace;t.flipY=true;t.anisotropy=2;this.ownedTextures.add(t);}
     this.unlitImage=new THREE.MeshBasicMaterial({map:image,toneMapped:false,side:THREE.DoubleSide});this.materials.add(this.unlitImage);
@@ -118,7 +124,9 @@ export class AtlasThreeRenderer {
     this.key.color.set(preset.key.color);this.key.intensity=preset.key.intensity;
     this.key.position.set(...preset.key.direction);
     this.fill.color.set(preset.fill.color);this.fill.intensity=preset.fill.intensity;
-    this.renderer.shadowMap.enabled=options.quality==='high'&&preset.key.castShadow==='high-only';
+    const useShadows=options.quality==='high'&&preset.key.castShadow==='high-only';
+    this.renderer.shadowMap.enabled=useShadows;this.key.castShadow=useShadows;
+    if(useShadows){this.key.shadow.mapSize.set(1024,1024);this.key.shadow.camera.left=-6;this.key.shadow.camera.right=6;this.key.shadow.camera.top=6;this.key.shadow.camera.bottom=-6;}
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,QUALITY_DPR[options.quality]||1));
     this.scene.background=new THREE.Color(preset.id==='night-tournament-menu'?'#0e152c':preset.id==='golden-hour-menu'?'#3a2f3b':'#14283a');
     this.resize();
@@ -144,6 +152,7 @@ export class AtlasThreeRenderer {
 
   buildStatic() {
     this.clearGeneratedGeometries();
+    if(this.clickMaterial){this.clickMaterial.dispose();this.materials.delete(this.clickMaterial);this.clickMaterial=null;}
     while(this.sceneRoot.children.length)this.sceneRoot.remove(this.sceneRoot.children[0]);
     this.boardRoot=new THREE.Group();this.sceneRoot.add(this.boardRoot);
     const src=this.models[this.mode].clone(true);
@@ -166,7 +175,7 @@ export class AtlasThreeRenderer {
   }
 
   makeClickCells() {
-    const invisible=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});this.materials.add(invisible);
+    const invisible=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});this.materials.add(invisible);this.clickMaterial=invisible;
     for(let cell=0;cell<25;cell++){
       const row=Math.floor(cell/5),col=cell%5,point=cellPosition(row,col,5);
       const g=new THREE.PlaneGeometry(.98,.98);g.rotateX(-Math.PI/2);this.boardGeometries.add(g);
@@ -206,7 +215,7 @@ export class AtlasThreeRenderer {
     if(this.mode==='assemble'){
       const board=this.state.uvProof?Array.from({length:25},(_,i)=>i):this.state.board;
       board.forEach((id,idx)=>{if(id==null)return;const p=cellPosition(Math.floor(idx/5),idx%5,5);this.insertTile(id,null,id,p,priorPositions,previous);});
-      this.state.rack.forEach((id,idx)=>{
+      if(!this.state.uvProof)this.state.rack.forEach((id,idx)=>{
         const p={x:idx%5-2,z:3.5+Math.floor(idx/5)};this.insertTile(id,null,id,p,priorPositions,previous);
       });
     }else{
@@ -221,10 +230,12 @@ export class AtlasThreeRenderer {
     const start=old.get(id);
     piece.position.copy(start??goal);
     this.tiles.set(id,piece);this.pieceRoot.add(piece);
-    if(start&&start.distanceTo(goal)>.005&&previous?.demoMoves!==this.state.demoMoves){
+    const moved=Boolean(start&&start.distanceTo(goal)>.005);
+    const transition=tileTransition(moved,previous,this.state);
+    if(transition==='animate'){
       const distance=start.distanceTo(goal),wrap=this.mode==='planar'&&distance>1.5;
       this.tweens.push({piece,start:start.clone(),goal,begin:performance.now(),duration:wrap?320:210,wrap});
-    }
+    }else if(transition==='snap')piece.position.copy(goal);
   }
 
   pick(e) {

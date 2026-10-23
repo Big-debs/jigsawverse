@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialAssemble, initialPlanar, assemblePlace, planarShift, cellPosition, isAssembleReferenceComplete, KINDS } from '../src/demoState.js';
+import { initialAssemble, initialPlanar, assemblePlace, planarShift, cellPosition, isAssembleReferenceComplete, KINDS, tileTransition } from '../src/demoState.js';
 
 test('Pass 06 coordinates center correctly', () => {
   assert.deepEqual(cellPosition(0, 0, 5), { x: -2, z: -2 });
@@ -31,4 +31,10 @@ test('Planar deterministic 6x6 fixture with six kinds and stable IDs', () => {
   assert.equal(d.board[7].id, s.board[1].id);
   assert.equal(d.board[1].id, s.board[31].id);
   assert.equal(planarShift(s, 'row', -1, 1), s);
+});
+test('non-move visual changes snap stale tile coordinates to their new goals',()=>{
+  const before=initialAssemble();
+  assert.equal(tileTransition(true,before,{...before,uvProof:true}),'snap');
+  assert.equal(tileTransition(true,before,{...before,demoMoves:1}),'animate');
+  assert.equal(tileTransition(false,before,{...before,uvProof:true}),'none');
 });

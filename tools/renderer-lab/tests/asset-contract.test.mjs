@@ -38,6 +38,7 @@ test('lab is isolated from production gameplay and multiplayer imports',()=>{
   assert.doesNotMatch(source,/gameLogic|multiplayer|supabase|planarMatchEngine|MatchGame/);
   assert.match(source,/GLTFLoader/);
   assert.match(source,/WebGLRenderer/);
+  assert.match(source,/computeVertexNormals/);
 });
 test('renderer swaps preserve the status overlay outside the owned render surface',()=>{
   const source=readFileSync(join(root,'tools/renderer-lab/src/main.js'),'utf-8');
