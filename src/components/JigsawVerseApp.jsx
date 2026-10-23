@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
-import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Eye, Upload, Image as ImageIcon } from 'lucide-react';
+import { Users, Gamepad2, Trophy, LogOut, Play, UserPlus, RefreshCw, AlertCircle, Wifi, WifiOff, Eye, Upload, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import { authService } from '../services/auth.service';
 import { gameService } from '../services/game.service';
@@ -10,6 +10,7 @@ import MoveHistoryPanel from './MoveHistoryPanel';
 import HintsPanel from './HintsPanel';
 import SinglePlayerGame from './SinglePlayerGame';
 import ImageLibrary from './ImageLibrary';
+import PlanarMatchGame from './PlanarMatchGame';
 import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
 import { isModeMultiplayer } from '../lib/gameModes';
 
@@ -149,7 +150,8 @@ const ROUTES = {
   JOIN_GAME: 'join',
   GAMEPLAY: 'gameplay',
   GAME_OVER: 'gameover',
-  SINGLE_PLAYER_GAME: 'single_player_game'
+  SINGLE_PLAYER_GAME: 'single_player_game',
+  PLANAR_MATCH: 'planar_match'
 };
 
 // =====================================================
@@ -463,6 +465,10 @@ const JigsawVerseApp = () => {
           />
         )}
 
+        {currentRoute === ROUTES.PLANAR_MATCH && (
+          <PlanarMatchGame onExit={() => navigate(ROUTES.HOME)} />
+        )}
+
         {currentRoute === ROUTES.GAME_OVER && (
           <GameOverScreen
             winner={gameData?.winner}
@@ -484,7 +490,7 @@ const JigsawVerseApp = () => {
 
 const HomeScreen = ({ onNavigate, setIsHost, setSelectedMode }) => {
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       {/* Hero Section */}
       <div className="text-center mb-8 sm:mb-12">
         <h2 className="text-3xl sm:text-5xl font-bold text-white mb-3 sm:mb-4">
@@ -496,7 +502,7 @@ const HomeScreen = ({ onNavigate, setIsHost, setSelectedMode }) => {
       </div>
 
       {/* Action Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {/* Create Game Card */}
         <button
           onClick={() => {
@@ -560,6 +566,26 @@ const HomeScreen = ({ onNavigate, setIsHost, setSelectedMode }) => {
           </p>
           <div className="mt-3 sm:mt-4 flex items-center text-white font-medium text-sm sm:text-base">
             <span>Play Solo</span>
+            <svg className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </button>
+
+        {/* Planar Match Card */}
+        <button
+          onClick={() => onNavigate(ROUTES.PLANAR_MATCH)}
+          className="group bg-gradient-to-br from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 rounded-2xl p-6 sm:p-8 text-left transition-all transform hover:scale-[1.02] sm:hover:scale-105 shadow-2xl active:scale-[0.98]"
+        >
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-white/30 transition-colors">
+            <Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+          </div>
+          <h3 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">Planar Match</h3>
+          <p className="text-amber-50 text-sm sm:text-base">
+            Shift complete rows and columns to build matches and cascading chains
+          </p>
+          <div className="mt-3 sm:mt-4 flex items-center text-white font-medium text-sm sm:text-base">
+            <span>Play Prototype</span>
             <svg className="w-4 h-4 sm:w-5 sm:h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
