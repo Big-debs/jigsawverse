@@ -13,7 +13,7 @@ let diagnostics = { renderer: 'initializing', frameP95Ms: null, drawCalls: null,
 $('#app').innerHTML = `
 <main class="shell">
   <header class="top">
-    <div><div class="eyebrow">Jigsawverse · Concept engineering</div><div class="brand">The Living Atlas</div><div class="subbrand">ATLAS WORKSHOP · RENDERER LAB / 10</div></div>
+    <div><div class="eyebrow">Jigsawverse · Concept engineering</div><div class="brand">The Living Atlas</div><div class="subbrand">ATLAS WORKSHOP · RENDERER LAB / 11</div></div>
     <div class="top-copy">Real GLB geometry, UV and material experiments for <strong>Assemble</strong> and <strong>Planar</strong>. Isolated from production gameplay, scoring, realtime rooms and CAESAR telemetry.</div>
   </header>
   <div class="page-grid">
@@ -24,6 +24,7 @@ $('#app').innerHTML = `
         <span class="hint-overlay" id="stageTip">Tap a rack tile, then an empty cell. This is a local demo only.</span>
       </div>
       <div class="stage-foot"><span id="stageStatus" role="status">Preparing renderer…</span><span id="stageCount">0 demo interactions</span></div>
+      <div class="mobile-action-host" id="mobileActionHost"></div>
     </section>
     <aside class="side" aria-label="Laboratory controls">
       <section class="panel"><div class="panel-title">Choose a game family</div><div class="seg" role="group" aria-label="Game family">
@@ -38,7 +39,7 @@ $('#app').innerHTML = `
         <select id="lightSelect" class="select"><option value="daylight-gameplay">Daylight · Gameplay</option><option value="golden-hour-menu">Golden Hour · Preview</option><option value="night-tournament-menu">Tournament Night · Preview</option></select>
         <div class="label">Decorative 3D environment</div><div class="seg" role="group" aria-label="Decorative world"><button class="control active" id="workshopBtn" type="button" aria-pressed="true">Atlas Workshop</button><button class="control" id="boardOnlyBtn" type="button" aria-pressed="false">Board only</button></div><p class="small">Visual-only scene; the 2D fallback remains independent.</p>
       </section>
-      <section class="panel"><div class="panel-title">Technical interaction fixture</div>
+      <section class="panel" id="actionPanel"><div class="panel-title">Gameplay controls · visual fixture</div>
       <div id="assembleControls"><p class="muted">Select any tile in the ten-piece rack, then select an empty board cell. This tests semantic picking and animated placement, not correctness.</p>
       <div class="seg"><button class="control" id="uvBtn" type="button" aria-pressed="false">UV corner proof</button><button class="control" id="resetAssemble" type="button">Reset preview</button></div></div>
       <div id="planarControls" hidden><p class="muted">Choose a line and shift it one cell. Wrapping is demonstrated, but matches, scoring and cascades remain the real game's responsibility.</p>
@@ -49,7 +50,7 @@ $('#app').innerHTML = `
         <div class="metric"><div class="metric-value" id="metricFps">—</div><div class="metric-key">Sampled frame p95 (ms)</div></div>
         <div class="metric"><div class="metric-value" id="metricCalls">—</div><div class="metric-key">Draw calls</div></div>
         <div class="metric"><div class="metric-value" id="metricTriangles">—</div><div class="metric-key">Submitted triangles</div></div>
-        <div class="metric"><div class="metric-value" id="metricTextures">—</div><div class="metric-key">GPU textures (Three.js count)</div></div><div class="metric"><div class="metric-value" id="metricWorkshop">—</div><div class="metric-key">Visible workshop props</div></div>
+        <div class="metric"><div class="metric-value" id="metricTextures">—</div><div class="metric-key">GPU textures (Three.js count)</div></div><div class="metric"><div class="metric-value" id="metricWorkshop">—</div><div class="metric-key">Visible workshop props</div></div><div class="metric"><div class="metric-value" id="metricGlyph">—</div><div class="metric-key">Planar glyph size (CSS px)</div></div>
       </div><div class="seg" style="margin-top:12px"><button class="control" id="copyBtn" type="button">Copy technical report</button><button class="control" id="contextLossBtn" type="button" disabled>Test context loss</button></div>
       <p class="small">Measurements are browser-session samples only; they are not physical-device FPS certification.</p></section>
     </aside>
@@ -58,6 +59,19 @@ $('#app').innerHTML = `
   <p class="foot">Preview-only, with deterministic test fixtures. Image reconstruction and glyphs are illustrative; competitive Assemble continues to require authoritative server-side secrets and state handling before ranked release.</p>
 </main>`;
 
+// Narrow viewports prioritize playable controls immediately beneath the stage.
+const controlParent=$('#actionPanel').parentNode;
+const actionPanel=$('#actionPanel');
+function positionActionPanel(){
+  const mobile=window.matchMedia('(max-width: 720px)').matches;
+  const destination=mobile?$('#mobileActionHost'):controlParent;
+  if(mobile){destination.appendChild(actionPanel);} else if(actionPanel.parentNode!==controlParent){
+    controlParent.insertBefore(actionPanel,controlParent.querySelector('.panel:nth-child(2)'));
+  }
+  $('#mobileActionHost').hidden=!mobile;
+}
+positionActionPanel();
+window.matchMedia('(max-width: 720px)').addEventListener('change',positionActionPanel);
 for(let i=0;i<6;i++)$('#indexSelect').insertAdjacentHTML('beforeend',`<option value="${i}" ${i===2?'selected':''}>Line ${i+1}</option>`);
 function setStatus(value){$('#stageStatus').textContent=value;}
 function updateButtons(){
@@ -110,7 +124,7 @@ async function boot(){
 function refreshMetrics(){
   const val=(k)=>diagnostics[k];
   $('#metricFps').textContent=val('frameP95Ms')==null?'—':Number(val('frameP95Ms')).toFixed(1);
-  $('#metricCalls').textContent=val('drawCalls')??'—';$('#metricTriangles').textContent=val('triangles')??'—';$('#metricTextures').textContent=val('textures')??'—';$('#metricWorkshop').textContent=val('workshopProps')??'—';
+  $('#metricCalls').textContent=val('drawCalls')??'—';$('#metricTriangles').textContent=val('triangles')??'—';$('#metricTextures').textContent=val('textures')??'—';$('#metricWorkshop').textContent=val('workshopProps')??'—';$('#metricGlyph').textContent=val('glyphPx')??'—';
 }
 $('#assembleBtn').addEventListener('click',()=>{prefs.family='assemble';previewState=initialAssemble();sync();});
 $('#planarBtn').addEventListener('click',()=>{prefs.family='planar';previewState=initialPlanar();sync();});
@@ -127,7 +141,7 @@ $('#axisSelect').addEventListener('change',e=>{prefs.axis=e.target.value;sync();
 $('#indexSelect').addEventListener('change',e=>{prefs.index=Number(e.target.value);sync();});
 for(const [id,dir] of [['#minusBtn',-1],['#plusBtn',1]])$(id).addEventListener('click',()=>{previewState=planarShift(previewState,prefs.axis,prefs.index,dir);sync();});
 $('#copyBtn').addEventListener('click',async()=>{
-  const report={pass:10,mode:prefs.family,quality:prefs.quality,lighting:prefs.light,world:prefs.world,adapter:activeKind,...diagnostics,userAgent:navigator.userAgent,viewport:{width:$('#viewport').clientWidth,height:$('#viewport').clientHeight},timestamp:new Date().toISOString(),note:'Local renderer visual fixture; not gameplay or device certification'};
+  const report={pass:11,mode:prefs.family,quality:prefs.quality,lighting:prefs.light,world:prefs.world,adapter:activeKind,...diagnostics,userAgent:navigator.userAgent,viewport:{width:$('#viewport').clientWidth,height:$('#viewport').clientHeight},timestamp:new Date().toISOString(),note:'Local renderer visual fixture; not gameplay or device certification'};
   try{await navigator.clipboard.writeText(JSON.stringify(report,null,2));setStatus('Technical report copied to clipboard');}catch{setStatus('Clipboard unavailable. See developer console for report.');console.info(report);}
 });
 $('#contextLossBtn').addEventListener('click',()=>{

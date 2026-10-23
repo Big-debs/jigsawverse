@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createWorkshopScene } from './worldScene.js';
+import { calculateViewportFit } from './mobileLayout.js';
 import { cellPosition, KIND_COLORS, KINDS, tileTransition } from './demoState.js';
 import { imageUvRect, glyphUvRect } from './uvContract.js';
 
@@ -256,8 +257,9 @@ export class AtlasThreeRenderer {
   resize() {
     if(this.disposed||!this.renderer)return;
     const w=Math.max(1,this.container.clientWidth),h=Math.max(1,this.container.clientHeight),aspect=w/h;
-    const needW=this.mode==='planar'?8.4:6.8, needH=this.mode==='planar'?8.4:9.1;
-    let viewW=Math.max(needW,needH*aspect);let viewH=viewW/aspect;
+    const fit=calculateViewportFit(this.mode==='planar'?'planar':'assemble',w,h);
+    this.viewportFit=fit;
+    let viewW=fit.worldWidth,viewH=fit.worldHeight;
     this.camera.left=-viewW/2;this.camera.right=viewW/2;this.camera.top=viewH/2;this.camera.bottom=-viewH/2;
     this.camera.position.set(0,18,4.2);this.camera.lookAt(0,0,this.mode==='assemble'?1.17:0);
     this.camera.near=.1;this.camera.far=50;this.camera.updateProjectionMatrix();
@@ -287,7 +289,7 @@ export class AtlasThreeRenderer {
     this.renderer.render(this.scene,this.camera);
     if(this.onMetrics&&(!this.lastReport||time-this.lastReport>1100)){
       this.lastReport=time;
-      this.onMetrics({frameP95Ms:p95(this.frameTimes),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,textures:this.renderer.info.memory.textures,workshopProps:this.workshop?.group.visible?this.workshop.plan.props.length:0});
+      this.onMetrics({frameP95Ms:p95(this.frameTimes),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,textures:this.renderer.info.memory.textures,workshopProps:this.workshop?.group.visible?this.workshop.plan.props.length:0,glyphPx:this.viewportFit?.glyphPx??null});
     }
     this.raf=requestAnimationFrame(t=>this.animate(t));
   }
