@@ -1,11 +1,29 @@
-import { Eye, EyeOff, Grid3x3, Sparkles, History } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff, Grid3x3, Sparkles, History, Volume2, Gauge } from 'lucide-react';
+import { playGameSound, unlockGameAudio } from '../lib/audioManager';
 
 const GameSettingsPanel = ({ settings, onSettingsChange }) => {
-  const toggleSetting = (key) => {
+  const [audioStatus, setAudioStatus] = useState('');
+  const toggleSetting = async (key) => {
+    if (key === 'soundEnabled' && !settings.soundEnabled) {
+      await unlockGameAudio();
+      playGameSound('success', { ...settings, soundEnabled: true });
+    }
     onSettingsChange({
       ...settings,
       [key]: !settings[key]
     });
+  };
+
+  const testSound = async () => {
+    setAudioStatus('');
+    const unlocked = await unlockGameAudio();
+    if (!unlocked) {
+      setAudioStatus('Sound is still blocked. Check silent mode and tap again.');
+      return;
+    }
+    await playGameSound('success', { ...settings, soundEnabled: true });
+    setAudioStatus('Test sound played');
   };
 
   const settingOptions = [
@@ -32,6 +50,18 @@ const GameSettingsPanel = ({ settings, onSettingsChange }) => {
       label: 'Move History',
       description: 'Display move history panel',
       icon: History
+    },
+    {
+      key: 'soundEnabled',
+      label: 'Sound Effects',
+      description: 'Play responsive gameplay sounds',
+      icon: Volume2
+    },
+    {
+      key: 'reducedMotion',
+      label: 'Reduced Motion',
+      description: 'Use calmer, shorter gameplay effects',
+      icon: Gauge
     }
   ];
 
@@ -79,6 +109,40 @@ const GameSettingsPanel = ({ settings, onSettingsChange }) => {
             </button>
           );
         })}
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-slate-700">
+        <div className="flex items-center justify-between mb-2">
+          <label htmlFor="sound-volume" className="text-sm text-white">Sound volume</label>
+          <span className="text-xs text-purple-300">
+            {Math.round((settings.soundVolume ?? 0.7) * 100)}%
+          </span>
+        </div>
+        <input
+          id="sound-volume"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={settings.soundVolume ?? 0.7}
+          disabled={!settings.soundEnabled}
+          onChange={(event) => onSettingsChange({
+            ...settings,
+            soundVolume: Number(event.target.value)
+          })}
+          className="w-full disabled:opacity-40"
+        />
+        <button
+          type="button"
+          onClick={testSound}
+          className="mt-3 w-full py-2.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 font-medium flex items-center justify-center gap-2 touch-target"
+        >
+          <Volume2 className="w-4 h-4" />
+          Test sound
+        </button>
+        {audioStatus && (
+          <p className="mt-2 text-xs text-center text-purple-300" role="status">{audioStatus}</p>
+        )}
       </div>
     </div>
   );

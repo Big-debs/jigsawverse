@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playGameSound } from '../../lib/audioManager';
 
 /**
  * BoardScene — Single Phaser scene for the entire game view.
@@ -32,8 +33,16 @@ export class BoardScene extends Phaser.Scene {
         this.rackSignature = '';
         this.pendingTextureKeys = new Set();
         this.rackRenderQueued = false;
+        this.boardRenderQueued = false;
         this.selectedPieceId = null;
         this.hintCells = [];
+        this.hintPieceIds = new Set();
+        this.hintBadges = [];
+        this.hintTimeout = null;
+        this.activeHint = null;
+        this.lastGameplayEffectId = null;
+        this.animatedPlacements = new Set();
+        this.resizeTimer = null;
 
         // Render layers
         this.boardContainer = null;
@@ -47,6 +56,8 @@ export class BoardScene extends Phaser.Scene {
     init(data) {
         this.rows = data.gridDimensions?.rows || 5;
         this.cols = data.gridDimensions?.cols || 5;
+        this.rackColumns = this.cols;
+        this.rackCapacity = this.rackColumns * this.rackRows;
         this.isNexusMode = data.isNexusMode || false;
         this.myPlayer = data.myPlayer || 'playerA';
         this.settings = data.settings || {};
@@ -64,7 +75,12 @@ export class BoardScene extends Phaser.Scene {
         this.events.emit('create');
 
         this.scale.on('resize', () => {
-            this.rebuildAll();
+            if (this.resizeTimer) clearTimeout(this.resizeTimer);
+            this.resizeTimer = setTimeout(() => {
+                this.resizeTimer = null;
+                const nextCellSize = this.calculateCellSize(this.scale.width, this.scale.height);
+                if (nextCellSize !== this.cellSize) this.rebuildAll();
+            }, 180);
         });
     }
 
@@ -76,19 +92,11 @@ export class BoardScene extends Phaser.Scene {
 
         if (w < 10 || h < 10) return; // Canvas not ready yet
 
-        // The board and rack share one tile scale. The rack is a fixed
-        // 5 × 2 continuation of the board rather than a miniature strip.
+        // The board and rack share one tile scale. The rack is always a
+        // two-row continuation with the same number of columns as the board.
         const margin = 8;
         const separatorGap = 12;
-        const layoutColumns = Math.max(this.cols, this.rackColumns);
-        const layoutRows = this.rows + this.rackRows;
-        const availableW = w - margin * 2;
-        const availableH = h - margin * 2 - separatorGap - this.rackPadding * 2;
-
-        this.cellSize = Math.max(1, Math.floor(Math.min(
-            availableW / layoutColumns,
-            availableH / layoutRows
-        )));
+        this.cellSize = this.calculateCellSize(w, h);
 
         const boardWidth = this.cellSize * this.cols;
         const boardHeight = this.cellSize * this.rows;
@@ -104,6 +112,19 @@ export class BoardScene extends Phaser.Scene {
         this.rackAreaH = rackHeight;
     }
 
+    calculateCellSize(width, height) {
+        const margin = 8;
+        const separatorGap = 12;
+        const layoutColumns = Math.max(this.cols, this.rackColumns);
+        const layoutRows = this.rows + this.rackRows;
+        const availableW = width - margin * 2;
+        const availableH = height - margin * 2 - separatorGap - this.rackPadding * 2;
+        return Math.max(1, Math.floor(Math.min(
+            availableW / layoutColumns,
+            availableH / layoutRows
+        )));
+    }
+
     rebuildAll() {
         // Destroy everything and recreate
         this.children.removeAll(true);
@@ -113,6 +134,7 @@ export class BoardScene extends Phaser.Scene {
         this.ghostSprite = null;
         this.rackSprites = [];
         this.rackSlotSprites = [];
+        this.hintBadges = [];
         this.boardContainer = null;
         this.rackContainer = null;
 
@@ -129,6 +151,7 @@ export class BoardScene extends Phaser.Scene {
         if (this.rackPieces.length > 0) {
             this.renderRack();
         }
+        if (this.activeHint) this.updateHint(this.activeHint, { playSound: false });
     }
 
     createRenderLayers() {
@@ -232,6 +255,15 @@ export class BoardScene extends Phaser.Scene {
         this.time.delayedCall(0, () => {
             this.rackRenderQueued = false;
             this.renderRack();
+        });
+    }
+
+    queueBoardRender() {
+        if (this.boardRenderQueued) return;
+        this.boardRenderQueued = true;
+        this.time.delayedCall(0, () => {
+            this.boardRenderQueued = false;
+            if (this.gameState) this.renderPieces(this.gameState);
         });
     }
 
@@ -349,14 +381,20 @@ export class BoardScene extends Phaser.Scene {
     }
 
     updateRackSelection() {
-        this.rackSprites.forEach(({ bg, piece }) => {
+        this.rackSprites.forEach(({ container, bg, piece }) => {
             if (!bg || !piece) return;
             const isSelected = this.selectedPieceId === piece.id;
+            const isHinted = this.hintPieceIds.has(piece.id);
             bg.setStrokeStyle(
-                isSelected ? 3 : 2,
-                isSelected ? 0xfbbf24 : 0x4a3b6e,
+                isSelected ? 4 : isHinted ? 4 : 2,
+                isSelected ? 0xfbbf24 : isHinted ? 0x22d3ee : 0x4a3b6e,
                 1
             );
+            if (container) {
+                this.tweens.killTweensOf(container);
+                container.setScale(isHinted ? 1.06 : 1);
+                container.setAlpha(this.hintPieceIds.size > 0 && !isHinted ? 0.34 : 1);
+            }
         });
     }
 
@@ -401,7 +439,7 @@ export class BoardScene extends Phaser.Scene {
     }
 
     updateSettings(settings, ghostImage) {
-        this.settings = settings;
+        this.settings = settings || {};
         this.ghostImageUrl = ghostImage;
         if (ghostImage && settings?.showGhostImage) {
             this.loadGhostImage();
@@ -457,7 +495,7 @@ export class BoardScene extends Phaser.Scene {
             if (piece.imageData) {
                 const textureKey = `piece_${piece.id}`;
                 if (!this.textures.exists(textureKey)) {
-                    this.loadTexture(textureKey, piece.imageData, () => this.renderPieces(this.gameState));
+                    this.loadTexture(textureKey, piece.imageData, () => this.queueBoardRender());
                 } else {
                     this.createPieceSprite(textureKey, piece, index, x, y);
                 }
@@ -468,7 +506,7 @@ export class BoardScene extends Phaser.Scene {
                 rect.setData('gridIndex', index);
                 rect.setDepth(1);
                 this.pieceSprites[index] = rect;
-                this.playSnapAnimation(rect);
+                this.animatePlacementOnce(rect, piece, index);
             }
 
             // Dim the cell
@@ -512,7 +550,17 @@ export class BoardScene extends Phaser.Scene {
         }
 
         this.pieceSprites[index] = sprite;
-        this.playSnapAnimation(sprite);
+        this.animatePlacementOnce(sprite, piece, index);
+    }
+
+    animatePlacementOnce(target, piece, index) {
+        const placementKey = `${piece.id}:${index}`;
+        if (this.animatedPlacements.has(placementKey)) {
+            target.setAlpha(1);
+            return;
+        }
+        this.animatedPlacements.add(placementKey);
+        this.playSnapAnimation(target);
     }
 
     // ========== MARKS ==========
@@ -552,83 +600,99 @@ export class BoardScene extends Phaser.Scene {
 
     // ========== HINT HIGHLIGHTING ==========
 
-    updateHint(hint) {
+    updateHint(hint, { playSound = true } = {}) {
         this.clearHintHighlights();
+        this.activeHint = hint || null;
         if (!hint) return;
 
-        switch (hint.type) {
-            case 'position': {
-                const idx = hint.correctPosition;
-                if (this.cellSprites[idx]) {
-                    this.cellSprites[idx].setFillStyle(0xfbbf24, 0.5);
-                    this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 1);
-                    this.hintCells = [idx];
-                }
-                break;
-            }
-            case 'edge': {
-                const cells = [];
-                for (let i = 0; i < this.rows * this.cols; i++) {
-                    const r = Math.floor(i / this.cols), c = i % this.cols;
-                    if (r === 0 || r === this.rows - 1 || c === 0 || c === this.cols - 1) cells.push(i);
-                }
-                cells.forEach(idx => {
-                    if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
-                        this.cellSprites[idx].setFillStyle(0xfbbf24, 0.35);
-                        this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 0.8);
-                    }
-                });
-                this.hintCells = cells;
-                break;
-            }
-            case 'corner': {
-                const corners = [0, this.cols - 1, this.cols * (this.rows - 1), this.rows * this.cols - 1];
-                corners.forEach(idx => {
-                    if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
-                        this.cellSprites[idx].setFillStyle(0xfbbf24, 0.5);
-                        this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 1);
-                    }
-                });
-                this.hintCells = corners;
-                break;
-            }
-            case 'region': {
-                const { rowStart, rowEnd, colStart, colEnd } = hint.region || {};
-                const cells = [];
-                for (let r = rowStart; r <= rowEnd; r++) {
-                    for (let c = colStart; c <= colEnd; c++) {
-                        const idx = r * this.cols + c;
-                        if (this.cellSprites[idx] && !this.gameState?.grid?.[idx]) {
-                            this.cellSprites[idx].setFillStyle(0xfbbf24, 0.35);
-                            this.cellSprites[idx].setStrokeStyle(2, 0xfbbf24, 0.8);
-                            cells.push(idx);
-                        }
-                    }
-                }
-                this.hintCells = cells;
-                break;
-            }
-        }
+        this.hintPieceIds = new Set(hint.pieceIds || []);
+        this.updateRackSelection();
 
-        // Pulse
-        (this.hintCells || []).forEach(idx => {
-            const cell = this.cellSprites[idx];
+        this.rackSprites.forEach(({ container, piece }) => {
+            if (!container || !this.hintPieceIds.has(piece?.id)) return;
+            const badge = this.add.container(-this.cellSize / 2 + 10, -this.cellSize / 2 + 10);
+            const circle = this.add.circle(0, 0, Math.max(8, this.cellSize * 0.12), 0x22d3ee, 1);
+            const label = this.add.text(0, 0, '1', {
+                fontSize: `${Math.max(10, this.cellSize * 0.18)}px`,
+                color: '#082f49',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            badge.add([circle, label]);
+            badge.setDepth(20);
+            container.add(badge);
+            this.hintBadges.push(badge);
+        });
+
+        const cells = Array.isArray(hint.cellIndices) ? hint.cellIndices : [];
+        this.cellSprites.forEach((cell, index) => {
+            if (!cells.includes(index)) cell.setAlpha(0.42);
+        });
+        cells.forEach(index => {
+            const cell = this.cellSprites[index];
             if (!cell) return;
+            const isExact = hint.type === 'position';
+            cell.setFillStyle(0xfbbf24, isExact ? 0.58 : 0.3);
+            cell.setStrokeStyle(isExact ? 3 : 2, isExact ? 0xfbbf24 : 0x22d3ee, 0.95);
+        });
+        this.hintCells = cells.filter(index => !!this.cellSprites[index]);
+
+        this.hintCells.forEach(index => {
+            const row = Math.floor(index / this.cols);
+            const col = index % this.cols;
+            const x = this.boardOffsetX + col * this.cellSize + 10;
+            const y = this.boardOffsetY + row * this.cellSize + 10;
+            const isExact = index === hint.targetCellIndex;
+            const badge = this.add.container(x, y);
+            const circle = this.add.circle(
+                0, 0,
+                Math.max(8, this.cellSize * 0.12),
+                isExact ? 0xfbbf24 : 0x22d3ee,
+                1
+            );
+            const label = this.add.text(0, 0, '1', {
+                fontSize: `${Math.max(10, this.cellSize * 0.18)}px`,
+                color: '#082f49',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            badge.add([circle, label]);
+            badge.setDepth(20);
+            this.boardContainer?.add(badge);
+            this.hintBadges.push(badge);
+        });
+
+        this.hintCells.forEach(index => {
+            const cell = this.cellSprites[index];
+            this.tweens.killTweensOf(cell);
             this.tweens.add({
-                targets: cell, fillAlpha: 0.8,
-                duration: 700, yoyo: true, repeat: 3,
+                targets: cell,
+                fillAlpha: 0.78,
+                duration: this.settings?.reducedMotion ? 1 : 650,
+                yoyo: !this.settings?.reducedMotion,
+                repeat: this.settings?.reducedMotion ? 0 : 3,
                 ease: 'Sine.easeInOut'
             });
         });
 
-        this.time.delayedCall(5000, () => this.clearHintHighlights());
+        if (playSound) this.playSoundEffect('hint');
+        const remaining = Math.max(250, (hint.expiresAt || Date.now() + (hint.duration || 5000)) - Date.now());
+        this.hintTimeout = this.time.delayedCall(remaining, () => {
+            this.hintTimeout = null;
+            this.clearHintHighlights(false);
+        });
     }
 
-    clearHintHighlights() {
-        (this.hintCells || []).forEach(idx => {
-            const cell = this.cellSprites[idx];
+    clearHintHighlights(cancelTimer = true) {
+        this.activeHint = null;
+        if (cancelTimer && this.hintTimeout) {
+            this.hintTimeout.remove(false);
+            this.hintTimeout = null;
+        }
+
+        (this.hintCells || []).forEach(index => {
+            const cell = this.cellSprites[index];
             if (!cell) return;
-            const piece = this.gameState?.grid?.[idx];
+            this.tweens.killTweensOf(cell);
+            const piece = this.gameState?.grid?.[index];
             if (piece) {
                 cell.setFillStyle(0x2d1f5e, 0.3);
                 cell.setStrokeStyle(1, 0x6c5ce7, 0.6);
@@ -637,12 +701,84 @@ export class BoardScene extends Phaser.Scene {
                 cell.setStrokeStyle(1, 0x4a3b6e, 0.5);
             }
         });
+
         this.hintCells = [];
+        this.hintPieceIds = new Set();
+        this.hintBadges.forEach(badge => badge?.destroy());
+        this.hintBadges = [];
+        this.cellSprites.forEach(cell => cell?.setAlpha(1));
+        this.updateRackSelection();
+    }
+
+    playSoundEffect(kind) {
+        playGameSound(kind, this.settings);
+    }
+
+    playGameplayEffect(event) {
+        if (!event?.id || event.id === this.lastGameplayEffectId) return;
+        this.lastGameplayEffectId = event.id;
+
+        switch (event.type) {
+            case 'piece_selected':
+                this.playSoundEffect('select');
+                break;
+            case 'piece_placed':
+                this.pulseCell(event.gridIndex);
+                this.playSoundEffect('place');
+                break;
+            case 'milestone_reveal':
+                (event.correctCells || []).forEach(index => this.playCorrectGlow(index));
+                (event.removedCells || []).forEach(index => this.playEjectAnimation(index));
+                if (typeof event.points === 'number' && event.points !== 0) {
+                    this.playScorePopup(event.anchorCell ?? 0, event.points, event.breakdown);
+                }
+                if (event.streak >= 3) this.playStreakEffect(event.streak);
+                this.playSoundEffect((event.removedCells || []).length ? 'failure' : 'success');
+                break;
+            case 'check_concealed':
+                this.pulseCell(event.gridIndex);
+                this.playSoundEffect('place');
+                break;
+            case 'placement_rejected':
+                this.playShakeAnimation(event.gridIndex);
+                this.playSoundEffect('reject');
+                break;
+            case 'hint_activated':
+                // updateHint owns the visual pulse and sound.
+                break;
+            case 'check_resolved':
+                if (event.outcome === 'successful_check' || event.outcome === 'opponent_passed_incorrect') {
+                    this.playEjectAnimation(event.gridIndex);
+                    this.playSoundEffect('failure');
+                } else {
+                    this.playCorrectGlow(event.gridIndex);
+                    this.playSoundEffect('success');
+                }
+                break;
+            case 'rack_refilled':
+                this.playRefillAnimation();
+                this.playSoundEffect('refill');
+                break;
+            case 'streak_increased':
+                this.playStreakEffect(event.streak);
+                this.playSoundEffect('success');
+                break;
+            case 'game_completed':
+                this.cameras.main.flash(this.settings?.reducedMotion ? 1 : 500, 251, 191, 36, false);
+                this.playSoundEffect('complete');
+                break;
+            default:
+                break;
+        }
     }
 
     // ========== ANIMATIONS ==========
 
     playSnapAnimation(target) {
+        if (this.settings?.reducedMotion) {
+            target.setAlpha(1);
+            return;
+        }
         const targetScaleX = target.scaleX;
         const targetScaleY = target.scaleY;
         target.setScale(targetScaleX * 0.3, targetScaleY * 0.3);
@@ -709,7 +845,15 @@ export class BoardScene extends Phaser.Scene {
 
     playShakeAnimation(gridIndex) {
         const sprite = this.pieceSprites[gridIndex];
-        if (!sprite) return;
+        if (!sprite) {
+            this.pulseCell(gridIndex);
+            return;
+        }
+        if (this.settings?.reducedMotion) {
+            sprite.setTint(0xf87171);
+            this.time.delayedCall(180, () => sprite.clearTint());
+            return;
+        }
         this.tweens.add({
             targets: sprite,
             x: sprite.x - 4,
@@ -720,8 +864,21 @@ export class BoardScene extends Phaser.Scene {
 
     playEjectAnimation(gridIndex, onComplete) {
         const sprite = this.pieceSprites[gridIndex];
-        if (!sprite) { onComplete?.(); return; }
+        if (!sprite) {
+            this.pulseCell(gridIndex);
+            onComplete?.();
+            return;
+        }
         sprite.setTint(0xff4444);
+        if (this.settings?.reducedMotion) {
+            sprite.setAlpha(0);
+            this.time.delayedCall(100, () => {
+                sprite.destroy();
+                delete this.pieceSprites[gridIndex];
+                onComplete?.();
+            });
+            return;
+        }
         this.tweens.add({
             targets: sprite,
             scaleX: 0, scaleY: 0, alpha: 0, angle: 180,
@@ -749,11 +906,25 @@ export class BoardScene extends Phaser.Scene {
     pulseCell(gridIndex) {
         const cell = this.cellSprites[gridIndex];
         if (!cell) return;
+        this.tweens.killTweensOf(cell);
+        const restore = () => {
+            const piece = this.gameState?.grid?.[gridIndex];
+            cell.setFillStyle(piece ? 0x2d1f5e : 0x1a1130, piece ? 0.3 : 0.6);
+            cell.setStrokeStyle(1, piece ? 0x6c5ce7 : 0x4a3b6e, piece ? 0.6 : 0.5);
+        };
+        if (this.settings?.reducedMotion) {
+            cell.setStrokeStyle(2, 0xfbbf24, 0.9);
+            this.time.delayedCall(160, restore);
+            return;
+        }
         this.tweens.add({
-            targets: cell, fillAlpha: 0.9,
-            duration: 400, yoyo: true, repeat: 2,
+            targets: cell,
+            fillAlpha: 0.9,
+            duration: 400,
+            yoyo: true,
+            repeat: 2,
             ease: 'Sine.easeInOut',
-            onComplete: () => cell.setFillStyle(0x1a1130, 0.6)
+            onComplete: restore
         });
     }
 
@@ -768,16 +939,17 @@ export class BoardScene extends Phaser.Scene {
         const hexColor = Phaser.Display.Color.GetColor(color.r, color.g, color.b);
         Object.values(this.pieceSprites).forEach(sprite => {
             sprite.setTint(hexColor);
-            this.time.delayedCall(300, () => sprite.clearTint());
+            this.time.delayedCall(this.settings?.reducedMotion ? 120 : 300, () => sprite.clearTint());
         });
     }
 
     playTimerUrgency(secondsLeft) {
         if (secondsLeft > 30) return;
-        this.cameras.main.flash(200, 255, 50, 50, false);
+        this.cameras.main.flash(this.settings?.reducedMotion ? 1 : 200, 255, 50, 50, false);
     }
 
     playRefillAnimation() {
+        if (this.settings?.reducedMotion) return;
         this.rackSprites.forEach(({ container }, i) => {
             if (!container) return;
             const targetX = container.x;

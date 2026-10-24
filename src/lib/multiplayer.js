@@ -147,7 +147,8 @@ export class MultiplayerGameHost {
         game.id,
         pieces,
         gridDimensions.totalPieces,
-        settings.mode || 'CLASSIC'
+        settings.mode || 'CLASSIC',
+        this.gameLogic
       );
 
       console.log('Step 6: Setting up realtime channel (broadcast)...');
@@ -308,6 +309,7 @@ export class MultiplayerGameHost {
       playerARack: gl.playerARack.map(p => p ? p.id : null),
       playerBRack: gl.playerBRack.map(p => p ? p.id : null),
       piecePool: gl.piecePool.map(p => p.id),
+      pieceOwners: gl.pieceOwners,
       currentTurn: gl.currentTurn,
       scores: gl.scores,
       revealedScores: gl.revealedScores,
@@ -321,7 +323,8 @@ export class MultiplayerGameHost {
       nextCheckRevealProgress: gl.nextCheckRevealProgress,
       piecePlacedBy: gl.piecePlacedBy,
       pieceMarks: gl.pieceMarks,
-      nexusResolved: gl.nexusResolved
+      nexusResolved: gl.nexusResolved,
+      lastGameplayEvent: gl.lastGameplayEvent
     };
 
     try {
@@ -422,25 +425,23 @@ export class MultiplayerGameHost {
       throw new Error(result.message);
     }
 
+    this.gameLogic.recordGameplayEvent('piece_placed', {
+      actor: currentPlayer,
+      pieceId,
+      gridIndex,
+      awaitingCheck: !!result.awaitingCheck
+    });
+
     // Broadcast FIRST for instant opponent update, then persist to DB in background
     await this.broadcastGameState();
 
     // DB writes in background — don't block the UI
     Promise.all([
       realtimeService.updateGameState(this.gameId, {
-        grid: this.gameLogic.grid.map(p => p ? {
-          id: p.id,
-          correctPosition: p.correctPosition
-        } : null),
-        player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
-        player_b_rack: this.gameLogic.playerBRack.map(p => p ? p.id : null),
-        piece_pool: this.gameLogic.piecePool.map(p => p.id),
+        ...this.gameLogic.exportForDatabase(),
         // In Nexus: don't broadcast turn or awaiting_decision — truly simultaneous
         current_turn: isNexus ? null : this.gameLogic.currentTurn,
-        pending_check: isNexus ? null : this.gameLogic.pendingCheck,
         awaiting_decision: isNexus ? null : (result.awaitingCheck ? 'opponent_check' : null),
-        move_history: this.gameLogic.moveHistory,
-        timer_remaining: this.gameLogic.timerRemaining
       }),
       gameService.updateGame(this.gameId, {
         player_a_score: this.gameLogic.scores.playerA.score,
@@ -452,10 +453,41 @@ export class MultiplayerGameHost {
     return result;
   }
 
+  async useHint(hintType) {
+    if (!this.gameLogic) throw new Error('Game not initialized');
+
+    const result = this.gameLogic.useHint('playerA', hintType);
+    if (!result.success) return result;
+
+    // Synchronize the public cost/count only. The private hint payload is
+    // returned to this player and is never included in the broadcast.
+    await this.broadcastGameState();
+    Promise.all([
+      realtimeService.updateGameState(this.gameId, this.gameLogic.exportForDatabase()),
+      gameService.updateGame(this.gameId, {
+        player_a_score: this.gameLogic.scores.playerA.score,
+        player_a_accuracy: this.gameLogic.scores.playerA.accuracy,
+        player_a_streak: this.gameLogic.scores.playerA.streak
+      })
+    ]).catch(err => console.error('Failed to persist player A hint usage:', err));
+
+    return result;
+  }
+
   async respondToCheck(decision) {
     if (!this.gameLogic) throw new Error('Game not initialized');
 
+    const pending = this.gameLogic.pendingCheck;
     const result = this.gameLogic.handleOpponentCheck('playerA', decision);
+    if (result.success) {
+      this.gameLogic.recordGameplayEvent(result.correctnessRevealed ? 'check_resolved' : 'check_concealed', {
+        actor: 'playerA',
+        gridIndex: pending?.gridIndex,
+        pieceId: pending?.pieceId,
+        decision,
+        outcome: result.result
+      });
+    }
 
     // Broadcast FIRST for instant opponent update
     await this.broadcastGameState();
@@ -754,6 +786,7 @@ export class MultiplayerGameGuest {
       playerARack: gl.playerARack.map(p => p ? p.id : null),
       playerBRack: gl.playerBRack.map(p => p ? p.id : null),
       piecePool: gl.piecePool.map(p => p.id),
+      pieceOwners: gl.pieceOwners,
       currentTurn: gl.currentTurn,
       scores: gl.scores,
       revealedScores: gl.revealedScores,
@@ -767,7 +800,8 @@ export class MultiplayerGameGuest {
       nextCheckRevealProgress: gl.nextCheckRevealProgress,
       piecePlacedBy: gl.piecePlacedBy,
       pieceMarks: gl.pieceMarks,
-      nexusResolved: gl.nexusResolved
+      nexusResolved: gl.nexusResolved,
+      lastGameplayEvent: gl.lastGameplayEvent
     };
 
     try {
@@ -816,25 +850,23 @@ export class MultiplayerGameGuest {
       throw new Error(result.message);
     }
 
+    this.gameLogic.recordGameplayEvent('piece_placed', {
+      actor: currentPlayer,
+      pieceId,
+      gridIndex,
+      awaitingCheck: !!result.awaitingCheck
+    });
+
     // Broadcast FIRST for instant host update, then persist to DB in background
     await this.broadcastGameState();
 
     // DB writes in background — don't block the UI
     Promise.all([
       realtimeService.updateGameState(this.gameId, {
-        grid: this.gameLogic.grid.map(p => p ? {
-          id: p.id,
-          correctPosition: p.correctPosition
-        } : null),
-        player_a_rack: this.gameLogic.playerARack.map(p => p ? p.id : null),
-        player_b_rack: this.gameLogic.playerBRack.map(p => p ? p.id : null),
-        piece_pool: this.gameLogic.piecePool.map(p => p.id),
+        ...this.gameLogic.exportForDatabase(),
         // In Nexus: don't broadcast turn or awaiting_decision
         current_turn: isNexus ? null : this.gameLogic.currentTurn,
-        pending_check: isNexus ? null : this.gameLogic.pendingCheck,
         awaiting_decision: isNexus ? null : (result.awaitingCheck ? 'opponent_check' : null),
-        move_history: this.gameLogic.moveHistory,
-        timer_remaining: this.gameLogic.timerRemaining
       }),
       gameService.updateGame(this.gameId, {
         player_b_score: this.gameLogic.scores.playerB.score,
@@ -846,10 +878,41 @@ export class MultiplayerGameGuest {
     return result;
   }
 
+  async useHint(hintType) {
+    if (!this.gameLogic) throw new Error('Game not initialized');
+
+    const result = this.gameLogic.useHint('playerB', hintType);
+    if (!result.success) return result;
+
+    // Synchronize the public cost/count only. The private hint payload is
+    // returned to this player and is never included in the broadcast.
+    await this.broadcastGameState();
+    Promise.all([
+      realtimeService.updateGameState(this.gameId, this.gameLogic.exportForDatabase()),
+      gameService.updateGame(this.gameId, {
+        player_b_score: this.gameLogic.scores.playerB.score,
+        player_b_accuracy: this.gameLogic.scores.playerB.accuracy,
+        player_b_streak: this.gameLogic.scores.playerB.streak
+      })
+    ]).catch(err => console.error('Failed to persist player B hint usage:', err));
+
+    return result;
+  }
+
   async respondToCheck(decision) {
     if (!this.gameLogic) throw new Error('Game not initialized');
 
+    const pending = this.gameLogic.pendingCheck;
     const result = this.gameLogic.handleOpponentCheck('playerB', decision);
+    if (result.success) {
+      this.gameLogic.recordGameplayEvent(result.correctnessRevealed ? 'check_resolved' : 'check_concealed', {
+        actor: 'playerB',
+        gridIndex: pending?.gridIndex,
+        pieceId: pending?.pieceId,
+        decision,
+        outcome: result.result
+      });
+    }
 
     // Broadcast FIRST for instant host update
     await this.broadcastGameState();

@@ -13,12 +13,16 @@ export const HINT_CONFIG = {
     corner: -3,
     region: -5
   },
-  MAX_HINTS_PER_GAME: 5
+  MAX_HINTS_PER_GAME: 5,
+  DURATION_MS: 5000
 };
 
 export const ACCESSIBILITY_DEFAULTS = {
   showGhostImage: false,
   showGridLabels: true,
   highlightEdges: true,
-  showMoveHistory: false
+  showMoveHistory: false,
+  soundEnabled: true,
+  soundVolume: 0.7,
+  reducedMotion: false
 };

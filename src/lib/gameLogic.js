@@ -153,9 +153,12 @@ export class GameLogic {
     this.pieces = pieces;
     this.grid = Array(this.totalPieces).fill(null);
     this.piecePool = [...pieces];
+    this.pieceOwners = {};
     this.playerARack = [];
     this.playerBRack = [];
-    this.rackCapacity = 10;
+    // Two rack rows, always matching the board width. A 5×5 board therefore
+    // holds 10 rack tiles, while a 10×10 board holds 20.
+    this.rackCapacity = Math.max(2, this.cols * 2);
     this.currentTurn = 'playerA';
     this.scores = {
       playerA: { score: 0, accuracy: 100, streak: 0, correctPlacements: 0, totalPlacements: 0, hintsUsed: 0 },
@@ -172,6 +175,9 @@ export class GameLogic {
     this.nextCheckRevealProgress = 0.2;
     this.timerRemaining = 600; // Default 10 minutes
     this.isPlacementInProgress = false; // Add placement lock
+    this.hintSequence = 0;
+    this.gameplayEventSequence = 0;
+    this.lastGameplayEvent = null;
 
     // Game mode support
     this.mode = mode || 'CLASSIC';
@@ -195,13 +201,42 @@ export class GameLogic {
   initialize() {
     // Shuffle the piece pool to randomize distribution
     this.piecePool = this.shufflePieces();
+    this.piecePool.forEach((piece, index) => {
+      this.pieceOwners[piece.id] = index % 2 === 0 ? 'playerA' : 'playerB';
+    });
     this.fillRack('playerA');
     this.fillRack('playerB');
     this.gameState = 'active';
   }
 
+  validateTileLocations() {
+    const locations = new Map();
+    const add = (piece, location) => {
+      if (!piece) return;
+      const existing = locations.get(piece.id) || [];
+      existing.push(location);
+      locations.set(piece.id, existing);
+    };
+
+    this.grid.forEach((piece, index) => add(piece, `grid:${index}`));
+    this.playerARack.forEach((piece, index) => add(piece, `playerA:${index}`));
+    this.playerBRack.forEach((piece, index) => add(piece, `playerB:${index}`));
+    this.piecePool.forEach((piece, index) => add(piece, `pool:${index}`));
+
+    const duplicates = [];
+    const missing = [];
+    this.pieces.forEach(piece => {
+      const pieceLocations = locations.get(piece.id) || [];
+      if (pieceLocations.length === 0) missing.push(piece.id);
+      if (pieceLocations.length > 1) duplicates.push({ pieceId: piece.id, locations: pieceLocations });
+    });
+
+    return { valid: duplicates.length === 0 && missing.length === 0, duplicates, missing };
+  }
+
   initializeSinglePlayer() {
     this.piecePool = this.shufflePieces();
+    this.piecePool.forEach(piece => { this.pieceOwners[piece.id] = 'playerA'; });
     this.playerARack = [];
     this.playerBRack = [];
     this.fillRack('playerA');
@@ -228,9 +263,14 @@ export class GameLogic {
     // Create new rack with actual pieces first
     const newRack = [...actualPieces];
 
-    // Add pieces from pool
+    // Add only pieces assigned to this player. This prevents simultaneous
+    // multiplayer refills from handing the same tile to both racks.
     for (let i = 0; i < needed && this.piecePool.length > 0; i++) {
-      const piece = this.piecePool.shift();
+      const poolIndex = this.piecePool.findIndex(piece => (
+        this.mode === 'SINGLE_PLAYER' || this.pieceOwners[piece.id] === player
+      ));
+      if (poolIndex === -1) break;
+      const [piece] = this.piecePool.splice(poolIndex, 1);
       if (piece) {
         newRack.push(piece);
       }
@@ -263,6 +303,7 @@ export class GameLogic {
       }
     }
 
+    this.pieceOwners[completePiece.id] = player;
     const returnedToRack = rack.filter(Boolean).length < this.rackCapacity;
     if (returnedToRack) {
       rack.push(completePiece);
@@ -442,14 +483,19 @@ export class GameLogic {
     const filledCells = this.grid.filter(cell => cell !== null && cell !== undefined).length;
     const progress = this.totalPieces > 0 ? filledCells / this.totalPieces : 0;
     if (progress < this.nextCheckRevealProgress) {
-      return { reached: false, removedCount: 0 };
+      return { reached: false, removedCount: 0, removedCells: [], correctCells: [] };
     }
 
     const returnedPieces = [];
+    const removedCells = [];
+    const correctCells = [];
     this.grid.forEach((piece, index) => {
       if (piece && piece.correctPosition !== index) {
         this.grid[index] = null;
         returnedPieces.push(piece);
+        removedCells.push(index);
+      } else if (piece) {
+        correctCells.push(index);
       }
     });
     this.piecePool = [...returnedPieces, ...this.piecePool];
@@ -457,7 +503,8 @@ export class GameLogic {
     const bucket = Math.floor(progress / 0.2);
     this.nextCheckRevealProgress = Math.min((bucket + 1) * 0.2, 1);
 
-    return { reached: true, removedCount: returnedPieces.length };
+    this.syncRevealedScores();
+    return { reached: true, removedCount: returnedPieces.length, removedCells, correctCells };
   }
 
   shouldRevealCheckAtCurrentProgress() {
@@ -692,7 +739,7 @@ export class GameLogic {
       const piece = this.grid[i];
       if (!piece) continue;
 
-      const placedBy = this.piecePlacedBy[i] || 'playerA';
+      const placedBy = this.getPlacementOwner(i, piece.id);
       const isCorrect = piece.correctPosition === i;
       const mark = this.pieceMarks[i];
 
@@ -738,12 +785,27 @@ export class GameLogic {
     this.syncRevealedScores();
     this.gameState = 'finished';
 
+    const winner = this.scores.playerA.score > this.scores.playerB.score
+      ? 'playerA'
+      : this.scores.playerB.score > this.scores.playerA.score ? 'playerB' : 'tie';
+
     return {
       success: true,
       results,
-      finalScores: { ...this.scores },
-      winner: this.getWinner()
+      finalScores: {
+        playerA: { ...this.scores.playerA },
+        playerB: { ...this.scores.playerB }
+      },
+      winner
     };
+  }
+
+  getPlacementOwner(gridIndex, pieceId) {
+    if (this.piecePlacedBy[gridIndex]) return this.piecePlacedBy[gridIndex];
+    const matchingMove = [...this.moveHistory].reverse().find(move => (
+      move.gridIndex === gridIndex && move.pieceId === pieceId
+    ));
+    return matchingMove?.player || 'playerA';
   }
 
   updateScore(player, points, isCorrectPlacement) {
@@ -961,6 +1023,13 @@ export class GameLogic {
   }
 
   getWinner() {
+    if (this.mode === 'NEXUS' && this.nexusResolved) {
+      const nexusScoreA = this.scores.playerA.score;
+      const nexusScoreB = this.scores.playerB.score;
+      if (nexusScoreA > nexusScoreB) return 'playerA';
+      if (nexusScoreB > nexusScoreA) return 'playerB';
+      return 'tie';
+    }
     if (!this.isGameComplete()) return null;
 
     const scoreA = this.scores.playerA.score;
@@ -980,21 +1049,27 @@ export class GameLogic {
     }
   }
 
+  recordGameplayEvent(type, payload = {}) {
+    const timestamp = Date.now();
+    this.lastGameplayEvent = {
+      id: `${type}-${timestamp}-${++this.gameplayEventSequence}`,
+      type,
+      timestamp,
+      ...payload
+    };
+    return this.lastGameplayEvent;
+  }
+
   useHint(player, hintType) {
-
     const score = this.scores[player];
-
-    // Check if player has exceeded hint limit
+    if (!score) {
+      return { success: false, message: 'Unknown player' };
+    }
+    if (this.gameState === 'finished' || this.isGameComplete()) {
+      return { success: false, message: 'Hints are unavailable after the game ends' };
+    }
     if (score.hintsUsed >= HINT_CONFIG.MAX_HINTS_PER_GAME) {
       return { success: false, message: 'Maximum hints used for this game' };
-    }
-
-    // Get hint information based on type
-    const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
-    const availablePieces = rack.filter(p => p !== null);
-
-    if (availablePieces.length === 0) {
-      return { success: false, message: 'No pieces available for hint' };
     }
 
     const validHintTypes = Object.keys(HINT_CONFIG.COSTS);
@@ -1002,73 +1077,126 @@ export class GameLogic {
       return { success: false, message: 'Unknown hint type' };
     }
 
-    // Get hint cost and deduct points only after validation passes
-    const cost = HINT_CONFIG.COSTS[hintType];
-    this.updateScore(player, cost, false);
-    score.hintsUsed++;
+    const rack = player === 'playerA' ? this.playerARack : this.playerBRack;
+    const availablePieces = rack.filter(Boolean);
+    if (availablePieces.length === 0) {
+      return { success: false, message: 'No pieces available for hint' };
+    }
 
-    let hintInfo = {};
+    const randomPiece = (pieces) => pieces[Math.floor(Math.random() * pieces.length)];
+    const actionablePieces = availablePieces.filter(piece => !this.grid[piece.correctPosition]);
+    const edgeCount = (piece) => {
+      const edges = piece.edges || {};
+      return [edges.top, edges.right, edges.bottom, edges.left].filter(Boolean).length;
+    };
+    const boardEdgeCells = [];
+    for (let index = 0; index < this.totalPieces; index++) {
+      const row = Math.floor(index / this.cols);
+      const col = index % this.cols;
+      if (row === 0 || row === this.rows - 1 || col === 0 || col === this.cols - 1) {
+        boardEdgeCells.push(index);
+      }
+    }
+    const cornerCells = [
+      0,
+      this.cols - 1,
+      this.cols * (this.rows - 1),
+      this.rows * this.cols - 1
+    ].filter((index, position, values) => values.indexOf(index) === position);
+
+    let pieceIds = [];
+    let cellIndices = [];
+    let region = null;
+    let targetCellIndex = null;
+
+    if (actionablePieces.length === 0) {
+      return {
+        success: false,
+        message: 'Every hinted destination is currently occupied. Wait for the next reveal to clear incorrect tiles.'
+      };
+    }
 
     switch (hintType) {
       case 'position': {
-        const hintPiece = availablePieces[Math.floor(Math.random() * availablePieces.length)];
-        hintInfo = {
-          type: 'position',
-          pieceId: hintPiece.id,
-          correctPosition: hintPiece.correctPosition
-        };
+        const piece = randomPiece(actionablePieces);
+        pieceIds = [piece.id];
+        cellIndices = [piece.correctPosition];
+        targetCellIndex = piece.correctPosition;
         break;
       }
       case 'edge': {
-        const edgePieces = availablePieces.filter((p) => {
-          const edges = p.edges || {};
-          const edgeCount = [edges.top, edges.right, edges.bottom, edges.left].filter(Boolean).length;
-          // Edge hints should exclude corner pieces (which have 2 edges).
-          return p.isEdge && edgeCount === 1;
-        });
-        hintInfo = {
-          type: 'edge',
-          edgePieceIds: edgePieces.map(p => p.id)
-        };
+        const pieces = actionablePieces.filter(piece => piece.isEdge && edgeCount(piece) === 1);
+        if (pieces.length === 0) {
+          return { success: false, message: 'No edge pieces are currently in your rack' };
+        }
+        const piece = randomPiece(pieces);
+        pieceIds = [piece.id];
+        cellIndices = boardEdgeCells.filter(index => !this.grid[index]);
         break;
       }
       case 'corner': {
-        const cornerPieces = availablePieces.filter(p => {
-          const edges = p.edges || {};
-          return (edges.top && edges.left) || (edges.top && edges.right) ||
-            (edges.bottom && edges.left) || (edges.bottom && edges.right);
-        });
-        hintInfo = {
-          type: 'corner',
-          cornerPieceIds: cornerPieces.map(p => p.id)
-        };
+        const pieces = actionablePieces.filter(piece => edgeCount(piece) >= 2);
+        if (pieces.length === 0) {
+          return { success: false, message: 'No corner pieces are currently in your rack' };
+        }
+        const piece = randomPiece(pieces);
+        pieceIds = [piece.id];
+        cellIndices = cornerCells.filter(index => !this.grid[index]);
         break;
       }
       case 'region': {
-        const hintPiece = availablePieces[Math.floor(Math.random() * availablePieces.length)];
-        const correctRow = Math.floor(hintPiece.correctPosition / this.cols);
-        const correctCol = hintPiece.correctPosition % this.cols;
-        hintInfo = {
-          type: 'region',
-          pieceId: hintPiece.id,
-          region: {
-            rowStart: Math.max(0, correctRow - 1),
-            rowEnd: Math.min(this.rows - 1, correctRow + 1),
-            colStart: Math.max(0, correctCol - 1),
-            colEnd: Math.min(this.cols - 1, correctCol + 1)
-          }
+        const piece = randomPiece(actionablePieces);
+        const correctRow = Math.floor(piece.correctPosition / this.cols);
+        const correctCol = piece.correctPosition % this.cols;
+        region = {
+          rowStart: Math.max(0, correctRow - 1),
+          rowEnd: Math.min(this.rows - 1, correctRow + 1),
+          colStart: Math.max(0, correctCol - 1),
+          colEnd: Math.min(this.cols - 1, correctCol + 1)
         };
+        pieceIds = [piece.id];
+        for (let row = region.rowStart; row <= region.rowEnd; row++) {
+          for (let col = region.colStart; col <= region.colEnd; col++) {
+            cellIndices.push(row * this.cols + col);
+          }
+        }
         break;
       }
       default:
         return { success: false, message: 'Unknown hint type' };
     }
 
+    // Charge only after an actionable hint has been created.
+    const cost = HINT_CONFIG.COSTS[hintType];
+    score.score += cost;
+    score.hintsUsed += 1;
+    // Hint costs are public actions, so show the deduction immediately without
+    // exposing any still-concealed placement score.
+    if (this.revealedScores[player]) {
+      this.revealedScores[player].score += cost;
+    }
+
+    const duration = HINT_CONFIG.DURATION_MS || 5000;
+    const createdAt = Date.now();
+    const hint = {
+      id: `${player}-hint-${createdAt}-${++this.hintSequence}`,
+      type: hintType,
+      player,
+      pieceIds,
+      cellIndices,
+      region,
+      targetCellIndex,
+      cost,
+      duration,
+      createdAt,
+      expiresAt: createdAt + duration
+    };
+
     return {
       success: true,
       cost,
       hintsUsed: score.hintsUsed,
-      hint: hintInfo
+      hint
     };
   }
 
@@ -1117,6 +1245,8 @@ export class GameLogic {
       turnsRemaining: { ...this.turnsRemaining },
       checksRemaining: { ...this.checksRemaining },
       nextCheckRevealProgress: this.nextCheckRevealProgress,
+      lastGameplayEvent: this.lastGameplayEvent ? { ...this.lastGameplayEvent } : null,
+      pieceOwners: { ...this.pieceOwners },
       // Nexus mode state
       piecePlacedBy: { ...this.piecePlacedBy },
       pieceMarks: { ...this.pieceMarks },
@@ -1137,6 +1267,12 @@ export class GameLogic {
       scores: this.scores,
       turns_remaining: this.turnsRemaining,
       checks_remaining: this.checksRemaining,
+      last_gameplay_event: this.lastGameplayEvent,
+      revealed_scores: this.revealedScores,
+      piece_placed_by: this.piecePlacedBy,
+      piece_marks: this.pieceMarks,
+      nexus_resolved: this.nexusResolved,
+      piece_owners: this.pieceOwners,
       // NOTE: gameplay_mode is only set during initializeGameState, not on updates
       // NOTE: 'pieces' exists but we don't update it after initialization
       // NOTE: 'awaiting_decision' is set separately in makeMove/respondToCheck
@@ -1220,6 +1356,22 @@ export class GameLogic {
       ? piecePoolData.map(item => getPieceFromIdOrObject(item)).filter(Boolean)
       : [];
 
+    this.pieceOwners = { ...(data.pieceOwners || data.piece_owners || {}) };
+    this.playerARack.forEach(piece => { if (piece) this.pieceOwners[piece.id] = 'playerA'; });
+    this.playerBRack.forEach(piece => { if (piece) this.pieceOwners[piece.id] = 'playerB'; });
+    if (Object.keys(this.pieceOwners).length < this.pieces.length) {
+      const counts = {
+        playerA: Object.values(this.pieceOwners).filter(owner => owner === 'playerA').length,
+        playerB: Object.values(this.pieceOwners).filter(owner => owner === 'playerB').length
+      };
+      this.piecePool.forEach(piece => {
+        if (this.pieceOwners[piece.id]) return;
+        const owner = counts.playerA <= counts.playerB ? 'playerA' : 'playerB';
+        this.pieceOwners[piece.id] = owner;
+        counts[owner]++;
+      });
+    }
+
     console.log('Piece pool import:', {
       piecePoolDataLength: piecePoolData.length,
       reconstructedPoolLength: this.piecePool.length,
@@ -1248,6 +1400,7 @@ export class GameLogic {
     this.gameState = data.game_state || data.gameState || 'active';
     this.pendingCheck = data.pending_check || data.pendingCheck || null;
     this.moveHistory = data.move_history || data.moveHistory || [];
+    this.lastGameplayEvent = data.last_gameplay_event || data.lastGameplayEvent || null;
 
     // Import mode data
     const importedMode = data.gameplay_mode || data.mode;
@@ -1264,7 +1417,15 @@ export class GameLogic {
     }
 
     // Import Nexus mode state
-    this.piecePlacedBy = data.piecePlacedBy || data.piece_placed_by || {};
+    this.piecePlacedBy = { ...(data.piecePlacedBy || data.piece_placed_by || {}) };
+    this.grid.forEach((piece, gridIndex) => {
+      if (piece && !this.piecePlacedBy[gridIndex]) {
+        this.piecePlacedBy[gridIndex] = this.getPlacementOwner(gridIndex, piece.id);
+      }
+      if (piece && !this.pieceOwners[piece.id]) {
+        this.pieceOwners[piece.id] = this.piecePlacedBy[gridIndex];
+      }
+    });
     this.pieceMarks = data.pieceMarks || data.piece_marks || {};
     this.nexusResolved = data.nexusResolved || data.nexus_resolved || false;
 
