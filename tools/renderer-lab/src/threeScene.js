@@ -81,7 +81,7 @@ export class AtlasThreeRenderer {
     const glb=(url)=>loader.loadAsync(url);
     const [assemble,planar,tile,image,glyph,base,normal,orm]=await Promise.all([
       glb(assembleGlbUrl),glb(planarGlbUrl),glb(tileGlbUrl),
-      textureLoader.loadAsync(assembleReferenceUrl),textureLoader.loadAsync(glyphUrl),
+      textureLoader.loadAsync(options?.imageUrl || assembleReferenceUrl),textureLoader.loadAsync(glyphUrl),
       loadImage(baseColorUrl),loadImage(normalUrl),loadImage(ormUrl),
     ]);
     if(this.disposed)return;
