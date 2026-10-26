@@ -4,7 +4,7 @@ import { GameLogic } from '../lib/gameLogic';
 import { ACCESSIBILITY_DEFAULTS } from '../lib/gameConfig';
 import HintsPanel from './HintsPanel';
 import GameSettingsPanel from './GameSettingsPanel';
-import { createSoloAtlasSession, isSoloAtlasEnabled } from '../lib/soloAtlasBridge';
+import { createEnabledSoloAtlasSession } from '../lib/soloAtlasBridge';
 
 const PhaserGame = lazy(() => import('./PhaserGame'));
 const AtlasSoloRenderer = lazy(() => import('./AtlasSoloRenderer'));
@@ -45,8 +45,7 @@ const SinglePlayerGame = ({
   const [activeHint, setActiveHint] = useState(null);
   const [preferAtlas3D, setPreferAtlas3D] = useState(false);
   const [atlas3DFailed, setAtlas3DFailed] = useState(false);
-  const atlasSession = useState(() => isSoloAtlasEnabled() && typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? createSoloAtlasSession(pieces, puzzleDimensions, () => crypto.randomUUID()) : null)[0];
+  const atlasSession = useState(() => createEnabledSoloAtlasSession(pieces, puzzleDimensions))[0];
 
   const timerRef = useRef(null);
   const feedbackTimeoutRef = useRef(null);

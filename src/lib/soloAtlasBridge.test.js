@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createSoloAtlasSession, isSoloAtlasEnabled } from './soloAtlasBridge.js';
+import { createEnabledSoloAtlasSession, createSoloAtlasSession, isSoloAtlasEnabled } from './soloAtlasBridge.js';
 import { GameLogic } from './gameLogic.js';
 
 const pieces=()=>Array.from({length:25},(_,id)=>({
@@ -19,6 +19,11 @@ describe('solo Atlas integration gates',()=>{
     expect(isSoloAtlasEnabled({})).toBe(false);
     expect(isSoloAtlasEnabled({VITE_ENABLE_LIVING_ATLAS_SOLO_3D:'false'})).toBe(false);
     expect(isSoloAtlasEnabled({VITE_ENABLE_LIVING_ATLAS_SOLO_3D:'true'})).toBe(true);
+  });
+  it('creates an enabled session without requiring secure-context browser crypto',()=>{
+    const enabled={VITE_ENABLE_LIVING_ATLAS_SOLO_3D:'true'};
+    expect(createEnabledSoloAtlasSession(pieces(),dims,enabled,()=> 'fallback123')).not.toBeNull();
+    expect(createEnabledSoloAtlasSession(pieces(),dims,{},()=> 'fallback123')).toBeNull();
   });
   it('rejects unsupported grid dimensions and incomplete piece registries',()=>{
     expect(createSoloAtlasSession(pieces(),{rows:8,cols:8,totalPieces:64})).toBeNull();

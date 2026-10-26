@@ -13,6 +13,11 @@ export function isSoloAtlasEnabled(env = import.meta.env) {
   return env?.VITE_ENABLE_LIVING_ATLAS_SOLO_3D === 'true';
 }
 
+export function createEnabledSoloAtlasSession(pieces, dimensions, env = import.meta.env, createNonce) {
+  if (!isSoloAtlasEnabled(env)) return null;
+  return createSoloAtlasSession(pieces, dimensions, createNonce);
+}
+
 export function createSoloAtlasSession(pieces, dimensions, createNonce = () => Math.random().toString(36).slice(2)) {
   if (dimensions?.rows !== 5 || dimensions?.cols !== 5 ||
       dimensions?.totalPieces !== 25 ||
